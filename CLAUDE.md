@@ -75,7 +75,33 @@ The repo was renamed from `sharetribe-template` to **`revie-dev`** so it matches
 This repo tracks `sharetribe/web-template` as the `upstream` git remote (origin is `regan-revie/revie-dev`) and periodically merges upstream releases — `v12.3.0` was the most recent. To keep those merges painless, prefer **adding new files** over editing core `src/` files, and concentrate custom logic in `server/api/`, `ext/`, and clearly named new modules. When a core file genuinely must change, keep the diff small and leave a comment explaining why.
 
 ## Who you're working with
-Regan is the founder of Revie. Philip is the technical collaborator handling engineering on this project (not the founder) — he's comfortable with git, GitHub, and the command line from data-analysis work, but is newer to web development and React/Redux specifically. Explain web-dev-specific concepts as you go rather than assuming prior front-end experience. Favor small, reviewable changes with clear commit messages — this will become a live business, and Philip needs to be able to follow what changed and why.
+
+Regan is the founder of Revie and is doing the engineering on this project
+herself. Her background is marketing and go-to-market leadership (ex-Google,
+ex-Head of EMEA Marketing at Chainalysis), plus coaching — not software
+engineering. She can run commands, follow a diff, and reason about
+architecture, but she is not a web developer.
+
+What this means in practice:
+
+- **Define jargon inline, briefly.** Not a lecture, half a sentence. "the
+  reducer (the function that updates Redux state)" is the right density.
+- **Say what a change does before saying how.** Lead with the effect on the
+  product, then the implementation.
+- **Explain React, Redux, CSS-modules and build-tooling concepts as they come
+  up** rather than assuming prior front-end experience.
+- **Flag when something is a judgement call versus a standard practice**, so
+  she knows where her opinion is needed and where it isn't.
+- **Small, reviewable changes with clear commit messages.** This is becoming a
+  live business and she needs to be able to follow what changed and why —
+  including months later, and including when handing work to someone else.
+- **Push back.** If an approach is wrong, say so before building it. Being
+  agreeable costs her more than being blunt does.
+
+Philip Gradwell is a technical collaborator and advisor who has worked on this
+repo previously — much of the Nylas integration and the decisions recorded in
+this file are his. He is not currently the one driving day-to-day work. If a
+change would invalidate something he built or decided, say so explicitly.
 
 ## The six requirements that shaped the calendar decision
 Sharetribe's built-in calendar can't do these:
