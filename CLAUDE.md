@@ -5,6 +5,30 @@ This repo is a fork of `sharetribe/web-template`, the client app for a coach<>cl
 ## Goal
 Replace/extend Sharetribe's built-in booking calendar with a real calendar/scheduling integration (Nylas), so clients book coaching sessions against a coach's actual connected calendar while Sharetribe continues to handle listings, coach<>client matching, and payment (Stripe Connect, via Sharetribe).
 
+## Current focus
+
+The active phase is design-system work, not feature work.
+
+The Nylas calendar integration is NOT complete. It reached a real milestone —
+the first end-to-end booking succeeded — but it remains on the active
+jobs-to-be-done list. Everything documented about it in this file is still
+accurate and still needed.
+
+Building it surfaced a separate problem: the UI came out clunky and off-brand.
+The cause isn't the booking components. Nothing underneath them has ever been
+branded — configBranding.js still imports Sharetribe's biketribe demo assets,
+and marketplaceDefaults.css is entirely stock (purple marketplace colour, green
+primary button, system fonts, 2px corners, bluish-cold greys). Any feature
+built on that foundation comes out looking wrong, and correcting it
+per-component means correcting it forever.
+
+So feature work is paused while a Revie token layer goes in. Nylas UI work
+resumes on top of it once tokens land, and every feature after that ships
+on-brand by default.
+
+Do not condense, tidy or reorganise the existing Nylas documentation. It
+records traps that were expensive to find and all of it stays.
+
 ## Working in this repo
 
 ### Commands
