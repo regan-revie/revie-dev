@@ -11,7 +11,55 @@
   composes: buttonPrimary from global;
 
   /* Clear padding that is set for link elements looking like buttons */
-  padding: 0;
+  padding: 16px 24px;
+
+  @media (--viewportMedium) {
+    padding: 20px 40px;
+  }
+
+  /* Brand CTA treatment, matched against the real buttons on heyrevie.com
+     (measured live: 14px Schibsted Grotesk 500, uppercase, 1px letter-
+     spacing, 20px/40px padding, fully rounded at that height). */
+  font-family: var(--fontFamilySecondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 14px;
+
+  /* Pill shape, applied unconditionally so disabled doesn't change shape
+     when the button becomes enabled. */
+  border-radius: var(--borderRadiusPill);
+
+  /* Buttons are width: 100% of their container, so in a wide panel a short
+     label becomes a stretched bar. 565px is the widest width checked live
+     that still read as a pill (the settings-page column, which is also the
+     booking form's); at 800px it did not. Left-aligned so it lines up with
+     form fields rather than floating in the middle. */
+  max-width: 565px;
+
+  /* Ground (lavender) comes from Console's marketplaceColors.primaryButton -
+     not set here. Label is maroon, overriding buttonPrimary's --colorWhite
+     above: white-on-lavender measures ~1.8:1 and fails WCAG. */
+  color: var(--revieMaroon);
+
+  /* colorPrimaryButtonDark is not used: mergeBranding derives it as
+     marketplaceColor's own dark variant does (-10% HSL lightness), which
+     clips to black for a color this dark already - see the marketplaceColor
+     finding above. Referencing --reviePink/--revieMaroon directly
+     sidesteps that entirely. Hover is pink to match heyrevie.com's live CTA
+     hover (measured rgb(255,144,194)); maroon on pink is 8.64:1. Hover and
+     focus share the same colors so keyboard and mouse match; focus
+     additionally gets a visible ring (buttonPrimary above sets
+     outline: none, so this replaces rather than removes it). */
+  &:hover,
+  &:focus {
+    background-color: var(--reviePink);
+    color: var(--revieMaroon);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieMaroon);
+    outline-offset: 2px;
+  }
 }
 
 .primaryButtonInlineRoot {
@@ -21,10 +69,44 @@
 .secondaryButtonRoot {
   composes: buttonSecondary from global;
 
-  /* We must lift up the text from the center since it looks better with
-   the button border. Also clears the top padding set for link
-   elements looking like buttons */
-  padding: 0 0 2px 0;
+  /* Same pill shape and padding as primaryButtonRoot, so the two sit at the
+     same size next to each other. */
+  padding: 16px 24px;
+
+  @media (--viewportMedium) {
+    padding: 20px 40px;
+  }
+
+  font-family: var(--fontFamilySecondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 14px;
+
+  border-radius: var(--borderRadiusPill);
+
+  /* Same cap as primaryButtonRoot so the two stay the same width when they
+     sit in the same panel. */
+  max-width: 565px;
+
+  /* Outlined maroon, not lavender: lavender ground now belongs to the
+     primary button, so secondary needs to read as clearly different next
+     to it rather than just "primary, disabled-looking". Overrides
+     buttonSecondary's colorGrey100 border and colorGrey700 text above. */
+  background-color: transparent;
+  border: 1px solid var(--revieMaroon);
+  color: var(--revieMaroon);
+
+  &:hover,
+  &:focus {
+    background-color: var(--revieLavender);
+    color: var(--revieMaroon);
+    border-color: var(--revieMaroon);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieMaroon);
+    outline-offset: 2px;
+  }
 }
 
 .secondaryButtonInlineRoot {

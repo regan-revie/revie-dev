@@ -51,7 +51,7 @@
 }
 
 :global(.image-gallery-slide-wrapper) {
-  background-color: var(--colorWhite);
+  background-color: var(--colorGrey50);
   border-bottom: 1px solid var(--colorGrey100);
 
   @media (--viewportMedium) {
@@ -62,7 +62,7 @@
 }
 
 :global(.fullscreen) {
-  background-color: var(--colorWhite) !important;
+  background-color: var(--colorGrey50) !important;
 
   & :global(.image-gallery-slide-wrapper) {
     background-color: transparent;

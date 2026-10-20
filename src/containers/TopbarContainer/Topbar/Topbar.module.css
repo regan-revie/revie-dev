@@ -50,7 +50,7 @@
   align-items: center;
 
   /* fill */
-  background-color: var(--colorWhite);
+  background-color: var(--revieMaroon);
 
   /* shadows */
   box-shadow: var(--boxShadow);
