@@ -7,6 +7,17 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Body font is Bio Sans
+**Date:** Oct 20, 2026
+**Decision:** Bio Sans is the body font. Regan has added the files to the fonts folder. Inter is no longer a stand-in.
+**Affects:** `--fontFamily` in `revieTokens.css`, `@font-face` rules, `public/index.html`
+
+### DECISION: Colours follow the brand guidelines
+**Date:** Oct 20, 2026
+**Decision:** Maroon and lavender are the primary colours. Every text/background combination must be an approved pairing from `docs/brand.md`. Primary button: maroon ground, off-white label. Secondary: lavender ground, maroon label. Pink is hover/accent only. Orange is accent only.
+**Why:** The guidelines are the source of truth. This replaces the lavender-primary / outlined-maroon setup currently in the code.
+**Affects:** `--colorPrimaryButton*`, `--colorSecondaryButton*` in `revieTokens.css`
+
 ### DECISION: Use the real brand fonts
 **Date:** Oct 20, 2026
 **Decision:** TT Commons Pro (headlines), Bio Sans (body), Schibsted Grotesk (CTAs, all caps). We own or have permissions for all three. Replaces the September Hanken Grotesk / Inter substitutes.
