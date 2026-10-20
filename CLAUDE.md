@@ -29,6 +29,12 @@ on-brand by default.
 Do not condense, tidy or reorganise the existing Nylas documentation. It
 records traps that were expensive to find and all of it stays.
 
+**Branding assets differ by Sharetribe environment.** Dev uses the cream
+desktop wordmark because this repo's topbar is maroon. Live must keep the
+maroon wordmark: Live runs Sharetribe's hosted frontend with a white topbar
+and none of this repo's CSS, so a cream logo there would be invisible. Do not
+copy Dev branding to Live until Live runs this codebase (post-Extend).
+
 ## Working in this repo
 
 ### Commands
@@ -185,6 +191,7 @@ Sharetribe's built-in calendar can't do these:
   Note there is a `Sharetribe` item in the `Revie` 1Password vault, separate from `sharetribe_dev_id` / `sharetribe_dev_secret` in `Revie Dev`, which is presumably the live application's credentials.
 - **When does the app leave Sandbox?** Nothing in the integration can carry Revie branding or narrowed scopes until it does, so this gates the polish rather than the build. It must happen before real coaches connect.
 - (Superseded, no longer relevant: an earlier question about Cal.com's "active user billing" vs "high water mark" billing — moot now that we've moved to Nylas.)
+- **Should Signature Sessions have their own photos at all, or show the coach's headshot instead?** Found while auditing the design-system work: session listings currently have no real photography — the "Test Session" listing's image is the Revie logo itself, uploaded as a stand-in during earlier testing, not a deliberate fallback. The stock no-image placeholder (`NoImageIcon.js`) is a generic, unbranded picture-frame SVG. A client is booking a person, not an object, so a headshot-first treatment may fit better than the template's default photo-gallery assumption. Decide before onboarding coaches at scale.
 
 ## Current state — Phase 1 done, Phase 2's booking loop verified end to end
 **Phase 1 is proven.** The stock template runs locally against the `revie_dev` environment: `yarn dev` serves the frontend on :3000 and the API server on :3500, 1Password resolves both Sharetribe credentials through `op run`, the hosted config assets load from the Marketplace API, and the app renders in the browser. The repo is no longer a bare fork: `server/api/nylas/` holds the webhook receiver and the coach calendar connect flow, `render.yaml` defines the deployed service, and `server/apiRouter.js` and `server/index.js` carry small, commented changes to wire them in. Everything else is still upstream.
@@ -233,8 +240,9 @@ Still outstanding for Phase 2:
 
 Also currently incomplete: `REACT_APP_STRIPE_PUBLISHABLE_KEY` and `REACT_APP_MAPBOX_ACCESS_TOKEN` are both empty in `.env`. Stripe is needed before any payment flow can be tested end to end.
 
-## Backlog — next project after this one: discount codes
-Not in scope yet, but worth keeping the architecture compatible: Regan wants discount codes, and there's an existing Stripe integration via Sharetribe. The planned approach (confirmed against Sharetribe's own docs, which use "validating a discount code" as their canonical example for privileged transitions): client submits a code with the booking request → the trusted backend (the same one built for the calendar integration) validates it against a small store of valid codes → backend calls a privileged transition (`privileged-set-line-items`) to recompute Sharetribe's line items with a discount line item → Sharetribe charges the discounted total through its existing Stripe Connect flow, unchanged. No need to touch Stripe's own Coupon/PromotionCode objects. When this project starts, it should mostly be "one more privileged transition + a table of codes" on top of the backend this project builds — don't build the calendar backend in a way that makes that harder later.
+## Backlog
+- **Next project after this one: discount codes.** Not in scope yet, but worth keeping the architecture compatible: Regan wants discount codes, and there's an existing Stripe integration via Sharetribe. The planned approach (confirmed against Sharetribe's own docs, which use "validating a discount code" as their canonical example for privileged transitions): client submits a code with the booking request → the trusted backend (the same one built for the calendar integration) validates it against a small store of valid codes → backend calls a privileged transition (`privileged-set-line-items`) to recompute Sharetribe's line items with a discount line item → Sharetribe charges the discounted total through its existing Stripe Connect flow, unchanged. No need to touch Stripe's own Coupon/PromotionCode objects. When this project starts, it should mostly be "one more privileged transition + a table of codes" on top of the backend this project builds — don't build the calendar backend in a way that makes that harder later.
+- **Coach profile URLs are `/u/{uuid}`.** Coach profiles are a primary SEO surface, and a UUID doesn't read as a real product. Making them `/u/{name-slug}` requires: a slug field in user `publicData`, uniqueness enforcement at signup, a custom route, server-side slug-to-id resolution via the Integration API, and redirects when a name changes. Real work, not urgent. Listing URLs already slug correctly from the title, so this is specifically a profile-URL gap.
 
 ## Next session — start here
 Everything is committed and pushed to `origin/main`, working tree clean.
