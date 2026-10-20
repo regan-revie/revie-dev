@@ -133,6 +133,22 @@ repo previously — much of the Nylas integration and the decisions recorded in
 this file are his. He is not currently the one driving day-to-day work. If a
 change would invalidate something he built or decided, say so explicitly.
 
+## Working with the planning project
+
+`docs/` is the shared source of truth between this repo and Regan's Claude
+project on Claude.ai. The planning project decides; this repo builds and
+records what happened.
+
+- **When Regan pastes a "### DECISION:" block**, add it to the top of
+  `docs/decisions.md`, and update this file if it changes how you work.
+- **At the end of every session**, append a "## HANDOFF" entry to
+  `docs/changelog.md` (template at the top of that file): what changed, what's
+  next, anything blocked.
+- **If you change listing fields, transaction processes, integrations** or
+  anything else covered by `docs/tech-constraints.md`, update that file in the
+  same change.
+- **Never put secrets in `docs/`.** This folder is synced to Claude.ai.
+
 ## The six requirements that shaped the calendar decision
 Sharetribe's built-in calendar can't do these:
 1. Coaches do not need to leave the heyrevie.com platform.
@@ -270,7 +286,7 @@ Everything is committed and pushed to `origin/main`, working tree clean.
 3. **Hardening** — reschedules/cancellations initiated from the calendar side, timezone edge cases, abandoned-booking handling.
 4. **Go-live** — upgrade to Sharetribe Extend, create the **non-sandbox Nylas application in the EU region** (see the data-region decision above — this is a blocker, not a nice-to-have), stand up the production Render service alongside the dev one, point at the live marketplace, and onboard real coaches (Nylas calendar connect + event-type selection). Note the dev Render environment already exists from Phase 2, so this is a second service rather than a first deploy.
 
-Check with Philip which phase we're currently in if it's not obvious from recent commits/branches.
+Check `docs/changelog.md` and recent commits/branches to see which phase we're currently in.
 
 ## Useful references
 - Sharetribe Web Template docs: https://www.sharetribe.com/docs/template/introduction/sharetribe-web-template/
