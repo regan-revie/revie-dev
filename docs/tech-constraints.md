@@ -21,7 +21,8 @@ Three Sharetribe environments, each with its own hosted configuration (listing t
 
 ## What's already built (platform)
 - **Nylas calendar integration:** coaches connect Google/Outlook; availability comes from their real calendar. Booking, payment capture and confirmation work end to end (first real booking 2026-09-13).
-- **Working hours:** the availability endpoint reads `publicData.nylasOpenHours` per listing and filters slots by it. **Nothing in the repo writes that field yet**, so there is no coach-facing way to set working hours; it has to be set by hand.
+- **Working hours:** the availability endpoint reads `publicData.nylasOpenHours` per listing (one window of days + start + end) and filters slots by it. **Nothing in the repo writes that field**, so coaches have no way to set working hours; it has to be set by hand. A coach with no hours set is simply bookable at any time the calendar is free.
+- **No coach-facing UI for the Nylas flow exists.** The server endpoints are there (`/api/nylas/connect`, `/callback`, `/enable-listing`), but nothing in `src/` calls them: a coach cannot connect a calendar, choose one, or switch a session to calendar booking from the product. Only the client-side booking, checkout and cancel/reschedule UI is built.
 - Render service with Postgres, verified webhook path with HMAC signature checks
 - Custom booking UI replacing Sharetribe's, plus client cancel/reschedule (built; not yet exercised live end to end)
 - Google SSO, Integration API wired up
@@ -35,6 +36,8 @@ Three Sharetribe environments, each with its own hosted configuration (listing t
 
 **Not built yet**
 - The matching quiz and any matching/scoring logic. Matching can't run on Sharetribe search, so it will likely need our own logic on the Render server, using listing fields like the ones above.
+- Coach onboarding for calendar booking: connect calendar, choose calendar, set working hours, enable a session (see above)
+- **Booking-time enforcement of working hours and notice period.** Both are applied only when listing slots. Nothing re-checks them when a booking is created, so a crafted checkout request could book outside them. Also, the hours filter checks a slot's start but not its end, so a long session can run past closing time.
 - Our own booking confirmation and reminder emails (no email-sending code exists in `server/`)
 - Provider-initiated (coach) cancel/reschedule
 - Recovery if the create-booking call fails after payment (the transaction would stall at `confirm-payment`)
@@ -56,6 +59,7 @@ Three Sharetribe environments, each with its own hosted configuration (listing t
 - **Reviews and messages attach to transactions.** Coach-level ratings must be computed.
 - **Coach subscriptions are Stripe Billing**, separate from the Stripe Connect marketplace flow.
 - **Sharetribe booking records can't be changed after creation.** A rescheduled session's real time lives in our Postgres table, not on the transaction.
+- **Sharetribe validates bookings against the listing's `availabilityPlan`** when a booking is created, and `OrderPanel` needs `availabilityPlan.timezone` to render any booking form. `enableListing` therefore overwrites each calendar listing's plan with a 24/7 one carrying the calendar's time zone. Anything a coach enters in the stock Availability tab is discarded when that runs.
 - **Console branding overrides code.** Hosted branding (colors, logo) is applied inline on `<html>` and beats the stylesheet; the repo's `configBranding.js` is only the local fallback.
 
 ## Where the platform touches the marketing site

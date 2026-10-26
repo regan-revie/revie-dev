@@ -147,6 +147,7 @@ records what happened.
 - **If you change listing fields, transaction processes, integrations** or
   anything else covered by `docs/tech-constraints.md`, update that file in the
   same change.
+- **Work to `docs/go-live-plan.md`** (phases, dates, what to cut if November slips) and to the launch scope in `docs/decisions.md`.
 - **Never put secrets in `docs/`.** This folder is synced to Claude.ai.
 
 ## The six requirements that shaped the calendar decision
