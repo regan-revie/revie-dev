@@ -4,7 +4,8 @@ The working copy lives in the planning project's "Revie go-live plan" doc. This 
 
 *Last updated: 2026-10-26*
 
-**Dates:** Live cutover Dec 14 (proposed) · code freeze Dec 19 · public launch Jan 1, 2027.
+**Dates:** Live cutover Dec 14 (confirmed) · code freeze Dec 19 · public launch Jan 1, 2027.
+**Calendars:** Google only at launch; Outlook later, no date.
 **Scope:** see "Launch scope for Jan 1, 2027" in `decisions.md`.
 
 ## Phases

@@ -58,6 +58,7 @@ Every email today is a Sharetribe built-in. The default-booking process (`ext/tr
 - **At expiry / decline:** the client gets "request expired" or "declined". These are the only emails a failed booking produces.
 - **After the session (`complete`):** payout ("money paid") email to the coach and review requests to both.
 - **Not covered at all:** `transition/cancel` (a cancelled session emails nobody), reschedules, payment expiry, and any reminder before the session.
+- **Several templates have no body for our bookings.** The coach's confirmation ("operator accepted"), the client's "declined" and "expired" emails, and the operator-declined email only branch on `unitType` of hour, day or night. Our sessions are `fixed`, so those emails render a title and a footer with no text about who, what or when. The coach's confirmation title reads "A booking request was accepted on your behalf" and ends "If you suspect this was a mistake, please contact the team". Only the client's "accepted" and the coach's "money paid" emails handle `fixed`. Fixing this means editing the template HTML in `ext/` and pushing the process with the CLI; Console's Email texts can only change the wording.
 - Times in these emails come from the transaction's booking, which Sharetribe never updates, so they show the original time after a reschedule.
 - Account emails (verify email, password reset, user approval) are Sharetribe built-ins configured in Console, not in the repo.
 - Unverified: Google/Nylas may also send its own calendar invitation to the client when the booking event is created.
@@ -71,6 +72,7 @@ Every email today is a Sharetribe built-in. The default-booking process (`ext/tr
 - **Reviews and messages attach to transactions.** Coach-level ratings must be computed.
 - **Coach subscriptions are Stripe Billing**, separate from the Stripe Connect marketplace flow.
 - **Sharetribe booking records can't be changed after creation.** A rescheduled session's real time lives in our Postgres table, not on the transaction.
+- **While a booking is `preauthorized` the coach is offered "Accept request" / "Decline request"** (`TransactionPage.stateDataBooking.js`) and an inbox attention badge (`statesNeedingProviderAttention`), and the process lets the provider run `transition/accept`. `transition/operator-decline` already exists (full refund, cancels the card authorisation). A new process version would be needed to remove the provider transitions; it only affects new transactions, and each Sharetribe environment has its own process.
 - **Sharetribe validates bookings against the listing's `availabilityPlan`** when a booking is created, and `OrderPanel` needs `availabilityPlan.timezone` to render any booking form. `enableListing` therefore overwrites each calendar listing's plan with a 24/7 one carrying the calendar's time zone. Anything a coach enters in the stock Availability tab is discarded when that runs.
 - **Console branding overrides code.** Hosted branding (colors, logo) is applied inline on `<html>` and beats the stylesheet; the repo's `configBranding.js` is only the local fallback.
 

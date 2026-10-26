@@ -19,6 +19,34 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-10-26 (second session)
+
+**Branch:** `revie-design-tokens`, pushed to PR #1 (not merged).
+
+**What changed**
+- Applied the topbar loop fix: cherry-picked Sharetribe's `be151ebbd` (kept their authorship; trimmed the unrelated entries from the `CHANGELOG.md` conflict) and restored the nav label letter-spacing. Tested on the dev server at 375px, 1024px and 1280px, plus a phone-to-desktop resize without reload: console clean on every load, nav measured correctly.
+- Added two decisions: booking failure after payment releases the hold; emails split between Sharetribe and Postmark.
+- Recorded in `tech-constraints.md`: coaches can accept a not-yet-confirmed booking; several Sharetribe email templates have no body for `fixed` bookings.
+- Opened a separate PR from `main` to Prettier-format the 6 Nylas files failing `format-ci` (no logic changes).
+
+**Plans delivered (not built)**
+- Payment-failure recovery: server-owned retry, decline via the existing `transition/operator-decline`, Sentry alert, sweeper for closed tabs, new process version for Dev, client changes. See the chat reply for the test plan.
+- Emails: copy for each template, a template fix for `fixed` bookings, a notification on `transition/cancel`, and a Postmark module under `server/email/`.
+
+**What's next**
+- Merge PR #1, then check checkout, inbox, settings and the listing editor while logged in on `revie-dev`.
+- Build payment-failure recovery first (phase 2), then the email template fixes, then working hours.
+- Regan: set `REACT_APP_SENTRY_DSN` in Render (not pasted anywhere); Console `primaryButton` to `#310416` via Test; create the Postmark account and verify the sending domain.
+- Remove the hardcoded primary ground from `Button.module.css` once Console is confirmed.
+
+**Blocked / needs a decision**
+- Whether Sharetribe's Test and Live environments accept a CLI process push (needed to roll out the new process version). Unverified.
+- A support email address for the email footers.
+- Cancellation emails: Sharetribe can only send them when a transition runs, so a late cancellation (inside 48 hours, no transition) needs Postmark. Decide whether to send all cancellation emails from Postmark for one consistent voice.
+- Whether any coach sells sessions longer than 60 minutes (the `length` field).
+
+---
+
 ## HANDOFF — 2026-10-26
 
 **Branch:** `revie-design-tokens`, pushed. **PR #1** open to `main` (not merged).
