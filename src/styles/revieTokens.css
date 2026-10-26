@@ -127,26 +127,30 @@
    * Maroon and lavender are Revie's primary colours. Stock primary button is
    * #138041, a green inherited from Sharetribe's demo marketplace.
    *
-   * Primary   — lavender ground, maroon label, pill shape. 9.62:1, AAA.
+   * Primary   — maroon ground, off-white label, pill shape. 15.63:1, AAA.
    *             Hover/focus — pink ground (--reviePink), maroon label. 8.64:1,
    *             AAA. Pink matches heyrevie.com's live CTA hover.
-   * Secondary — outlined maroon: transparent ground, 1px maroon border,
-   *             maroon label, same pill shape. Hover/focus fills lavender.
+   * Secondary — lavender ground, maroon label, same pill shape. 9.62:1, AAA.
+   *             Hover/focus — pink ground, maroon label.
    *
-   * Matched against the live CTAs on heyrevie.com (measured, not estimated):
-   * #DBABF5 ground, #310416 label, 14px Schibsted Grotesk 500, uppercase,
-   * 1px letter-spacing, 20px/40px padding, fully rounded. See
-   * src/components/Button/Button.module.css for the actual rules — the
-   * tokens below only cover the colours that aren't Console-controlled.
+   * Decision (docs/decisions.md, "Colours follow the brand guidelines"):
+   * every text/background combination must be an approved pairing from
+   * docs/brand.md. Pink and orange are hover/accent only.
    *
-   * IMPORTANT: the primary button's ground colour is NOT set here. It comes
-   * from Console's marketplaceColors.primaryButton (currently #DBABF5),
-   * applied inline on <html> via mergeBranding, which beats any value in
-   * this file regardless of load order. --colorPrimaryButton below is the
-   * local fallback only — the live colour is Console's, not this file's.
+   * Shape and type are matched against the live CTAs on heyrevie.com
+   * (measured): 14px Schibsted Grotesk 500, uppercase, 1px letter-spacing,
+   * 20px/40px padding, fully rounded. See src/components/Button/
+   * Button.module.css for the actual rules.
+   *
+   * IMPORTANT: Console's marketplaceColors.primaryButton is applied inline
+   * on <html> via mergeBranding and beats --colorPrimaryButton below
+   * regardless of load order. The primary button therefore sets its maroon
+   * ground explicitly in Button.module.css instead of trusting the token,
+   * but Console should still be set to #310416 so the other users of the
+   * token (inline primary button, spinner states) agree.
    *
    * Orange, pink, periwinkle and chartreuse stay accents: tags, illustration,
-   * empty states, and pink is also the primary-button hover. Not otherwise the main
+   * empty states, and pink is also the button hover. Not otherwise the main
    * action on a screen.
    *
    * NOTE: --marketplaceColor is deliberately NOT set here. marketplaceDefaults

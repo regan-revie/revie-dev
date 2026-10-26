@@ -36,20 +36,25 @@
      form fields rather than floating in the middle. */
   max-width: 565px;
 
-  /* Ground (lavender) comes from Console's marketplaceColors.primaryButton -
-     not set here. Label is maroon, overriding buttonPrimary's --colorWhite
-     above: white-on-lavender measures ~1.8:1 and fails WCAG. */
-  color: var(--revieMaroon);
+  /* Primary: maroon ground, off-white label (15.63:1, approved pairing).
+     The ground is set explicitly here rather than left to
+     --colorPrimaryButton: Console's marketplaceColors.primaryButton is
+     applied inline on <html> and overrides that token, so relying on it
+     would let a Console edit silently change the button. Console should
+     still be set to #310416 so the other users of the token (inline
+     primary button, spinner states) agree. Overrides buttonPrimary's
+     --colorWhite label: white is not a brand colour. */
+  background-color: var(--revieMaroon);
+  color: var(--revieCream);
 
   /* colorPrimaryButtonDark is not used: mergeBranding derives it as
      marketplaceColor's own dark variant does (-10% HSL lightness), which
      clips to black for a color this dark already - see the marketplaceColor
-     finding above. Referencing --reviePink/--revieMaroon directly
-     sidesteps that entirely. Hover is pink to match heyrevie.com's live CTA
-     hover (measured rgb(255,144,194)); maroon on pink is 8.64:1. Hover and
-     focus share the same colors so keyboard and mouse match; focus
-     additionally gets a visible ring (buttonPrimary above sets
-     outline: none, so this replaces rather than removes it). */
+     finding above. Hover is pink (maroon label, 8.64:1, approved pairing),
+     matching heyrevie.com's live CTA hover. Hover and focus share the same
+     colors so keyboard and mouse match; focus additionally gets a visible
+     ring (buttonPrimary above sets outline: none, so this replaces rather
+     than removes it). */
   &:hover,
   &:focus {
     background-color: var(--reviePink);
@@ -88,19 +93,18 @@
      sit in the same panel. */
   max-width: 565px;
 
-  /* Outlined maroon, not lavender: lavender ground now belongs to the
-     primary button, so secondary needs to read as clearly different next
-     to it rather than just "primary, disabled-looking". Overrides
-     buttonSecondary's colorGrey100 border and colorGrey700 text above. */
-  background-color: transparent;
-  border: 1px solid var(--revieMaroon);
+  /* Secondary: lavender ground, maroon label (9.62:1, approved pairing).
+     No border, so it is the same height as the primary button. Overrides
+     buttonSecondary's grey border, white ground and grey label. */
+  background-color: var(--revieLavender);
+  border: none;
   color: var(--revieMaroon);
 
+  /* Hover/focus: pink ground, maroon label (8.64:1), same as primary. */
   &:hover,
   &:focus {
-    background-color: var(--revieLavender);
+    background-color: var(--reviePink);
     color: var(--revieMaroon);
-    border-color: var(--revieMaroon);
   }
 
   &:focus-visible {
@@ -138,7 +142,7 @@
 }
 
 .primaryButton.inProgress:disabled {
-  background-color: var(--colorPrimaryButton);
+  background-color: var(--revieMaroon);
 }
 
 .secondaryButton.inProgress:disabled,
@@ -155,7 +159,7 @@
 }
 
 .primaryButton.ready:disabled {
-  background-color: var(--colorPrimaryButton);
+  background-color: var(--revieMaroon);
 }
 
 .secondaryButton.ready:disabled,
@@ -196,14 +200,21 @@
   }
 }
 
+/* Spinner and checkmark follow the approved label colour of each button:
+   off-white on the maroon primary, maroon on the lavender secondary. */
+.primaryButton .spinner,
+.primaryButton .checkmark {
+  stroke: var(--revieCream);
+}
+
 .secondaryButton .spinner,
 .secondaryButtonInline .spinner {
-  stroke: var(--colorGrey300);
+  stroke: var(--revieMaroon);
 }
 
 .secondaryButton .checkmark,
 .secondaryButtonInline .checkmark {
-  stroke: var(--colorGrey300);
+  stroke: var(--revieMaroon);
 }
 
 /* Social logins && SSO buttons */
