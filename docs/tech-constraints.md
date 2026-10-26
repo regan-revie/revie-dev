@@ -32,15 +32,16 @@ Three Sharetribe environments, each with its own hosted configuration (listing t
 - Listing type `signature-session`, process `default-booking/release-1`, `unitType: fixed`, `availabilityType: oneSeat`, 20% provider commission
 - Listing fields, the same in Dev, Test and Live: `identity`, `communication_style`, `structure`, `language`, `coachlocation`, `pre_work`
 - One difference: Dev and Test have a `length` field; Live has `timezone` instead (a workaround for Sharetribe having no per-coach timezone; don't build anything on it)
+- **`length` is "Session Length"** (an enum: 60, 90 or 120 minutes) and is a search filter. It is not connected to the booking duration: Nylas takes the duration from the event type (60 minutes), so a coach choosing "90 minutes" still gets 60-minute slots. No code in the repo reads or writes `length` or `timezone`; both are used only through Console's hosted config.
 - Listing types and fields are hosted config in Console. The repo's local config files are the stock template, commented out, so the repo alone doesn't show them.
 
 **Not built yet**
 - The matching quiz and any matching/scoring logic. Matching can't run on Sharetribe search, so it will likely need our own logic on the Render server, using listing fields like the ones above.
 - Coach onboarding for calendar booking: connect calendar, choose calendar, set working hours, enable a session (see above)
 - **Booking-time enforcement of working hours and notice period.** Both are applied only when listing slots. Nothing re-checks them when a booking is created, so a crafted checkout request could book outside them. Also, the hours filter checks a slot's start but not its end, so a long session can run past closing time.
-- Our own booking confirmation and reminder emails (no email-sending code exists in `server/`)
+- Our own booking confirmation and reminder emails (no email-sending code exists in `server/`; no email library is installed; Nylas reminders are not configured in `scheduler.js`)
 - Provider-initiated (coach) cancel/reschedule
-- Recovery if the create-booking call fails after payment (the transaction would stall at `confirm-payment`)
+- **Recovery if booking creation fails after payment.** The browser calls `/api/nylas/create-booking` once, fire and forget (`CheckoutPageWithPayment.js`), and sends the client to their order page whatever happens. On failure the transaction stays in `preauthorized`: the card is authorised, not captured, and nothing runs `operator-accept`. The coach has an email saying "you have a new booking request" and can still accept it by hand in Sharetribe, which would take payment for a session that is not on their calendar. If nobody acts, Sharetribe auto-expires it (`transition/expire`, at most 6 days after payment, or sooner near the session), refunds in full and emails the client "request expired". The only record of the failure is a server `console.error` (Render logs) and a browser console error. No retry, no database row, no alert; Sentry is wired in `server/log.js` but only runs if `REACT_APP_SENTRY_DSN` is set, and `render.yaml` doesn't set it.
 - Coach subscriptions via Stripe Billing
 
 ## Nylas constraints that affect go-live
@@ -49,6 +50,17 @@ Three Sharetribe environments, each with its own hosted configuration (listing t
 - Google OAuth verification (sensitive calendar scopes) is required beyond the 100-test-user allowance; weeks, not months.
 - The Microsoft connector still requests mail and contacts scopes and must be narrowed before Outlook is offered.
 - Nylas's availability endpoint ignores `min_booking_notice`; we filter on our server. Keep that filtering server-side.
+
+## Emails
+Every email today is a Sharetribe built-in. The default-booking process (`ext/transaction-processes/default-booking/`) sends:
+- **At payment (`confirm-payment`):** the coach gets "You have a new booking request". This is the stock accept-or-decline wording, which is wrong for our auto-accept flow, and it arrives before the booking is actually confirmed.
+- **At `operator-accept`:** the client gets "Your booking request was accepted"; the coach gets an operator-accepted email.
+- **At expiry / decline:** the client gets "request expired" or "declined". These are the only emails a failed booking produces.
+- **After the session (`complete`):** payout ("money paid") email to the coach and review requests to both.
+- **Not covered at all:** `transition/cancel` (a cancelled session emails nobody), reschedules, payment expiry, and any reminder before the session.
+- Times in these emails come from the transaction's booking, which Sharetribe never updates, so they show the original time after a reschedule.
+- Account emails (verify email, password reset, user approval) are Sharetribe built-ins configured in Console, not in the repo.
+- Unverified: Google/Nylas may also send its own calendar invitation to the client when the booking event is created.
 
 ## Sharetribe constraints that shape design
 - **Top-level data model is fixed:** users, listings, transactions, bookings, stock, reviews, messages, each extensible with extended data. No new first-class entities. Anything else needs our own database (Postgres on Render).
