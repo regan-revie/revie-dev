@@ -7,6 +7,17 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Booking failure after payment releases the hold
+**Date:** Oct 26, 2026
+**Decision:** The server owns create-booking after payment. It retries once; on a second failure it declines the transaction (releasing the card authorisation), logs to Sentry and emails Regan. A coach never sees an acceptable request for a session that isn't on their calendar.
+**Why:** Today a failed booking leaves a "new booking request" the coach can accept by hand, charging the client for a session that doesn't exist.
+**Affects:** CheckoutPageWithPayment.js, server booking route, transaction process (Dev).
+
+### DECISION: Emails are split between Sharetribe and Postmark
+**Date:** Oct 26, 2026
+**Decision:** Sharetribe built-in emails cover booking confirmation and cancellation, with copy fixed in Console. Reminders and reschedule emails are sent by our server via Postmark, because Sharetribe booking records can't change and its emails show the original time.
+**Affects:** Console email templates, transaction process notifications, server/ (new email module).
+
 ### DECISION: Working hours are one schedule per coach
 **Date:** Oct 26, 2026
 **Decision:** Each coach has one working-hours schedule, stored on their user profile and edited with the template's plan form. Availability reads it from the listing author. Hours and notice period are enforced when slots are listed AND when a booking is created, checking both the start and end of the session.
@@ -24,8 +35,8 @@ Newest at the top. When the planning project settles something, it produces a `#
 **Decision:** Full redesign for browse, coach profile, checkout and confirmation, in that order after the Layer 2 consistency pass, starting with the coach profile. Every other screen gets brand tokens only.
 **Affects:** Layer 3 scope in "Order of work for the platform" (Sept 2026).
 
-### DECISION: Cut over Live on Dec 14, announce Jan 1 (PROPOSED, not yet confirmed by Regan)
-**Date:** Oct 20, 2026
+### DECISION: Cut over Live on Dec 14, announce Jan 1
+**Date:** Oct 20, 2026 (confirmed Oct 26)
 **Decision:** Switch Live to this codebase on Dec 14, code freeze Dec 19, public announcement Jan 1.
 **Why:** Two weeks of real bookings before launch, and a buffer before holiday support slowdowns.
 **Affects:** Extend upgrade moves to ~Dec 1.
@@ -75,4 +86,4 @@ Newest at the top. When the planning project settles something, it produces a `#
 - **Matching quiz:** deferred to Q1 2027 (see Launch scope). What questions, how scoring works, where it runs.
 - How does coach browse work, given Sharetribe indexes listings not users?
 - Where do the existing 200+ quiz responses live, and can they inform the quiz design?
-- When to upgrade to Extend ahead of Jan 1 (proposed: ~Dec 1)
+- When to upgrade to Extend ahead of Jan 1 (~Dec 1, ahead of the Dec 14 cutover)
