@@ -7,11 +7,11 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
-### DECISION: Dev's listing type points at release-2 on purpose
+### DECISION: Dev's Test Session listing runs release-2; listing types stay on release-1
 **Date:** Oct 27, 2026
-**Decision:** Dev's Signature Session listing type uses `default-booking/release-2` (no provider accept/decline; the server confirms or declines bookings). Never copy listing types from Test to Dev until Test also runs release-2. Release-2 is not pushed to Test or Live.
-**Why:** A copy from Test would silently set Dev back to release-1 and bring back the coach's Accept button for bookings that may not be on their calendar. Existing listings also keep their own `transactionProcessAlias` and must be switched individually.
-**Affects:** Console listing-type config (Dev), the Test to Dev copy step, Live cutover (release-2 goes to Live at cutover).
+**Decision:** The Dev "Test Session" listing carries `publicData.transactionProcessAlias: default-booking/release-2` (no provider accept/decline; the server confirms or declines bookings). Release-2 is not pushed to Test or Live.
+**Correction (same day):** this entry first said Dev's *listing type* points at release-2. That is not possible: Console's listing type only offers Sharetribe's default processes, not a specific version, so every environment's listing type stays on `default-booking/release-1`. A Test to Dev copy of listing types is therefore harmless again. What matters is the alias stored on each *listing*, which decides the process of every new transaction. How new listings get release-2 before the Dec 14 cutover is still to be decided (see the HANDOFF of Oct 27).
+**Affects:** the Dev "Test Session" listing, new-listing creation, Live cutover (release-2 goes to Live at cutover).
 
 ### DECISION: Booking slots start every 30 minutes; no length filter
 **Date:** Oct 27, 2026
