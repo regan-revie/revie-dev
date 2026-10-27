@@ -365,7 +365,11 @@ const server = app.listen(PORT, () => {
   nylasDb
     .initSchema()
     .then(ready => {
-      if (ready) console.log('[nylas-db] booking mapping table ready'); // eslint-disable-line no-console
+      if (!ready) return;
+      console.log('[nylas-db] booking mapping table ready'); // eslint-disable-line no-console
+      // The sweeper that recovers paid-but-unconfirmed bookings needs the tables above, so it only
+      // starts once they exist. See server/jobs/ and server/api/nylas/bookingRecovery.js.
+      require('./jobs').start(); // eslint-disable-line global-require
     })
     .catch(e => console.error('[nylas-db] schema init failed:', e.message));
 });

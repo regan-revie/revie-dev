@@ -9,8 +9,13 @@ jest.mock('./integration', () => ({
   applyTransition: jest.fn(async () => ({ ok: true, transaction: {} })),
 }));
 
+jest.mock('./bookingRecovery', () => ({
+  cancelIfDeclined: jest.fn(async () => false),
+}));
+
 const db = require('./db');
 const { applyTransition } = require('./integration');
+const { cancelIfDeclined } = require('./bookingRecovery');
 const {
   TRANSACTION_FIELD,
   extractTransactionId,
@@ -26,6 +31,7 @@ beforeEach(() => {
   db.isAvailable.mockReturnValue(true);
   require('./integration').isConfigured.mockReturnValue(true);
   applyTransition.mockResolvedValue({ ok: true, transaction: {} });
+  cancelIfDeclined.mockResolvedValue(false);
 });
 
 describe('extractTransactionId()', () => {
@@ -125,6 +131,18 @@ describe('booking.created', () => {
       handled: true,
       action: 'already-accepted',
     });
+  });
+
+  it('cancels the Nylas booking when the transaction was already declined (late webhook)', async () => {
+    // bookingRecovery declined the transaction while the booking was in flight; the booking then
+    // landed. A real booking is on the coach's calendar for a session that will not happen.
+    applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+    cancelIfDeclined.mockResolvedValue(true);
+    await expect(handleBookingWebhook(created)).resolves.toEqual({
+      handled: true,
+      action: 'orphan-cancelled',
+    });
+    expect(cancelIfDeclined).toHaveBeenCalledWith({ transactionId: TX, bookingId: BOOKING });
   });
 
   it('throws on a real transition failure so Nylas retries', async () => {

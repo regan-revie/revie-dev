@@ -1,28 +1,24 @@
 /**
  * POST /api/nylas/create-booking
  *
- * The missing link discovered by actually running a booking end to end: nothing else in the
- * codebase ever tells Nylas a booking happened. `NylasBookingForm` only feeds Sharetribe's own
- * checkout (price, payment); the availability endpoint only *reads* free/busy time. Without this
- * call, a client can pay in full and the transaction sits at `confirm-payment` forever, because
- * there is no `booking.created` webhook to run `transition/operator-accept` - see
- * server/api/nylas/bookingSync.js, which was built and tested against a signed webhook payload but
- * never had anything upstream to actually send one.
+ * Called once by the browser right after a client's payment is confirmed (see
+ * src/containers/CheckoutPage/CheckoutPageWithPayment.js). Nothing else tells Nylas a booking
+ * happened - Sharetribe's checkout only knows about price and payment - so without this call a
+ * client could pay and the transaction would sit at `preauthorized` with nothing on the coach's
+ * calendar.
  *
- * Called once, right after the client's payment is confirmed (see
- * src/containers/CheckoutPage/CheckoutPageWithPayment.js). Deliberately does not touch our own
- * database or run any Sharetribe transition itself - that is the webhook's job once Nylas calls
- * back, and duplicating it here would let the two paths drift apart. If this call never reaches
- * Nylas (network drop, tab closed before it fires), the transaction is simply never confirmed and
- * sits at "payment received" - a known gap for the reconciliation/abandoned-booking work in
- * CLAUDE.md's Phase 3, not something this endpoint tries to paper over.
+ * This endpoint only proves who is calling. The work - retrying, waiting for a late webhook, and
+ * declining the transaction (releasing the card authorisation) if the booking cannot be made - is
+ * bookingRecovery.ensureBooking(), the same routine the sweeper runs for a client whose browser
+ * never made this call. See that file for the full sequence.
+ *
+ * The browser does not wait for the result: the order page polls the transaction instead.
  */
 
 const { createCookieTokenStore, getSdk, handleError } = require('../../api-util/sdk');
-const { createBooking } = require('./availability');
 const { isConfigured } = require('./config');
-const { TRANSACTION_FIELD } = require('./bookingSync');
 const { loadCalendarBookingTransaction } = require('./manageBookingShared');
+const { ensureBooking } = require('./bookingRecovery');
 
 module.exports = async (req, res) => {
   if (!isConfigured()) {
@@ -40,43 +36,27 @@ module.exports = async (req, res) => {
   const sdk = getSdk(req, res, tokenStore);
 
   try {
-    const [{ tx, configurationId, booking }, userResponse] = await Promise.all([
+    // transactions.show refuses (403) a transaction the caller is not a party to; on top of that
+    // only the customer who paid may trigger this.
+    const [{ tx }, userResponse] = await Promise.all([
       loadCalendarBookingTransaction(sdk, transactionId),
       sdk.currentUser.show(),
     ]);
 
-    const hasConfirmedPayment = (tx.attributes.transitions || []).some(
-      t => t.transition === 'transition/confirm-payment'
-    );
-    if (!hasConfirmedPayment) {
-      // Guards against a client calling this before paying, which would create a calendar hold
-      // with no money behind it.
-      res.status(409).json({ error: 'Transaction has not confirmed payment yet' });
+    const customerId = tx.relationships?.customer?.data?.id?.uuid;
+    if (!customerId || customerId !== userResponse.data.data.id.uuid) {
+      res.status(403).json({ error: 'Only the customer can create the booking' });
       return;
     }
 
-    if (!configurationId) {
-      res.status(422).json({ error: 'Listing is not set up for calendar booking' });
+    const result = await ensureBooking({ transactionId, source: 'browser' });
+
+    if (result.outcome === 'unavailable') {
+      res.status(503).json({ error: 'Booking recovery is not available', ...result });
       return;
     }
-
-    if (!booking?.attributes?.start || !booking?.attributes?.end) {
-      res.status(422).json({ error: 'Transaction has no booking period' });
-      return;
-    }
-
-    const profile = userResponse.data.data.attributes.profile || {};
-    const email = userResponse.data.data.attributes.email;
-
-    const created = await createBooking({
-      configurationId,
-      start: booking.attributes.start,
-      end: booking.attributes.end,
-      guest: { name: profile.displayName || email, email },
-      additionalFields: { [TRANSACTION_FIELD]: transactionId },
-    });
-
-    res.status(200).json({ bookingId: created?.booking_id || created?.id || null });
+    // 200 even for 'declined': the endpoint did what it should. The order page shows the outcome.
+    res.status(200).json(result);
   } catch (e) {
     if (e.status) {
       handleError(res, e);
