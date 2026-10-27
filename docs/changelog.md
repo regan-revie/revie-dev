@@ -23,6 +23,12 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 **Branch / PR:** `docs-release-2-rollout`, docs and one helper script only. PR #6 (the recovery code) is merged and live on Render dev.
 
+**Corrections and follow-up (later the same day)**
+- **Console cannot point a listing type at release-2** (it only offers default processes), so the Console step below is void and the "listing type points at release-2" wording in this entry, `decisions.md`, `tech-constraints.md` and `CLAUDE.md` was wrong; corrected. Listing types stay on release-1 everywhere, so a Test to Dev copy is harmless again.
+- Regan approved it and I ran `use-release-2` on the Dev "Test Session" listing (`6aa17447-...`) and nothing else. `status` before: `default-booking/release-1`; after: `default-booking/release-2`.
+- Added the `revie1-dev` flex-cli note to `CLAUDE.md`.
+- Open: how NEW listings get release-2 before the Dec 14 cutover (plan given in chat, not built).
+
 **What changed**
 - **Pushed process release-2 to Dev only** (`npx flex-cli`, marketplace `revie1-dev`). First validated locally with `flex-cli process --path` (it parsed the file and described exactly the intended machine), and confirmed Dev's live version 1 was identical to the file I edited from. Output: `Version 2 successfully saved for process default-booking`, then `Alias default-booking/release-2 successfully created to point to version 2.` `process list` now shows version 2 (`release-2`, 0 transactions) and version 1 (`release-1`, 4 transactions). Pulled version 2 back and confirmed it matches git (the server drops comments and stores templates with CRLF line endings). **Nothing was pushed to Test or Live.**
 - Corrected the Dev marketplace id in `tech-constraints.md`: flex-cli needs `revie1-dev` (`revie_dev` is only the display name). `CLAUDE.md` still calls Dev `revie_dev` in several places; those are display-name uses and left alone.
