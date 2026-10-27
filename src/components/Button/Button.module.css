@@ -37,14 +37,11 @@
   max-width: 565px;
 
   /* Primary: maroon ground, off-white label (15.63:1, approved pairing).
-     The ground is set explicitly here rather than left to
-     --colorPrimaryButton: Console's marketplaceColors.primaryButton is
-     applied inline on <html> and overrides that token, so relying on it
-     would let a Console edit silently change the button. Console should
-     still be set to #310416 so the other users of the token (inline
-     primary button, spinner states) agree. Overrides buttonPrimary's
+     The ground comes from --colorPrimaryButton, which Console's
+     marketplaceColors.primaryButton sets inline on <html> and the page
+     root (#310416) and revieTokens.css defaults to the same maroon. Don't hardcode it here: if
+     Console changes, this button should follow. Overrides buttonPrimary's
      --colorWhite label: white is not a brand colour. */
-  background-color: var(--revieMaroon);
   color: var(--revieCream);
 
   /* colorPrimaryButtonDark is not used: mergeBranding derives it as
@@ -142,7 +139,7 @@
 }
 
 .primaryButton.inProgress:disabled {
-  background-color: var(--revieMaroon);
+  background-color: var(--colorPrimaryButton);
 }
 
 .secondaryButton.inProgress:disabled,
@@ -159,7 +156,7 @@
 }
 
 .primaryButton.ready:disabled {
-  background-color: var(--revieMaroon);
+  background-color: var(--colorPrimaryButton);
 }
 
 .secondaryButton.ready:disabled,

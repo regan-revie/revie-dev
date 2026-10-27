@@ -142,12 +142,11 @@
    * 20px/40px padding, fully rounded. See src/components/Button/
    * Button.module.css for the actual rules.
    *
-   * IMPORTANT: Console's marketplaceColors.primaryButton is applied inline
-   * on <html> via mergeBranding and beats --colorPrimaryButton below
-   * regardless of load order. The primary button therefore sets its maroon
-   * ground explicitly in Button.module.css instead of trusting the token,
-   * but Console should still be set to #310416 so the other users of the
-   * token (inline primary button, spinner states) agree.
+   * The primary button's ground is NOT hardcoded in the component: it reads
+   * --colorPrimaryButton. Console's marketplaceColors.primaryButton is applied
+   * inline on <html> and the page root via mergeBranding and beats the value
+   * below regardless of load order, so Console must stay at #310416 (set in Test, then copied
+   * forward). The value below is only the fallback when Console has none.
    *
    * Orange, pink, periwinkle and chartreuse stay accents: tags, illustration,
    * empty states, and pink is also the button hover. Not otherwise the main
@@ -300,6 +299,38 @@ h1 {
 h6 {
   font-family: var(--fontFamilySecondary);
   letter-spacing: 0.04em;
+}
+
+/* ================================================================
+   TOPBAR OVERFLOW MENU LABEL ("Menu" / "More")
+
+   The label is grey700 text with a marketplaceColor (maroon) hover
+   underline, both written for a white bar. On the maroon bar the text
+   read dim and the underline vanished. Off-white on maroon is an approved
+   pairing (15.63:1), with the same lavender hover underline as the other
+   nav links.
+
+   This lives here, not in LinksMenu.module.css, so the core template file
+   stays untouched for upstream merges. CSS Modules hash the class name but
+   keep the "LinksMenu_linkMenuLabel__" prefix in dev and production, so an
+   attribute selector finds it. The "__" excludes ...LabelWrapper. The
+   leading "html" raises specificity above the component's own rule, which
+   loads after this file and would otherwise win ties. The arrow icon is
+   passed a class that carries no colour, so it is set to follow the text.
+   ================================================================ */
+
+html [class*='LinksMenu_linkMenuLabel__'] {
+  color: var(--revieCream);
+}
+
+html [class*='LinksMenu_linkMenuLabel__']:hover {
+  color: var(--revieCream);
+  border-bottom-color: var(--revieLavender);
+}
+
+html [class*='LinksMenu_linkMenuLabel__'] svg {
+  fill: currentColor;
+  stroke: currentColor;
 }
 
 /* ================================================================
