@@ -1,3 +1,10 @@
+;; Revie changes (release-2, see docs/decisions.md "Booking failure after payment releases the hold"):
+;; - The provider can no longer accept or decline. Calendar bookings are confirmed by our server
+;;   (:transition/operator-accept, run when Nylas reports the booking) and, if the booking cannot be
+;;   made, declined by our server (:transition/operator-decline), which releases the card hold.
+;; - Removed the emails that only made sense for a request the coach accepts: "new booking request"
+;;   (sent at payment, before the booking exists) and "declined on your behalf" to the provider.
+;; - :transition/expire stays as the safety net.
 {:format :v3,
  :transitions
  [{:name :transition/inquire,
@@ -41,13 +48,6 @@
    :actions [{:name :action/stripe-confirm-payment-intent}],
    :from :state/pending-payment,
    :to :state/preauthorized}
-  {:name :transition/accept,
-   :actor :actor.role/provider,
-   :actions
-   [{:name :action/accept-booking}
-    {:name :action/stripe-capture-payment-intent}],
-   :from :state/preauthorized,
-   :to :state/accepted}
   {:name :transition/operator-accept,
    :actor :actor.role/operator,
    :actions
@@ -55,16 +55,6 @@
     {:name :action/stripe-capture-payment-intent}],
    :from :state/preauthorized,
    :to :state/accepted}
-  {:name :transition/decline,
-   :actor :actor.role/provider,
-   :actions
-   [{:name :action/calculate-full-refund}
-    {:name :action/stripe-refund-payment}
-    ;; Keep this action last in the list of actions for
-    ;; the transition
-    {:name :action/decline-booking}],
-   :from :state/preauthorized,
-   :to :state/declined}
   {:name :transition/operator-decline,
    :actor :actor.role/operator,
    :actions
@@ -160,15 +150,7 @@
    :from :state/reviewed-by-provider,
    :to :state/reviewed}],
  :notifications
- [{:name :notification/booking-new-request,
-   :on :transition/confirm-payment,
-   :to :actor.role/provider,
-   :template :booking-new-request}
-  {:name :notification/booking-accepted-request,
-   :on :transition/accept,
-   :to :actor.role/customer,
-   :template :booking-accepted-request}
-  {:name :notification/booking-operator-accepted-request-to-customer,
+ [{:name :notification/booking-operator-accepted-request-to-customer,
    :on :transition/operator-accept,
    :to :actor.role/customer,
    :template :booking-accepted-request}
@@ -176,18 +158,10 @@
    :on :transition/operator-accept,
    :to :actor.role/provider,
    :template :booking-operator-accepted-request}
-  {:name :notification/booking-declined-request,
-   :on :transition/decline,
-   :to :actor.role/customer,
-   :template :booking-declined-request}
   {:name :notification/booking-operator-declined-request-to-customer,
    :on :transition/operator-decline,
    :to :actor.role/customer,
    :template :booking-declined-request}
-  {:name :notification/booking-operator-declined-request-to-provider,
-   :on :transition/operator-decline,
-   :to :actor.role/provider,
-   :template :booking-operator-declined-request}
   {:name :notification/booking-expired-request,
    :on :transition/expire,
    :to :actor.role/customer,
