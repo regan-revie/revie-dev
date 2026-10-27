@@ -26,8 +26,7 @@ const { isFreeCancellation, TRANSACTION_FIELD } = require('./scheduler');
  * something the mock payload (which only ever showed `null`) could confirm.
  */
 const extractTransactionId = data => {
-  const fields =
-    data?.booking_info?.additional_fields ?? data?.customFields ?? data?.custom_fields;
+  const fields = data?.booking_info?.additional_fields ?? data?.customFields ?? data?.custom_fields;
   if (!fields) return null;
 
   if (Array.isArray(fields)) {
@@ -50,8 +49,7 @@ const extractTransactionId = data => {
  * session fifty years out and would make every cancellation look free.
  */
 const extractBookingStart = data => {
-  const raw =
-    data?.booking_info?.start_time ?? data?.start_time ?? data?.startTime ?? data?.start;
+  const raw = data?.booking_info?.start_time ?? data?.start_time ?? data?.startTime ?? data?.start;
   if (raw == null) return null;
   if (typeof raw === 'number') return new Date(raw * 1000);
   const parsed = new Date(raw);

@@ -78,7 +78,9 @@ module.exports = async (req, res) => {
       handleError(res, e);
       return;
     }
-    console.error(`[nylas] Booking reschedule failed for transaction ${transactionId}: ${e.message}`);
+    console.error(
+      `[nylas] Booking reschedule failed for transaction ${transactionId}: ${e.message}`
+    );
     res.status(502).json({ error: 'Could not reschedule the calendar booking' });
   }
 };

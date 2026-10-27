@@ -28,7 +28,10 @@ import css from './ManageCalendarBooking.module.css';
  * booking dates: a reschedule updates our database, never Sharetribe's immutable booking record,
  * so that is the only place the current time can be read from once one has happened.
  */
-const ManageCalendarBooking = ({ transactionId: transactionIdMaybe, listingId: listingIdMaybe }) => {
+const ManageCalendarBooking = ({
+  transactionId: transactionIdMaybe,
+  listingId: listingIdMaybe,
+}) => {
   // Callers pass the SDK entities' own .id (transaction.id, listing.id), which may be a UUID
   // object or already a plain string - normalised here rather than pushed onto every caller.
   const transactionId = transactionIdMaybe?.uuid || transactionIdMaybe;
@@ -154,7 +157,9 @@ const ManageCalendarBooking = ({ transactionId: transactionIdMaybe, listingId: l
 
       {mode === 'confirm-cancel' ? (
         <div className={css.confirmCancel}>
-          <p><FormattedMessage id="ManageCalendarBooking.confirmCancelText" /></p>
+          <p>
+            <FormattedMessage id="ManageCalendarBooking.confirmCancelText" />
+          </p>
           <div className={css.actions}>
             <PrimaryButton inProgress={actionInProgress} onClick={handleCancel}>
               <FormattedMessage id="ManageCalendarBooking.confirmCancelButton" />
@@ -169,7 +174,9 @@ const ManageCalendarBooking = ({ transactionId: transactionIdMaybe, listingId: l
       {mode === 'reschedule' ? (
         <div className={css.reschedule}>
           {availability.state === 'loading' ? (
-            <p><FormattedMessage id="ManageCalendarBooking.loadingSlots" /></p>
+            <p>
+              <FormattedMessage id="ManageCalendarBooking.loadingSlots" />
+            </p>
           ) : availability.state === 'error' || availability.slots.length === 0 ? (
             <p className={css.error}>
               <FormattedMessage id="ManageCalendarBooking.noSlots" />

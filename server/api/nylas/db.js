@@ -102,7 +102,14 @@ const recordBooking = async ({
            status                    = EXCLUDED.status,
            updated_at                = now()
      RETURNING *`,
-    [nylasBookingId, sharetribeTransactionId, nylasGrantId, bookingStart || null, bookingEnd || null, status]
+    [
+      nylasBookingId,
+      sharetribeTransactionId,
+      nylasGrantId,
+      bookingStart || null,
+      bookingEnd || null,
+      status,
+    ]
   );
   return rows[0];
 };
