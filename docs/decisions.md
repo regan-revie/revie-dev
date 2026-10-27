@@ -7,6 +7,12 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Dev's listing type points at release-2 on purpose
+**Date:** Oct 27, 2026
+**Decision:** Dev's Signature Session listing type uses `default-booking/release-2` (no provider accept/decline; the server confirms or declines bookings). Never copy listing types from Test to Dev until Test also runs release-2. Release-2 is not pushed to Test or Live.
+**Why:** A copy from Test would silently set Dev back to release-1 and bring back the coach's Accept button for bookings that may not be on their calendar. Existing listings also keep their own `transactionProcessAlias` and must be switched individually.
+**Affects:** Console listing-type config (Dev), the Test to Dev copy step, Live cutover (release-2 goes to Live at cutover).
+
 ### DECISION: Booking slots start every 30 minutes; no length filter
 **Date:** Oct 27, 2026
 **Decision:** Slots for every session length start on the hour and half hour. Each length gets its own Nylas configuration (publicData.nylasConfigurationIds keyed by length). The "Session Length" search filter is removed with the `length` field. The server rejects a booking whose price variant is missing, unknown, or doesn't match the booked length.
