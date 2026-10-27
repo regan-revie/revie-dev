@@ -19,6 +19,20 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-10-27 (release-2 test results; cancellation investigation)
+
+**Test results on Dev (Regan ran them):** happy path and sweeper scenarios passed. Slot-taken and forced-failure scenarios passed functionally (Stripe payment cancelled, Sentry alerted) but the customer's order page still read as "declined"; probably the activity-feed line "The booking request was declined." rather than the new title, to be confirmed. Both runs of `break` and `restore` on the Test Session listing worked and `status` confirmed it was restored. **Customer cancel failed** ("Something went wrong. Please try again shortly.").
+
+**Findings (nothing was changed; no fixes made):**
+- Release-2 did not break cancellation: `transition/cancel` is identical to release-1 (operator, accepted to cancelled, full refund), and the cancel panel only checks for the ACCEPTED state, which release-2 did not change.
+- Nylas accepts our cancel call's authorisation: a cancel of a nonexistent booking id returned 404 "Booking not found", not an auth error. So the failure is for a real booking or earlier in our endpoint. The exact status was not readable from here (no Render/Sentry access); it is in the browser's Network tab for `cancel-booking`, and in Sentry as `local-api-request-failed`.
+- The cancel endpoint takes the Nylas configuration id from the listing's current value, so a cancel attempted while the listing was broken for scenario 4 would fail with this same message.
+- Hosted Nylas cancel/reschedule links come from `scheduler.cancellation_url` / `rescheduling_url` (default book.nylas.com); `hide_cancellation_options` and `hide_rescheduling_options` are both false on the Dev configuration. They cannot work (private configuration) and change nothing in Sharetribe.
+
+**Next:** get the status of the failing `cancel-booking` request, then fix; then turn off the hosted links in the same configuration change as event title and Google Meet.
+
+---
+
 ## HANDOFF — 2026-10-27 (release-2 pushed to Dev)
 
 **Branch / PR:** `docs-release-2-rollout`, docs and one helper script only. PR #6 (the recovery code) is merged and live on Render dev.
