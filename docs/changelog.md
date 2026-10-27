@@ -19,6 +19,47 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-10-27 (payment-failure recovery)
+
+**Branch / PR:** `payment-failure-recovery`, PR open to `main`, not merged. Process release-2 is **not pushed to any environment**.
+
+**What changed**
+- **Server owns create-booking after payment** (`server/api/nylas/bookingRecovery.js`). Postgres claim so only one worker acts; up to two attempts (transient failures retried, "slot taken" not); about 10 seconds' grace for a late `booking.created` webhook; then `transition/operator-decline` and a Sentry error (code `nylas-booking-failed-declined`). A webhook that lands after a decline cancels the orphaned Nylas booking. `createBookingEndpoint.js` now only proves the caller is the customer and hands over.
+- **Sweeper** (`server/jobs/`): every 60 seconds, handles paid-but-unconfirmed bookings older than 3 minutes. Starts from `server/index.js` once the schema is ready. `DISABLE_BACKGROUND_JOBS=true` turns it off.
+- **`resolveBookingTarget(tx)`** in `manageBookingShared.js` is now the one place that picks a booking's Nylas configuration. Session lengths will change only that.
+- **Pricing hole closed** (`server/api-util/bookingVariantCheck.js`, called from `transactionLineItems`): a fixed-length booking is refused if its price variant is missing, unknown, or the wrong length.
+- **Process release-2 in `ext/`**: no provider accept/decline, no "new booking request" or "declined on your behalf" emails; the client's failure email and the expired email now have real text for fixed-length sessions (they rendered none).
+- **Client**: customers see "Confirming your session…" and the page polls (stops after 5 minutes); coaches get no Accept/Decline (unless an old release-1 transaction still allows it), no inbox badge, neutral wording.
+- Repaired `docs/decisions.md`: my earlier edit had inserted an entry into the header sentence. Added the Oct 27 "slots every 30 minutes; no length filter" decision.
+
+**What passed**
+- Server tests 346 (was 295; +51), client tests 1,119 including new ones for the poll hook and coach buttons. `format-ci` clean. One Inbox snapshot updated: the coach's notification dot and "action needed" label disappear for a paid-but-unconfirmed booking, as intended.
+- Against the real Dev services: the sweeper's Integration API query runs; `loadTransactionAsOperator` returns the transaction, listing, booking and the customer's email; `resolveBookingTarget` reads the real variant name from the transaction; the real `ensureBooking` on a real settled transaction touches nothing; the pricing check behaves correctly on the real Dev listing.
+- Sharetribe's documentation says `stripe-refund-payment` "supports both cancelling a PaymentIntent that has not yet been captured" and refunding a captured one.
+- Three of Dev's four transactions ended in `transition/expire`: the old failure mode did happen during earlier testing.
+
+**What did NOT pass or was not run (needs Regan)**
+- **Stripe test-mode check** that `operator-decline` cancels the authorisation, and every end-to-end scenario (bad `NYLAS_API_KEY` then pay with 4242; close the tab right after paying; block the calendar after picking a slot; happy path): all need a logged-in client, `flex-cli`, and the deployed service, none of which I have.
+- **The SQL was never run against a real Postgres** (none available locally). It uses plain `INSERT ... ON CONFLICT ... WHERE ... RETURNING` and `$n::int * interval '1 second'`. After the first deploy, check Render's logs for `[nylas-db] booking mapping table ready` and no `schema init failed`. The two-worker race is tested only against a stand-in with the same semantics.
+- The process EDN was checked for balanced brackets only; `flex-cli` will validate it on push.
+
+**Rollout, in this order**
+1. Merge the PR so Render dev deploys the code. Check the schema log lines above.
+2. Set `REACT_APP_SENTRY_DSN` in Render (a redeploy is needed) and add a Sentry alert rule on the tags `nylas-booking-failed-declined`, `nylas-decline-failed`, `nylas-orphan-booking-cancelled` to email Regan.
+3. Install `flex-cli` and log in. Push to **Dev only**: `flex-cli process push --path ext/transaction-processes/default-booking --process default-booking -m <dev marketplace>`, then `flex-cli process create-alias --process default-booking --version <n> --alias release-2 -m <dev marketplace>`. (Check `flex-cli process --help`; I couldn't run it.)
+4. In Dev's Console, point the Signature Session listing type at `default-booking/release-2`. This deliberately breaks the "change Test, then copy forward" rule, because Test must not get release-2. **A later Test→Dev copy of the listing types would silently put it back to release-1.**
+5. Run the scenarios above with the 4242 test card.
+
+**What's next**
+- Session lengths (decision recorded): the resolver is ready; needs per-length Nylas configurations, 30-minute slot starts, and removing the `length` field.
+- Email fixes for the coach's confirmation, then working hours, then coach onboarding.
+- Release-2 for Live happens at cutover, after Extend.
+
+**Blocked / needs a decision**
+- Nothing blocks the merge, but nothing is proven end to end until step 5 above.
+
+---
+
 ## HANDOFF — 2026-10-27
 
 **Branches / PRs:** PR #4 (`button-token-menu-label`) open. This docs branch is separate.
