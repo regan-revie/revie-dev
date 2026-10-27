@@ -19,6 +19,33 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-10-27
+
+**Branches / PRs:** PR #4 (`button-token-menu-label`) open. This docs branch is separate.
+
+**What changed**
+- **PR #4:** removed the hardcoded maroon from the primary button so `--colorPrimaryButton` drives it (Dev's hosted `primaryButton` confirmed `#310416`; verified by changing the variable and watching the button change). The topbar overflow "Menu" label is now off-white on maroon with a lavender hover underline, done in `revieTokens.css` so the core `LinksMenu.module.css` is untouched. Checked at 1024px with an injected element; the label can't be seen organically because the single custom link fits.
+- Added the "Session lengths use Sharetribe price variations" decision and recorded the investigation in `tech-constraints.md`.
+
+**Plan: session lengths (not built)**
+- **Needs one Nylas configuration per length.** Probed: Nylas rejects a duration parameter on a private configuration's availability, and a booking must match a slot from the same configuration. Store `publicData.nylasConfigurationIds` keyed by length (keep the existing id as the 60-minute entry).
+- **Server:** `scheduler.js` takes a duration per configuration; `enableListing.js` syncs one per distinct variant length (and again when a coach edits variants; lazy creation as a fallback); the availability endpoint takes `priceVariantName`, validates it against the listing's variants and uses that length's configuration; booking, cancel and reschedule resolve the configuration from the transaction's variant through one function (`loadCalendarBookingTransaction`).
+- **Enforcement:** at initiate, check that the booking's length equals the variant's length, that the variant name exists (no silent fallback to the base price), and the working-hours and notice rules on start and end.
+- **Client:** `NylasBookingForm` refetches slots when the variant changes; the browser-side `slotMatchesVariant` filter becomes redundant. The reschedule picker uses the booked length.
+- **Build order:** payment-failure recovery first, but it should call one resolver, `resolveBookingTarget(tx)` (configuration, start, end, length), instead of reading `configurationId` directly. Variations then only change that resolver, so neither piece is reworked.
+
+**What's next**
+- Merge PR #4. Then payment-failure recovery, email fixes, working hours, session lengths.
+- Regan: set `REACT_APP_SENTRY_DSN` in Render; create the Postmark account.
+
+**Blocked / needs a decision**
+- Slot step: Nylas starts on the hour (`round_to: 60`). A 90-minute session on the hour wastes 30 minutes, and Live has 45 and 75 minute sessions. Decide whether starts should be every 30 or 15 minutes.
+- Dropping `length` removes the "Session Length" search filter. Sharetribe can't filter on a variant's length, so there will be no length filter. Decide if that is acceptable.
+- Live has no 120-minute sessions today; the longest is 90.
+- The Zapier zap into Webflow may map `length` or `timezone`; unverified, check it before removing `length`.
+
+---
+
 ## HANDOFF — 2026-10-26 (second session)
 
 **Branch:** `revie-design-tokens`, pushed to PR #1 (not merged).
