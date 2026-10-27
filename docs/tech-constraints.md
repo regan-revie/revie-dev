@@ -32,7 +32,7 @@ Three Sharetribe environments, each with its own hosted configuration (listing t
 - Listing type `signature-session`, process `default-booking/release-1`, `unitType: fixed`, `availabilityType: oneSeat`, 20% provider commission
 - Listing fields, the same in Dev, Test and Live: `identity`, `communication_style`, `structure`, `language`, `coachlocation`, `pre_work`
 - One difference: Dev and Test have a `length` field; Live has `timezone` instead (a workaround for Sharetribe having no per-coach timezone; don't build anything on it)
-- **`length` is "Session Length"** (an enum: 60, 90 or 120 minutes) and is a search filter. It is not connected to the booking duration: Nylas takes the duration from the event type (60 minutes), so a coach choosing "90 minutes" still gets 60-minute slots. No code in the repo reads or writes `length` or `timezone`; both are used only through Console's hosted config.
+- **`length` is "Session Length"** (an enum: 60, 90 or 120 minutes) and is a search filter. It is not connected to the booking duration. Decision (Oct 26): drop it and don't add it to Live; session length comes from price variations (below). Its only reference anywhere is its own definition in Dev's hosted `listing-fields.json`, so removing it also removes the "Session Length" search filter. No code, translation, config or doc in the repo reads it. Live has `timezone` instead and no `length`.
 - Listing types and fields are hosted config in Console. The repo's local config files are the stock template, commented out, so the repo alone doesn't show them.
 
 **Not built yet**
@@ -62,6 +62,15 @@ Every email today is a Sharetribe built-in. The default-booking process (`ext/tr
 - Times in these emails come from the transaction's booking, which Sharetribe never updates, so they show the original time after a reschedule.
 - Account emails (verify email, password reset, user approval) are Sharetribe built-ins configured in Console, not in the repo.
 - Unverified: Google/Nylas may also send its own calendar invitation to the client when the booking event is created.
+
+## Session lengths and price variations
+- **The template (12.3) fully supports price variations for the `fixed` unit type.** The coach editor offers up to 20 variants per listing, each with a name, a price and a length (15-minute steps, up to 12 hours), stored in `publicData.priceVariants` as `{name, priceInSubunits, bookingLengthInMinutes}`. Dev's `signature-session` listing type has `priceVariations.enabled: true`.
+- **Our booking form already knows about variants.** `NylasBookingForm` shows the variant picker, sends `priceVariantName` through checkout (it lands in the transaction's `protectedData`), and filters the slot list to the chosen variant's length in the browser.
+- **But no length other than 60 minutes can be booked today.** Nylas returns slots at the configuration's fixed duration (`duration_minutes`, 60 in `scheduler.js`), so a 30, 90 or 120 minute variant finds no slots.
+- **Nylas can't offer several lengths from one configuration.** Probed against the live API: a private configuration's availability endpoint rejects `duration_minutes` and `duration` (HTTP 400, "invalid path"). Nylas's docs say a booking's start and end "must correspond to a valid time slot returned by the Scheduling Availability endpoint using the same Configuration", so longer slots can't be built by joining shorter ones. Duration is one fixed value per configuration. The way through is one Nylas configuration per length. Nylas documents no limit on configurations per grant or application.
+- **Everything reads one configuration today.** `loadCalendarBookingTransaction` (`manageBookingShared.js`) returns a single `publicData.nylasConfigurationId`, used by booking creation, cancel and reschedule.
+- **Pricing falls back silently.** `server/api-util/lineItems.js` uses the named variant's price only if the name matches; otherwise it charges the listing's base price, which the pricing panel sets to the *lowest* variant. A longer session booked without a matching `priceVariantName` is charged the cheapest variant. Nothing on the server checks that the booking's length matches the variant's `bookingLengthInMinutes`, so a crafted request could pay a 30-minute price for a 120-minute slot.
+- **Live today (read from the public site, 46 listings, 47 variants):** 60 minutes ×24, 90 ×16, 75 ×4, 45 ×2, 30 ×1, none at 120. 45 and 75 minutes exist, not only multiples of 30. Live listings carry `startTimeInterval` and `timezone`, and no `calendarBookingEnabled`.
 
 ## Sharetribe constraints that shape design
 - **Top-level data model is fixed:** users, listings, transactions, bookings, stock, reviews, messages, each extensible with extended data. No new first-class entities. Anything else needs our own database (Postgres on Render).
