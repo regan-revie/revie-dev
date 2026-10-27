@@ -7,6 +7,16 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Cancellation policy
+**Date:** Oct 26, 2026
+**Decision:** Clients can cancel free up to 48 hours before a session; after that the session is charged. No exceptions at launch. A deposit for exams or assessments a coach buys for the client is a post-launch item.
+**Affects:** Client cancellation emails (Postmark), checkout copy, booking terms.
+
+### DECISION: Support email is hello@heyrevie.com
+**Date:** Oct 26, 2026
+**Decision:** hello@heyrevie.com is the support address in every email footer and the reply-to on Postmark emails.
+**Affects:** Sharetribe email templates, Postmark templates.
+
 ### DECISION: Booking failure after payment releases the hold
 **Date:** Oct 26, 2026
 **Decision:** The server owns create-booking after payment. It retries once; on a second failure it declines the transaction (releasing the card authorisation), logs to Sentry and emails Regan. A coach never sees an acceptable request for a session that isn't on their calendar.
