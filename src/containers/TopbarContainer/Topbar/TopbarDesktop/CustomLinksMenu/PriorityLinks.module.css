@@ -27,7 +27,7 @@
   font-size: 14px;
   line-height: 18px;
   letter-spacing: 0;
-  color: var(--colorGrey700);
+  color: var(--revieCream);
 
   flex-shrink: 0;
   height: 100%;
@@ -35,8 +35,8 @@
   margin: 0;
 
   &:hover {
-    color: var(--colorBlack);
-    border-bottom: 4px solid var(--marketplaceColor);
+    color: var(--colorWhite);
+    border-bottom: 4px solid var(--revieLavender);
     border-radius: 0;
     text-decoration: none;
   }
@@ -48,9 +48,9 @@
 }
 
 .highlight {
-  color: var(--marketplaceColor);
+  color: var(--revieLavender);
   &:hover {
-    color: var(--marketplaceColorDark);
+    color: var(--revieLavenderDeep);
   }
 }
 
@@ -60,4 +60,8 @@
   margin: 28px 0;
   text-decoration: inherit;
   text-wrap: nowrap;
+
+  font-family: var(--fontFamilySecondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }

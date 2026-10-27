@@ -9,12 +9,8 @@
   justify-content: center;
 
   /* Colors */
-  background-image: linear-gradient(
-    -180deg,
-    var(--marketplaceColorLight) 0%,
-    var(--marketplaceColor) 100%
-  );
-  color: var(--colorWhite);
+  background-color: var(--revieLavender);
+  color: var(--revieMaroon);
 
   &:hover {
     text-decoration: none;

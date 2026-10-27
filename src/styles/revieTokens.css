@@ -1,0 +1,341 @@
+/**
+ * Revie design tokens.
+ *
+ * Overrides src/styles/marketplaceDefaults.css. Must be imported AFTER it —
+ * see the wiring note at the bottom of this file.
+ *
+ * Why a separate file: this fork tracks sharetribe/web-template upstream, and
+ * editing marketplaceDefaults.css directly would conflict on every merge. This
+ * file is additive, so upstream can change its defaults freely and Revie's
+ * values still land on top.
+ *
+ * Every value here was checked against the actual variables and global element
+ * styles in marketplaceDefaults.css. Source of truth for brand values:
+ * docs/brand.md.
+ */
+
+/* ================================================================
+   FONT FACES
+   All three families are self-hosted from src/assets/fonts/. Confirmed
+   against the webpack config: this file has no preprocessor, so
+   resolve-url-loader never applies to it — url() resolves through plain
+   css-loader, relative to this file's own location, same as a JS import.
+   Hence '../assets/fonts/...' below, one level up from src/styles/.
+
+   TT Commons Pro and Bio Sans are static fonts: two faces each, Regular
+   (400) and Bold (700). Bio Sans has no italic and no 500 or 600 weights.
+   The browser maps a request to the nearest face WITHOUT faking it: 500
+   renders with the 400 face, 600 with the 700 face. The template uses
+   weight 500 for body text (html/li/p/pre) and 600 for many labels, so
+   body text sits at 400 and semibold labels sit at 700. Italic text (e.g.
+   Reviews, ActivityFeed) is the browser's synthesised slant, because there
+   is no Bio Sans italic file.
+
+   Schibsted Grotesk is a variable font, declared as ONE face with a
+   font-weight RANGE (100 900), so the 500 used by buttons and nav links is
+   the font's real 500 instance rather than a substitute.
+   ================================================================ */
+
+@font-face {
+  font-family: 'TT Commons Pro';
+  src: url('../assets/fonts/tt-commons-pro-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TT Commons Pro';
+  src: url('../assets/fonts/tt-commons-pro-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Bio Sans';
+  src: url('../assets/fonts/bio-sans-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Bio Sans';
+  src: url('../assets/fonts/bio-sans-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Schibsted Grotesk';
+  src: url('../assets/fonts/schibsted-grotesk-variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ================ Revie palette ================ */
+  /* Reference these. Never repeat a hex anywhere else in the codebase. */
+
+  --revieMaroon: #310416; /* Pantone 7421 C — primary */
+  --revieLavender: #dbabf5; /* Pantone 2562 C — primary */
+  --revieGreen: #032723; /* Pantone 5535 C */
+  --reviePink: #ff90c2; /* Pantone 190 C */
+  --revieOrange: #ff9352; /* Pantone 1635 C */
+  --reviePeriwinkle: #d8e6ff; /* Pantone 2708 C */
+  --revieChartreuse: #eaea73; /* Pantone 379 C */
+  --revieCream: #efeeed; /* Pantone Gray 1 C — the brand neutral */
+
+  /* Tonal variants, derived by lightness only so hue and saturation hold. */
+  --revieMaroonDeep: #230310; /* hsl(336 85% 7%)  — pressed */
+  --revieMaroonSoft: #470620; /* hsl(336 85% 15%) — hover */
+  --revieLavenderDeep: #c98cf0; /* hsl(281 79% 75%) — pressed */
+  --revieLavenderSoft: #ebcdf9; /* hsl(281 79% 89%) — tint */
+
+  /* ================ Greys ================ */
+  /**
+   * Stock greys sit at hue 240 (bluish) and read cold against a warm maroon
+   * and cream palette.
+   *
+   * Two things worth knowing about this scale:
+   *
+   * 1. body { background-color: var(--colorGrey50) } — so grey50 IS the page
+   *    background of the entire app. Setting it to the brand cream makes
+   *    #EFEEED the ground everywhere, in one line.
+   *
+   * 2. The rest of the ramp runs at hue 30 (the cream's own hue, a warm
+   *    neutral) and resolves into the brand maroon at the dark end, so greys
+   *    belong to the palette rather than sitting beside it.
+   */
+
+  --colorGrey50: var(--revieCream); /* page background */
+  --colorGrey100: hsl(30 5% 88%); /* borders, hairlines */
+  --colorGrey200: hsl(30 5% 80%);
+  --colorGrey300: hsl(30 5% 70%);
+  --colorGrey400: hsl(30 4% 60%);
+  --colorGrey500: hsl(30 4% 50%);
+  --colorGrey600: hsl(30 5% 40%);
+  --colorGrey700: hsl(30 6% 30%);
+  --colorGrey800: hsl(336 25% 18%);
+  --colorGrey900: var(--revieMaroon);
+
+  /* ================ Buttons ================ */
+  /**
+   * Maroon and lavender are Revie's primary colours. Stock primary button is
+   * #138041, a green inherited from Sharetribe's demo marketplace.
+   *
+   * Primary   — maroon ground, off-white label, pill shape. 15.63:1, AAA.
+   *             Hover/focus — pink ground (--reviePink), maroon label. 8.64:1,
+   *             AAA. Pink matches heyrevie.com's live CTA hover.
+   * Secondary — lavender ground, maroon label, same pill shape. 9.62:1, AAA.
+   *             Hover/focus — pink ground, maroon label.
+   *
+   * Decision (docs/decisions.md, "Colours follow the brand guidelines"):
+   * every text/background combination must be an approved pairing from
+   * docs/brand.md. Pink and orange are hover/accent only.
+   *
+   * Shape and type are matched against the live CTAs on heyrevie.com
+   * (measured): 14px Schibsted Grotesk 500, uppercase, 1px letter-spacing,
+   * 20px/40px padding, fully rounded. See src/components/Button/
+   * Button.module.css for the actual rules.
+   *
+   * IMPORTANT: Console's marketplaceColors.primaryButton is applied inline
+   * on <html> via mergeBranding and beats --colorPrimaryButton below
+   * regardless of load order. The primary button therefore sets its maroon
+   * ground explicitly in Button.module.css instead of trusting the token,
+   * but Console should still be set to #310416 so the other users of the
+   * token (inline primary button, spinner states) agree.
+   *
+   * Orange, pink, periwinkle and chartreuse stay accents: tags, illustration,
+   * empty states, and pink is also the button hover. Not otherwise the main
+   * action on a screen.
+   *
+   * NOTE: --marketplaceColor is deliberately NOT set here. marketplaceDefaults
+   * says it comes from brandingConfig and hosted assets, which overwrite the
+   * CSS value. Set it in Console to #310416 — that also colours every link,
+   * since a { color: var(--marketplaceColor) }.
+   */
+
+  --colorPrimaryButton: var(--revieMaroon);
+  --colorPrimaryButtonDark: var(--revieMaroonDeep);
+  --colorPrimaryButtonLight: var(--revieMaroonSoft);
+
+  --colorSecondaryButton: var(--revieLavender);
+  --colorSecondaryButtonDark: var(--revieLavenderDeep);
+  --colorSecondaryButtonLight: var(--revieLavenderSoft);
+
+  /* ================ Typography ================ */
+  /**
+   * TT Commons Pro     — main headlines (Regular 400 + Bold 700 licensed)
+   * Schibsted Grotesk  — secondary headlines and CTAs, ALL CAPS (SIL OFL)
+   * Bio Sans           — body copy (Regular 400 + Bold 700 only; no italic)
+   *
+   * IMPORTANT: this template has no headline font variable. h1–h6 declare no
+   * font-family and inherit from body, which uses --fontFamily. So a headline
+   * token alone does nothing — the global element overrides further down are
+   * what actually apply TT Commons Pro. Both are needed.
+   */
+
+  --fontFamily: 'Bio Sans', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+
+  --fontFamilyHeadline: 'TT Commons Pro', 'Schibsted Grotesk', var(--fontFamily);
+  --fontFamilySecondary: 'Schibsted Grotesk', var(--fontFamily);
+
+  /* ================ Shape ================ */
+  /**
+   * Stock is 2px / 4px, which reads sharp and institutional. Revie's brand
+   * world is built on rounded, pill-like forms — the logo, the tag treatments,
+   * the colour-combination swatches. This registers fastest of any change here.
+   *
+   * --borderRadiusLarge and --borderRadiusPill are NEW names; nothing in the
+   * template consumes them yet. They exist so Revie-specific components have a
+   * defined value to reach for instead of inventing one.
+   */
+
+  --borderRadius: 8px;
+  --borderRadiusMedium: 12px;
+  --borderRadiusLarge: 20px;
+  --borderRadiusPill: 999px;
+
+  /* ================ Shadows ================ */
+  /**
+   * Stock shadows are pure black, which desaturates a warm palette. Tinted
+   * with brand maroon (49, 4, 22) so elevation stays warm. Every shadow the
+   * template defines is overridden — a mix of black and maroon shadows across
+   * the app would look like a bug.
+   */
+
+  --boxShadow: 0 2px 4px 0 rgba(49, 4, 22, 0.1);
+  --boxShadowTop: 0 -2px 4px 0 rgba(49, 4, 22, 0.1);
+  --boxShadowLight: 0 2px 4px 0 rgba(49, 4, 22, 0.05);
+  --boxShadowPopup: 0 8px 16px 0 rgba(49, 4, 22, 0.3);
+  --boxShadowPopupLight: 0 3px 6px 0 rgba(49, 4, 22, 0.2);
+  --boxShadowBreakdown: 0 3px 6px 0 rgba(49, 4, 22, 0.2);
+  --boxShadowButton: 0 4px 8px 0 rgba(49, 4, 22, 0.1);
+  --boxShadowListingCard: 0 0 50px 0 rgba(49, 4, 22, 0.1);
+  --boxShadowFeaturedListingCard: 0 0 30px 0 rgba(49, 4, 22, 0.1);
+  --boxShadowNotFoundPageSearch: 0 2px 4px 0 rgba(49, 4, 22, 0.5);
+  --boxShadowSectionLocationHover: 0 10px 30px 0 rgba(49, 4, 22, 0.1);
+  --boxShadowBottomForm: 0 -2px 4px 0 rgba(49, 4, 22, 0.05);
+  --boxShadowFilterButton: 0 4px 16px 0 rgba(49, 4, 22, 0.2);
+
+  /* ================ DatePicker ================ */
+  /**
+   * The booking calendar is the most-used custom surface in the product, so it
+   * gets a complete override rather than a partial one.
+   *
+   * The template's datepicker assumes a DARK, saturated ground with white text
+   * — hover states are rgba(255,255,255,0.2), the date outline is solid white,
+   * header text and arrows are white. Keeping that assumption and swapping the
+   * ground to maroon means all of it still works. Switching to a light ground
+   * would silently break header text, arrows and outlines.
+   *
+   * Stock also uses --colorSuccess (#138041, green) for the selected date.
+   * Lavender on maroon reads as selection without borrowing success semantics.
+   *
+   * Contrast: cream on maroon 15.63:1, lavender on maroon 9.62:1, maroon on
+   * lavender 9.62:1. All AAA.
+   */
+
+  --datepickerFgColor: var(--revieCream);
+  --datepickerBgColor: var(--revieMaroon);
+  --datepickerBorderColor: var(--revieMaroonSoft);
+  --datepickerDisabledFgColor: rgba(239, 238, 237, 0.35);
+  --datepickerDisabledTextDeco: unset;
+  --datepickerHoveredFgColor: inherit;
+  --datepickerHoveredBgColor: rgba(255, 255, 255, 0.15);
+  --datepickerHeaderFgColor: var(--revieCream);
+  --datepickerHeaderFgColorDisabled: rgba(239, 238, 237, 0.35);
+  --datepickerHeaderArrowColor: var(--revieLavender);
+  --datepickerDateOutline: var(--revieLavender) solid 1px;
+  --datepickerButtonOutlineColor: var(--revieLavender);
+  --datepickerSelectedFgColor: var(--revieMaroon);
+  --datepickerSelectedBgColor: var(--revieLavender);
+  --datepickerSelectedHoveredFgColor: var(--revieMaroon);
+  --datepickerSelectedHoveredBgColor: var(--revieLavenderDeep);
+}
+
+/* ================================================================
+   GLOBAL ELEMENT OVERRIDES
+
+   marketplaceDefaults.css styles h1–h6 globally and they inherit the
+   body font. These rules are what actually put TT Commons Pro on
+   screen. Sizes, line-heights, margins and media queries are left
+   alone — the template's vertical rhythm is built on 6px/8px
+   multiples and changing sizes here would break it.
+
+   NOTE: components use CSS Modules, so a global utility class can't
+   be referenced from a component's .module.css without :global().
+   That's why this targets elements rather than defining classes.
+   ================================================================ */
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--fontFamilyHeadline);
+  letter-spacing: -0.01em;
+}
+
+/**
+ * Stock h1 uses --fontWeightBlack (900). Only TT Commons Pro Regular (400)
+ * and Bold (700) are licensed, so 900 would be synthesised by the browser and
+ * render as a smeared fake-bold. Pinned to 700.
+ *
+ * If a heavier headline weight is wanted later, buy the weight from TypeType
+ * rather than reverting this.
+ */
+h1 {
+  font-weight: var(--fontWeightBold);
+}
+
+/**
+ * h6 is already uppercase in the template, which is exactly the role
+ * Schibsted Grotesk plays in the brand — secondary headings and eyebrows.
+ */
+h6 {
+  font-family: var(--fontFamilySecondary);
+  letter-spacing: 0.04em;
+}
+
+/* ================================================================
+   WIRING THIS UP
+
+   1. Import, in src/index.js, immediately after line 22:
+
+        import './styles/marketplaceDefaults.css';
+        import './styles/revieTokens.css';    <- add this
+
+      Order is the whole point: CSS is last-wins, so these must load
+      after the defaults. Still ahead of every component stylesheet.
+      This one line is the only change to a core template file.
+
+   2. @font-face rules go in the placeholder block at the top of this
+      file. Required families, named exactly to match the stacks above:
+        'TT Commons Pro'    400 and 700 (two static faces)
+        'Bio Sans'          400 and 700 (two static faces)
+        'Schibsted Grotesk' variable, font-weight: 100 900
+      Use font-display: swap on every face so text renders in a
+      fallback instead of staying invisible while fonts load.
+
+      Body text uses --fontWeightMedium (500) per the template's
+      html/li/p/pre rule. Bio Sans has no 500, so it renders with the
+      400 face (see the note at the top of this file).
+
+   3. In Sharetribe Console, set the marketplace colour to #310416.
+      That drives --marketplaceColor, which colours every link and the
+      text selection highlight.
+
+   STILL OUTSTANDING, tracked separately:
+   - Replace the biketribe-* assets in src/assets/ and the imports in
+     src/config/configBranding.js.
+   - Audit components for hardcoded hex, px radii and font-family
+     declarations. Unknown how many exist; they'd override these tokens.
+   - --colorSuccess / --colorFail / --colorAttention are left at stock
+     values deliberately. They carry meaning rather than brand, and
+     none of them is in the Revie palette. Worth a decision later.
+   ================================================================ */

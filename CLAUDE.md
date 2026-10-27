@@ -29,6 +29,12 @@ on-brand by default.
 Do not condense, tidy or reorganise the existing Nylas documentation. It
 records traps that were expensive to find and all of it stays.
 
+**Branding assets differ by Sharetribe environment.** Dev uses the cream
+desktop wordmark because this repo's topbar is maroon. Live must keep the
+maroon wordmark: Live runs Sharetribe's hosted frontend with a white topbar
+and none of this repo's CSS, so a cream logo there would be invisible. Do not
+copy Dev branding to Live until Live runs this codebase (post-Extend).
+
 ## Working in this repo
 
 ### Commands
@@ -50,6 +56,7 @@ records traps that were expensive to find and all of it stays.
   - **This is narrower than what it replaced**, not merely quieter. The desktop app integration gave Claude's shell whatever the signed-in human could see — every vault — for as long as the app stayed unlocked. Widening the auto-lock window to stop the interruptions would have widened that further; the service account removes the prompts *and* cuts access to one vault, read-only, with its use logged.
   - The token record lives outside `Revie Dev` on purpose, so the credential is not stored inside the thing it unlocks.
 - **Diagnosing `op` when it stops working:** `op whoami` is ambiguous — it says the same thing whether the app is locked, the CLI integration is off, or no account is configured. `op account list` is the one that distinguishes them: empty means the CLI genuinely has no account. Prefer re-enabling **Settings → Developer → Integrate with 1Password CLI** over `op account add`, because the manual path writes derived key material into `~/.config/op/config` whereas the app integration stores nothing.
+- **GitHub CLI: always pass `--repo regan-revie/revie-dev`.** In this clone `gh` resolves its default repo to `sharetribe/web-template` (the `upstream` remote), so a bare `gh pr create` targets Sharetribe's public repository.
 - **Tests:** `yarn test` (client, Jest) and `yarn test-server` (Express server tests). `yarn test-ci` runs both.
 - **Format:** `yarn format` (Prettier over `**/*.{js,css}`); CI enforces it via `yarn format-ci`.
 - **Config:** `yarn config-check` validates `src/config/` against the connected Sharetribe environment. `yarn build` produces the production bundle; `yarn start` serves it.
@@ -127,6 +134,23 @@ repo previously — much of the Nylas integration and the decisions recorded in
 this file are his. He is not currently the one driving day-to-day work. If a
 change would invalidate something he built or decided, say so explicitly.
 
+## Working with the planning project
+
+`docs/` is the shared source of truth between this repo and Regan's Claude
+project on Claude.ai. The planning project decides; this repo builds and
+records what happened.
+
+- **When Regan pastes a "### DECISION:" block**, add it to the top of
+  `docs/decisions.md`, and update this file if it changes how you work.
+- **At the end of every session**, append a "## HANDOFF" entry to
+  `docs/changelog.md` (template at the top of that file): what changed, what's
+  next, anything blocked.
+- **If you change listing fields, transaction processes, integrations** or
+  anything else covered by `docs/tech-constraints.md`, update that file in the
+  same change.
+- **Work to `docs/go-live-plan.md`** (phases, dates, what to cut if November slips) and to the launch scope in `docs/decisions.md`.
+- **Never put secrets in `docs/`.** This folder is synced to Claude.ai.
+
 ## The six requirements that shaped the calendar decision
 Sharetribe's built-in calendar can't do these:
 1. Coaches do not need to leave the heyrevie.com platform.
@@ -185,6 +209,7 @@ Sharetribe's built-in calendar can't do these:
   Note there is a `Sharetribe` item in the `Revie` 1Password vault, separate from `sharetribe_dev_id` / `sharetribe_dev_secret` in `Revie Dev`, which is presumably the live application's credentials.
 - **When does the app leave Sandbox?** Nothing in the integration can carry Revie branding or narrowed scopes until it does, so this gates the polish rather than the build. It must happen before real coaches connect.
 - (Superseded, no longer relevant: an earlier question about Cal.com's "active user billing" vs "high water mark" billing — moot now that we've moved to Nylas.)
+- **Should Signature Sessions have their own photos at all, or show the coach's headshot instead?** Found while auditing the design-system work: session listings currently have no real photography — the "Test Session" listing's image is the Revie logo itself, uploaded as a stand-in during earlier testing, not a deliberate fallback. The stock no-image placeholder (`NoImageIcon.js`) is a generic, unbranded picture-frame SVG. A client is booking a person, not an object, so a headshot-first treatment may fit better than the template's default photo-gallery assumption. Decide before onboarding coaches at scale.
 
 ## Current state — Phase 1 done, Phase 2's booking loop verified end to end
 **Phase 1 is proven.** The stock template runs locally against the `revie_dev` environment: `yarn dev` serves the frontend on :3000 and the API server on :3500, 1Password resolves both Sharetribe credentials through `op run`, the hosted config assets load from the Marketplace API, and the app renders in the browser. The repo is no longer a bare fork: `server/api/nylas/` holds the webhook receiver and the coach calendar connect flow, `render.yaml` defines the deployed service, and `server/apiRouter.js` and `server/index.js` carry small, commented changes to wire them in. Everything else is still upstream.
@@ -233,8 +258,9 @@ Still outstanding for Phase 2:
 
 Also currently incomplete: `REACT_APP_STRIPE_PUBLISHABLE_KEY` and `REACT_APP_MAPBOX_ACCESS_TOKEN` are both empty in `.env`. Stripe is needed before any payment flow can be tested end to end.
 
-## Backlog — next project after this one: discount codes
-Not in scope yet, but worth keeping the architecture compatible: Regan wants discount codes, and there's an existing Stripe integration via Sharetribe. The planned approach (confirmed against Sharetribe's own docs, which use "validating a discount code" as their canonical example for privileged transitions): client submits a code with the booking request → the trusted backend (the same one built for the calendar integration) validates it against a small store of valid codes → backend calls a privileged transition (`privileged-set-line-items`) to recompute Sharetribe's line items with a discount line item → Sharetribe charges the discounted total through its existing Stripe Connect flow, unchanged. No need to touch Stripe's own Coupon/PromotionCode objects. When this project starts, it should mostly be "one more privileged transition + a table of codes" on top of the backend this project builds — don't build the calendar backend in a way that makes that harder later.
+## Backlog
+- **Next project after this one: discount codes.** Not in scope yet, but worth keeping the architecture compatible: Regan wants discount codes, and there's an existing Stripe integration via Sharetribe. The planned approach (confirmed against Sharetribe's own docs, which use "validating a discount code" as their canonical example for privileged transitions): client submits a code with the booking request → the trusted backend (the same one built for the calendar integration) validates it against a small store of valid codes → backend calls a privileged transition (`privileged-set-line-items`) to recompute Sharetribe's line items with a discount line item → Sharetribe charges the discounted total through its existing Stripe Connect flow, unchanged. No need to touch Stripe's own Coupon/PromotionCode objects. When this project starts, it should mostly be "one more privileged transition + a table of codes" on top of the backend this project builds — don't build the calendar backend in a way that makes that harder later.
+- **Coach profile URLs are `/u/{uuid}`.** Coach profiles are a primary SEO surface, and a UUID doesn't read as a real product. Making them `/u/{name-slug}` requires: a slug field in user `publicData`, uniqueness enforcement at signup, a custom route, server-side slug-to-id resolution via the Integration API, and redirects when a name changes. Real work, not urgent. Listing URLs already slug correctly from the title, so this is specifically a profile-URL gap.
 
 ## Next session — start here
 Everything is committed and pushed to `origin/main`, working tree clean.
@@ -262,7 +288,7 @@ Everything is committed and pushed to `origin/main`, working tree clean.
 3. **Hardening** — reschedules/cancellations initiated from the calendar side, timezone edge cases, abandoned-booking handling.
 4. **Go-live** — upgrade to Sharetribe Extend, create the **non-sandbox Nylas application in the EU region** (see the data-region decision above — this is a blocker, not a nice-to-have), stand up the production Render service alongside the dev one, point at the live marketplace, and onboard real coaches (Nylas calendar connect + event-type selection). Note the dev Render environment already exists from Phase 2, so this is a second service rather than a first deploy.
 
-Check with Philip which phase we're currently in if it's not obvious from recent commits/branches.
+Check `docs/changelog.md` and recent commits/branches to see which phase we're currently in.
 
 ## Useful references
 - Sharetribe Web Template docs: https://www.sharetribe.com/docs/template/introduction/sharetribe-web-template/
