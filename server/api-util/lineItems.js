@@ -6,6 +6,7 @@ const {
   getCustomerCommissionMaybe,
 } = require('./lineItemHelpers');
 const { types } = require('sharetribe-flex-sdk');
+const { assertValidBookingVariant } = require('./bookingVariantCheck');
 const { Money } = types;
 
 /**
@@ -144,6 +145,10 @@ const getDateRangeQuantityAndLineItems = (orderData, code) => {
  * @returns {Array} lineItems
  */
 exports.transactionLineItems = (listing, orderData, providerCommission, customerCommission) => {
+  // Revie: refuse a booking whose price variant is missing/unknown or doesn't match its length,
+  // instead of silently charging the base (lowest) price. See bookingVariantCheck.js.
+  assertValidBookingVariant(listing, orderData);
+
   const publicData = listing.attributes.publicData;
   // Note: the unitType needs to be one of the following:
   // day, night, hour, fixed, or item (these are related to payment processes)

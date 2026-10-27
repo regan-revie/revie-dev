@@ -81,6 +81,7 @@ import {
   sendMessage,
   sendReview,
   fetchMoreMessages,
+  fetchTransaction,
   fetchTimeSlots,
   fetchTransactionLineItems,
   uploadFile,
@@ -88,6 +89,7 @@ import {
   selectFileUploads,
   downloadFile,
 } from './TransactionPage.duck';
+import { useConfirmingBookingPoll } from './useConfirmingBookingPoll';
 import css from './TransactionPage.module.css';
 
 const MAX_MOBILE_SCREEN_WIDTH = 1023;
@@ -1200,6 +1202,20 @@ const TransactionPage = props => {
   });
 
   const fileUploads = useSelector(selectFileUploads, shallowEqual);
+
+  // A paid calendar booking is confirmed by our server a few seconds after payment: keep the order
+  // page fresh until it is confirmed or declined. See useConfirmingBookingPoll.js.
+  const pollConfig = useConfiguration();
+  const refetchTransaction = useCallback(() => {
+    if (transaction?.id && props.transactionRole) {
+      dispatch(fetchTransaction(transaction.id, props.transactionRole, pollConfig));
+    }
+  }, [dispatch, transaction?.id, props.transactionRole, pollConfig]);
+  useConfirmingBookingPoll({
+    transaction,
+    transactionRole: props.transactionRole,
+    refetch: refetchTransaction,
+  });
 
   // Dispatch callbacks
   const onTransition = useCallback(

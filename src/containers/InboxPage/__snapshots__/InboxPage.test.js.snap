@@ -229,11 +229,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   >
     <div
       class="rowNotificationDot"
-    >
-      <div
-        class="notificationDot"
-      />
-    </div>
+    />
     <div
       class="itemUsername"
     >
@@ -265,7 +261,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="itemState"
     >
       <div
-        class="stateName stateActionNeeded"
+        class="stateName stateNoActionNeeded"
       >
         <span>
           InboxPage.default-booking.preauthorized.status

@@ -23,6 +23,9 @@
                   {{/ eq}}{{#eq "night" protected-data.unitType}}
                   {{t "BookingExpiredRequest.ContentForDaily" "{providerDisplayName} didn't respond to your booking request for {listingTitle} from {dateStart,date,::YYYYMMMd} to {dateEnd,date,::YYYYMMMd} on time, so your request expired. Your card has not been charged." dateStart=booking.start dateEnd=booking.end listingTitle=listing.title providerDisplayName=provider.display-name}}
                   {{/ eq}}
+                  {{#eq "fixed" protected-data.unitType}}
+                  {{t "BookingExpiredRequest.ContentForFixed" "We couldn't confirm {listingTitle} with {providerDisplayName}, so we've released it and your card hasn't been charged. Pick another time and we'll get you booked." listingTitle=listing.title providerDisplayName=provider.display-name}}
+                  {{/ eq}}
                 <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
                     <tr>

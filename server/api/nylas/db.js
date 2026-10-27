@@ -73,7 +73,84 @@ const initSchema = async () => {
     `CREATE INDEX IF NOT EXISTS nylas_bookings_transaction_idx
        ON nylas_bookings (sharetribe_transaction_id)`
   );
+  // One row per paid transaction whose calendar booking is being made. See bookingRecovery.js.
+  await query(`
+    CREATE TABLE IF NOT EXISTS nylas_booking_attempts (
+      sharetribe_transaction_id text PRIMARY KEY,
+      status                    text NOT NULL DEFAULT 'pending',
+      attempts                  integer NOT NULL DEFAULT 0,
+      last_error                text,
+      locked_until              timestamptz NOT NULL DEFAULT now(),
+      created_at                timestamptz NOT NULL DEFAULT now(),
+      updated_at                timestamptz NOT NULL DEFAULT now()
+    )
+  `);
   return true;
+};
+
+/**
+ * Try to become the only worker handling this transaction's booking.
+ *
+ * A single INSERT ... ON CONFLICT DO UPDATE ... WHERE statement, so Postgres decides the winner
+ * atomically: it returns a row only if this call inserted the row or took over an expired lock on
+ * a still-pending one. Anything else (a live lock held by another worker, or a transaction already
+ * booked/declined) returns no row. That is what stops the browser's call and the sweeper from both
+ * creating a booking, or one of them declining while the other is mid-attempt.
+ *
+ * The lock expires by itself, so a worker that dies mid-attempt does not strand the transaction.
+ *
+ * @returns {Promise<object|null>} the attempt row if the lock was won, otherwise null
+ */
+const claimBookingAttempt = async (sharetribeTransactionId, lockSeconds = 90) => {
+  const { rows } = await query(
+    `INSERT INTO nylas_booking_attempts (sharetribe_transaction_id, status, locked_until)
+     VALUES ($1, 'pending', now() + $2::int * interval '1 second')
+     ON CONFLICT (sharetribe_transaction_id) DO UPDATE
+       SET locked_until = now() + $2::int * interval '1 second',
+           updated_at   = now()
+       WHERE nylas_booking_attempts.status = 'pending'
+         AND nylas_booking_attempts.locked_until < now()
+     RETURNING *`,
+    [sharetribeTransactionId, Math.round(lockSeconds)]
+  );
+  return rows[0] || null;
+};
+
+const getBookingAttempt = async sharetribeTransactionId => {
+  const { rows } = await query(
+    `SELECT * FROM nylas_booking_attempts WHERE sharetribe_transaction_id = $1`,
+    [sharetribeTransactionId]
+  );
+  return rows[0] || null;
+};
+
+/** Count one more try at creating the booking, and remember why the last one failed. */
+const recordAttemptFailure = async (sharetribeTransactionId, lastError) => {
+  const { rows } = await query(
+    `UPDATE nylas_booking_attempts
+        SET attempts = attempts + 1, last_error = $2, updated_at = now()
+      WHERE sharetribe_transaction_id = $1
+      RETURNING *`,
+    [sharetribeTransactionId, String(lastError || '').slice(0, 500)]
+  );
+  return rows[0] || null;
+};
+
+/**
+ * Finish with a terminal status ('booked' or 'declined'), or release a still-pending attempt for
+ * the sweeper to pick up again after `retryInSeconds`.
+ */
+const finishBookingAttempt = async (sharetribeTransactionId, status, retryInSeconds = 0) => {
+  const { rows } = await query(
+    `UPDATE nylas_booking_attempts
+        SET status = $2,
+            locked_until = now() + $3::int * interval '1 second',
+            updated_at = now()
+      WHERE sharetribe_transaction_id = $1
+      RETURNING *`,
+    [sharetribeTransactionId, status, Math.round(retryInSeconds)]
+  );
+  return rows[0] || null;
 };
 
 /**
@@ -155,6 +232,10 @@ module.exports = {
   findByBookingId,
   findByTransactionId,
   setStatus,
+  claimBookingAttempt,
+  getBookingAttempt,
+  recordAttemptFailure,
+  finishBookingAttempt,
   close,
   query,
 };

@@ -15,6 +15,7 @@
 const db = require('./db');
 const { applyTransition, isConfigured: integrationConfigured } = require('./integration');
 const { isFreeCancellation, TRANSACTION_FIELD } = require('./scheduler');
+const { cancelIfDeclined } = require('./bookingRecovery');
 
 /**
  * Pull the Sharetribe transaction id out of a booking payload.
@@ -102,7 +103,13 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
     if (trigger === 'booking.pending') return { handled: true, action: 'recorded' };
 
     const result = await applyTransition(transactionId, 'transition/operator-accept');
-    if (result.alreadyApplied) return { handled: true, action: 'already-accepted' };
+    if (result.alreadyApplied) {
+      // Normally a redelivered webhook. But it can also mean bookingRecovery.js declined this
+      // transaction while the booking was still in flight, leaving a real booking on the coach's
+      // calendar for a session that will never happen. Cancel it if so.
+      const orphanCancelled = await cancelIfDeclined({ transactionId, bookingId });
+      return { handled: true, action: orphanCancelled ? 'orphan-cancelled' : 'already-accepted' };
+    }
     if (!result.ok) throw result.error;
     return { handled: true, action: 'accepted' };
   }

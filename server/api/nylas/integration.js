@@ -77,4 +77,70 @@ const applyTransition = async (transactionId, transition, params = {}) => {
   }
 };
 
-module.exports = { isConfigured, getIntegrationSdk, applyTransition };
+/**
+ * Load a transaction with its listing, booking and customer, as the operator.
+ *
+ * The payment-failure recovery runs from the browser's call and from a timer with no user at all,
+ * so unlike manageBookingShared.loadCalendarBookingTransaction it cannot use a customer's session.
+ * Returns the same {tx, listing, booking} shape, plus the customer.
+ *
+ * @param {string} transactionId
+ */
+const loadTransactionAsOperator = async transactionId => {
+  const sdk = getIntegrationSdk();
+  if (!sdk) throw new Error('Integration API credentials are not configured');
+
+  const response = await sdk.transactions.show({
+    id: transactionId,
+    include: ['listing', 'booking', 'customer'],
+  });
+  const tx = response.data.data;
+  const included = response.data.included || [];
+  const find = ref =>
+    ref ? included.find(i => i.id.uuid === ref.id.uuid && i.type === ref.type) || null : null;
+
+  return {
+    tx,
+    listing: find(tx.relationships?.listing?.data),
+    booking: find(tx.relationships?.booking?.data),
+    customer: find(tx.relationships?.customer?.data),
+  };
+};
+
+/**
+ * Transactions whose customer has paid (confirm-payment, i.e. `preauthorized`) but that nothing has
+ * accepted or declined yet, and that have been sitting there at least `olderThanMinutes`.
+ *
+ * The age cut-off is what keeps the sweeper off bookings that are being made right now by the
+ * browser's own call.
+ *
+ * @returns {Promise<string[]>} transaction ids
+ */
+const findPaidUnconfirmedTransactions = async ({ olderThanMinutes = 3, maxPages = 5 } = {}) => {
+  const sdk = getIntegrationSdk();
+  if (!sdk) throw new Error('Integration API credentials are not configured');
+
+  const olderThan = new Date(Date.now() - olderThanMinutes * 60 * 1000);
+  const ids = [];
+  for (let page = 1; page <= maxPages; page += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const response = await sdk.transactions.query({
+      lastTransitions: ['transition/confirm-payment'],
+      lastTransitionedAtEnd: olderThan,
+      processName: 'default-booking',
+      perPage: 100,
+      page,
+    });
+    response.data.data.forEach(tx => ids.push(tx.id.uuid));
+    if (page >= (response.data.meta?.totalPages || 1)) break;
+  }
+  return ids;
+};
+
+module.exports = {
+  isConfigured,
+  getIntegrationSdk,
+  applyTransition,
+  loadTransactionAsOperator,
+  findPaidUnconfirmedTransactions,
+};

@@ -11,6 +11,40 @@ const findIncluded = (included, ref) =>
   ref ? (included || []).find(i => i.id.uuid === ref.id.uuid && i.type === ref.type) : null;
 
 /**
+ * Where, and for how long, a transaction's calendar booking should be made. The ONE place that
+ * decides which Nylas configuration a booking belongs to: create, cancel, reschedule and the
+ * payment-failure recovery all go through it, so nothing else reads
+ * publicData.nylasConfigurationId directly.
+ *
+ * Today a listing has a single configuration. Session lengths (price variations) will need one
+ * configuration per length; when that lands, only the configurationId line below changes.
+ *
+ * Pure: takes already-loaded resources, so it works with a Marketplace SDK response (a customer's
+ * own session) and an Integration SDK response (the sweeper, which has no user) alike.
+ *
+ * @param {{tx: object, listing: object, booking: object}} resources
+ * @returns {{configurationId: string|null, start: string|null, end: string|null,
+ *            lengthMinutes: number|null, variantName: string|null}}
+ */
+const resolveBookingTarget = ({ tx, listing, booking }) => {
+  const publicData = listing?.attributes?.publicData || {};
+  const start = booking?.attributes?.start || null;
+  const end = booking?.attributes?.end || null;
+  const lengthMinutes =
+    start && end ? Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000) : null;
+
+  return {
+    configurationId: publicData.calendarBookingEnabled
+      ? publicData.nylasConfigurationId || null
+      : null,
+    start,
+    end,
+    lengthMinutes,
+    variantName: tx?.attributes?.protectedData?.priceVariantName || null,
+  };
+};
+
+/**
  * Fetch a transaction together with its listing and booking, and resolve the listing's Nylas
  * configuration id if it has one.
  *
@@ -31,12 +65,9 @@ const loadCalendarBookingTransaction = async (sdk, transactionId) => {
   const listing = findIncluded(included, tx.relationships?.listing?.data);
   const booking = findIncluded(included, tx.relationships?.booking?.data);
 
-  const publicData = listing?.attributes?.publicData || {};
-  const configurationId = publicData.calendarBookingEnabled
-    ? publicData.nylasConfigurationId
-    : null;
+  const { configurationId } = resolveBookingTarget({ tx, listing, booking });
 
   return { tx, listing, booking, configurationId };
 };
 
-module.exports = { findIncluded, loadCalendarBookingTransaction };
+module.exports = { findIncluded, resolveBookingTarget, loadCalendarBookingTransaction };

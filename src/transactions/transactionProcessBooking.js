@@ -247,4 +247,7 @@ export const isRefunded = transition => {
   return txRefundedTransitions.includes(transition);
 };
 
-export const statesNeedingProviderAttention = [states.PREAUTHORIZED];
+// Revie: empty. A paid booking is confirmed by our server, not by the coach, so there is no
+// "needs your attention" state. (Older release-1 transactions that were waiting for the coach no
+// longer raise the inbox badge; they can still be accepted from their own page.)
+export const statesNeedingProviderAttention = [];
