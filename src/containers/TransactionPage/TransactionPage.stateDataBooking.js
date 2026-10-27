@@ -45,6 +45,17 @@ export const getStateDataForBookingProcess = (txInfo, processInfo) => {
       return { processName, processState, showDetailCardHeadings: true, showExtraInfo: true };
     })
     .cond([states.PREAUTHORIZED, PROVIDER], () => {
+      // Revie: calendar bookings are confirmed by our server (operator-accept), never by the coach,
+      // and process release-2 has no provider accept/decline at all. Offer the buttons only when
+      // the transaction still allows them (older release-1 transactions), so a coach is never
+      // shown an acceptable request for a session that is not on their calendar.
+      const transitionNames = Array.isArray(nextTransitions)
+        ? nextTransitions.map(t => t.attributes.name)
+        : [];
+      if (!transitionNames.includes(transitions.ACCEPT)) {
+        return { processName, processState, showDetailCardHeadings: true };
+      }
+
       const primary = isCustomerBanned ? null : actionButtonProps(transitions.ACCEPT, PROVIDER);
       const secondary = isCustomerBanned ? null : actionButtonProps(transitions.DECLINE, PROVIDER);
       return {
