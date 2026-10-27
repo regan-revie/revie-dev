@@ -1,6 +1,12 @@
 # Decisions
 
-Newest first. Each entry is a "### DECISION:" block pasted from the planning
+Newest first. Each entry is a "### DECISION: Session lengths use Sharetribe price variations
+**Date:** Oct 26, 2026
+**Decision:** A Signature Session can offer several lengths (30 to 120 minutes) using Sharetribe's built-in price variations, each with its own name, price and booking length. Our booking UI, Nylas availability endpoint, booking creation and working-hours check all use the chosen variation's length. The `length` listing field is dropped and not added to Live.
+**Why:** Coaches sell 30 to 120 minute sessions; today every slot is 60 minutes. Price variations are built in and avoid duplicate listings per length.
+**Affects:** Listing type config (Test → Dev and Live), custom booking UI, checkout, Nylas availability endpoint, booking creation, Live cutover.
+
+### DECISION:" block pasted from the planning
 project. Do not put secrets in this folder; it is synced to Claude.ai.
 
 Newest at the top. When the planning project settles something, it produces a `### DECISION:` block; add it here. This folder syncs to the Claude project via GitHub.
