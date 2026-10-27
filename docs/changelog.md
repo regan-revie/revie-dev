@@ -19,6 +19,32 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-10-27 (release-2 pushed to Dev)
+
+**Branch / PR:** `docs-release-2-rollout`, docs and one helper script only. PR #6 (the recovery code) is merged and live on Render dev.
+
+**What changed**
+- **Pushed process release-2 to Dev only** (`npx flex-cli`, marketplace `revie1-dev`). First validated locally with `flex-cli process --path` (it parsed the file and described exactly the intended machine), and confirmed Dev's live version 1 was identical to the file I edited from. Output: `Version 2 successfully saved for process default-booking`, then `Alias default-booking/release-2 successfully created to point to version 2.` `process list` now shows version 2 (`release-2`, 0 transactions) and version 1 (`release-1`, 4 transactions). Pulled version 2 back and confirmed it matches git (the server drops comments and stores templates with CRLF line endings). **Nothing was pushed to Test or Live.**
+- Corrected the Dev marketplace id in `tech-constraints.md`: flex-cli needs `revie1-dev` (`revie_dev` is only the display name). `CLAUDE.md` still calls Dev `revie_dev` in several places; those are display-name uses and left alone.
+- Recorded the decision that Dev's listing type points at release-2 on purpose and must never be overwritten by a Test to Dev copy. Added the same rule to `tech-constraints.md` and `CLAUDE.md`.
+- Wrote `docs/test-script-booking-recovery.md`: four scenarios in plain steps (happy path, browser never reports, slot taken, forced failure), each with what the client, coach, Stripe test mode and Sentry should show.
+- Added `scripts/dev-listing-test-helper.js`: a Dev-only helper (`status`, `break`, `restore`, `use-release-2`, `use-release-1`) so Regan can force a failure on one listing and undo it. Every change needs `--yes`; the original configuration id is saved outside the repo and never overwritten.
+
+**Found while preparing**
+- **A new transaction uses the listing's own `transactionProcessAlias`**, not the listing type's. Both Dev listings say release-1. Changing the listing type in Console only affects listings created afterwards, so the existing "Test Session" listing must be switched separately.
+- A deliberately invalid Nylas configuration id returns a clean 404 from Nylas, which recovery treats as permanent (one attempt, no retry). That is the safe forced failure; the retry path stays covered by the automated tests only.
+
+**Not done / needs Regan**
+- **Console (Dev):** point the Signature Session listing type at `default-booking/release-2` (steps in the chat reply). I'll verify it by reading the hosted config afterwards.
+- **Switch the existing listing:** `op run --env-file=.env -- node scripts/dev-listing-test-helper.js use-release-2 --listing 6aa17447-bd2d-4465-9a24-38498e5daa62 --yes`. I did not run it: changing a Dev listing needs Regan's go-ahead. The break and restore round trip was also not run for the same reason, so those two write paths are untested; only the guard and `status` were exercised.
+- Run the four scenarios; nothing is proven end to end until then.
+
+**What's next**
+- After the scenarios pass: session lengths (decided), the coach confirmation email fix, working hours, coach onboarding.
+- Release-2 to Test and Live is a deliberate step at cutover, not before.
+
+---
+
 ## HANDOFF — 2026-10-27 (payment-failure recovery)
 
 **Branch / PR:** `payment-failure-recovery`, PR open to `main`, not merged. Process release-2 is **not pushed to any environment**.

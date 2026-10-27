@@ -15,7 +15,7 @@ this folder; it is synced to Claude.ai.
 
 ## Environments
 Three Sharetribe environments, each with its own hosted configuration (listing types, branding, logo, Stripe), so they drift silently:
-- **Dev** (`revie_dev`): the only one that supports custom code; what this repo develops against. Private marketplace.
+- **Dev** (flex-cli marketplace id **`revie1-dev`**; `revie_dev` is only the marketplace's display name, and flex-cli rejects it): the only one that supports custom code; what this repo develops against. Private marketplace. Use `npx flex-cli ... --marketplace revie1-dev` (flex-cli is not installed globally; Regan is logged in, and the key must never be read or printed).
 - **Test:** a no-code preview meant to mirror Live. Console config changes are made here and copied to Dev and Live.
 - **Live:** production. A public marketplace, currently running Sharetribe's hosted frontend, not this codebase.
 
@@ -81,7 +81,9 @@ Every email today is a Sharetribe built-in. The default-booking process (`ext/tr
 - **Reviews and messages attach to transactions.** Coach-level ratings must be computed.
 - **Coach subscriptions are Stripe Billing**, separate from the Stripe Connect marketplace flow.
 - **Sharetribe booking records can't be changed after creation.** A rescheduled session's real time lives in our Postgres table, not on the transaction.
-- **Coaches no longer accept calendar bookings** (release-2 plus client changes, not yet deployed). Release-2 removes the provider `accept`/`decline` transitions; the client shows no Accept/Decline unless a transaction's `nextTransitions` still allows it (older release-1 transactions), no inbox badge (`statesNeedingProviderAttention` is empty), and `ACCEPT`/`DECLINE` stay in the client state graph for old transactions. Each Sharetribe environment has its own process and a new version only affects new transactions. It has not been pushed anywhere; it must not go to Test or Live until decided.
+- **Coaches no longer accept calendar bookings** (client changes deployed to Dev; process release-2 pushed to Dev only). Release-2 removes the provider `accept`/`decline` transitions. The client shows no Accept/Decline unless a transaction's `nextTransitions` still allows it (older release-1 transactions), no inbox badge (`statesNeedingProviderAttention` is empty), and `ACCEPT`/`DECLINE` stay in the client state graph for old transactions.
+- **Process versions (as of 2026-10-27, `npx flex-cli process list --process default-booking --marketplace revie1-dev`):** Dev has version 1 (`default-booking/release-1`, 4 transactions) and version 2 (`default-booking/release-2`, pushed 11:02, 0 transactions). **Test and Live have not had release-2 pushed and must not until decided.** A new version only affects new transactions.
+- **A new transaction uses the LISTING's `publicData.transactionProcessAlias`, not the listing type's.** The listing type's alias is only copied onto a listing when it is created, so changing the type in Console leaves existing listings on release-1. Existing Dev listings must be switched individually (`scripts/dev-listing-test-helper.js use-release-2`). Dev's hosted listing type must point at `default-booking/release-2` (see the decision of Oct 27).
 - **Sharetribe validates bookings against the listing's `availabilityPlan`** when a booking is created, and `OrderPanel` needs `availabilityPlan.timezone` to render any booking form. `enableListing` therefore overwrites each calendar listing's plan with a 24/7 one carrying the calendar's time zone. Anything a coach enters in the stock Availability tab is discarded when that runs.
 - **Console branding overrides code.** Hosted branding (colors, logo) is applied inline on `<html>` and beats the stylesheet; the repo's `configBranding.js` is only the local fallback.
 
@@ -92,7 +94,8 @@ Every email today is a Sharetribe built-in. The default-booking process (`ext/tr
 - Brand assets: logo, hero image, social share images (1200×630, 600×314), replacing the biketribe placeholders. Status: the desktop (cream) and mobile logos are wired in `configBranding.js` as the local fallback, but Console's hosted logo still overrides them. The hero and social-share images are still the biketribe placeholders; Revie versions are in `src/assets/` but not yet imported.
 
 ## House rules for the repo
-- Make Sharetribe Console config changes in **Test** and copy forward; don't edit Dev directly.
+- Make Sharetribe Console config changes in **Test** and copy forward; don't edit Dev directly. **Exception: listing types.** Dev's listing type points at `default-booking/release-2` on purpose, so never copy listing types from Test to Dev until Test also runs release-2; the copy would silently set Dev back to release-1.
+- Use `npx flex-cli` for every flex-cli command and always pass `--marketplace revie1-dev` for Dev. Never push a process to Test or Live without being told to.
 - Don't patch core template logic (e.g. `CustomLinksMenu.js`) to fix styling. Prefer additive files so upstream merges stay clean.
 - Branch for anything global.
 - Run locally with `op run --env-file=.env -- yarn dev`. Tests: `yarn test`, `yarn test-server`.
