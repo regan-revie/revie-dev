@@ -30,6 +30,6 @@ Until Dec 14 the new platform's Console changes are made directly in Dev (see "E
 
 **Made or planned in Dev since:**
 - [ ] Marketplace texts: replace the 1,397-key copy with the trimmed overrides (decision "Console texts hold only Revie's overrides"), including the instant-booking wording.
-- [ ] Email texts: the release-2 booking emails (accepted, operator accepted, failed/declined, expired, money paid) and the footer line; cancellation emails once they exist.
+- [ ] Email texts: the release-3 booking emails (accepted, operator accepted incl. `ContentForFixed`, failed/declined, expired, money paid, `BookingCanceledToCustomer.*` and `BookingCanceledToProvider.*`) and the footer line.
 - [ ] Remove the `length` listing field (session length comes from price variations); check the Zapier zap first.
-- [ ] Transaction process: release-2 is on Dev and (Oct 28) Test as version 2 with alias `release-2`, no transactions on it. Live gets it at cutover, then `BOOKING_PROCESS_ALIAS` is set on the production service.
+- [ ] Transaction process: release-3 (release-2 plus cancellation emails and the coach fixed-length body) is on Dev and Test as version 3 with alias `release-3`. Live gets release-3 at cutover (push it as a new version with alias `release-3`; Live has not had release-2 pushed), then `BOOKING_PROCESS_ALIAS=default-booking/release-3` is set on the production service.

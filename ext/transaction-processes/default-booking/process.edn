@@ -1,3 +1,10 @@
+;; Revie changes (release-3, see docs/decisions.md "Which emails come from Sharetribe and which from Postmark"):
+;; - :transition/cancel now emails the client (refund on its way) and the coach (session cancelled).
+;;   Release-2 sent nothing on a cancel. :transition/cancel always runs a full refund, and a
+;;   cancellation inside 48 hours deliberately calls no transition at all, so the client email can
+;;   state the refund unconditionally: it is only ever sent when a refund happens.
+;; - The coach's "operator accepted" email gains a body for fixed-length sessions (it only had
+;;   hourly, daily and nightly branches, so a fixed session printed a title and no sentence).
 ;; Revie changes (release-2, see docs/decisions.md "Booking failure after payment releases the hold"):
 ;; - The provider can no longer accept or decline. Calendar bookings are confirmed by our server
 ;;   (:transition/operator-accept, run when Nylas reports the booking) and, if the booking cannot be
@@ -150,7 +157,15 @@
    :from :state/reviewed-by-provider,
    :to :state/reviewed}],
  :notifications
- [{:name :notification/booking-operator-accepted-request-to-customer,
+ [{:name :notification/booking-canceled-to-customer,
+   :on :transition/cancel,
+   :to :actor.role/customer,
+   :template :booking-canceled-to-customer}
+  {:name :notification/booking-canceled-to-provider,
+   :on :transition/cancel,
+   :to :actor.role/provider,
+   :template :booking-canceled-to-provider}
+  {:name :notification/booking-operator-accepted-request-to-customer,
    :on :transition/operator-accept,
    :to :actor.role/customer,
    :template :booking-accepted-request}
