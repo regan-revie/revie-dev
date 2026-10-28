@@ -7,6 +7,30 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Edit Dev's Console directly until cutover
+**Date:** Oct 28, 2026
+**Decision:** Until the Dec 14 cutover, Console changes for the new platform are made directly in Dev, and logged in docs/go-live-plan.md under "Dev-only Console changes". No Test → Dev copies. At cutover, the logged changes are applied to Test and Live together. Test stays a mirror of Live until then.
+**Why:** Test must preview Live (old look, hosted frontend) while Dev carries the new brand; a Test → Dev copy would replace Dev's cream wordmark, turn off file attachments and change listing approval. Replaces the "change Test, then copy forward" house rule until cutover.
+**Affects:** CLAUDE.md, docs/tech-constraints.md house rules, docs/go-live-plan.md cutover checklist.
+
+### DECISION: Which emails come from Sharetribe and which from Postmark
+**Date:** Oct 28, 2026
+**Decision:** Sharetribe sends: Accepted request (client, "You're booked"), Operator accepted request (coach, "You've got a session"), Operator declined request and Expired request (client, "That one didn't go through, and you haven't been charged"), cancellation emails to client and coach, Money paid, and the review emails. New request and Declined request aren't sent under release-2. Postmark sends late-cancellation, reschedule and reminder emails only. Nylas Scheduler's own emails are turned off (disable_emails). Klaviyo is marketing only.
+**Why:** In testing, a cancel sent both a Sharetribe and a Nylas email to each person. Sharetribe already covers cancellations; Postmark fills only what it can't (no transition for late cancels, fixed times after a reschedule).
+**Affects:** Console Email texts, Nylas configuration, server/email (Postmark).
+
+### DECISION: Console texts hold only Revie's overrides
+**Date:** Oct 28, 2026
+**Decision:** Console marketplace and email texts keep only keys Revie deliberately changed; everything else comes from the repo's en.json. Wording changes go in the repo unless they must be editable without a deploy.
+**Why:** Dev's Console held a copy of nearly every stock key, so repo wording changes silently never appeared.
+**Affects:** Console marketplace texts and email texts (Dev now, Test and Live at cutover), src/translations/en.json.
+
+### DECISION: Coach profile redesign starts now
+**Date:** Oct 28, 2026
+**Decision:** The coach profile (listing page) redesign starts the week of Oct 28, ahead of the Nov 10 phase-4 date. Browse follows, opening with a few recommended coaches and a "Help me choose" link before the full list. Until cutover, a hand-run "Help me choose" form on the Live search page and heyrevie.com routes clients to Regan for personal matches.
+**Why:** Clients reach the search and coach pages and leave; the coach page doesn't give a full picture of the coach and the platform looks unfinished.
+**Affects:** Phase 4 timing in docs/go-live-plan.md, design work, browse layout.
+
 ### DECISION: Calendar listings move to release-2 when booking is enabled
 **Date:** Oct 28, 2026
 **Decision:** enableListing writes publicData.transactionProcessAlias from a server setting (BOOKING_PROCESS_ALIAS) in the same update as the Nylas configuration id, and refuses to write it if the setting is missing. Listing types stay on release-1 everywhere. The server rejects a booking on a calendar listing with any alias other than the listing's own.
@@ -58,11 +82,6 @@ Newest at the top. When the planning project settles something, it produces a `#
 **Decision:** The server owns create-booking after payment. It retries once; on a second failure it declines the transaction (releasing the card authorisation), logs to Sentry and emails Regan. A coach never sees an acceptable request for a session that isn't on their calendar.
 **Why:** Today a failed booking leaves a "new booking request" the coach can accept by hand, charging the client for a session that doesn't exist.
 **Affects:** CheckoutPageWithPayment.js, server booking route, transaction process (Dev).
-
-### DECISION: Emails are split between Sharetribe and Postmark
-**Date:** Oct 26, 2026
-**Decision:** Sharetribe built-in emails cover booking confirmation and cancellation, with copy fixed in Console. Reminders and reschedule emails are sent by our server via Postmark, because Sharetribe booking records can't change and its emails show the original time.
-**Affects:** Console email templates, transaction process notifications, server/ (new email module).
 
 ### DECISION: Working hours are one schedule per coach
 **Date:** Oct 26, 2026

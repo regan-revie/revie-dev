@@ -19,6 +19,35 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-10-28 (second session: emails off in Nylas, Console texts, checkout message, release-2 on Test)
+
+**Branch / PR:** `emails-texts-checkout-docs`, one PR, not merged. PR #8 was already merged; its decisions.md diff deleted nothing.
+
+**What changed**
+1. **Nylas emails off.** Every configuration is created and updated with `event_booking.disable_emails: true`. Dev's Test Session configuration re-synced: `disableEmails` was unset before, `true` after.
+2. **Checkout network error.** A status-less `TypeError` (Failed to fetch, Load failed) at checkout now says "We couldn't reach our servers. You haven't been charged. Check your connection and try again." (new key `CheckoutPage.networkError`). Only the price-estimate call (`transactionLineItems`) retries once on a network error; initiate is never retried silently, because a network error does not say whether the first request reached the server.
+3. **Release-2 pushed to Test only.** flex-cli id `revie1-test` (version 2, alias `default-booking/release-2`, 0 transactions; version 1 and its 4 transactions untouched). `revie1` (probably Live) was only listed, never pushed to. No Test listing or Console setting changed.
+4. **Docs.** Four decisions (Dev-direct Console until cutover; which emails Sharetribe vs Postmark, replacing the Oct 26 entry; Console texts hold only overrides; coach profile redesign starts now), `go-live-plan.md` (phase 4 timing, hand-run "Help me choose", new "Dev-only Console changes" cutover list), and the Dev-direct rule in CLAUDE.md and tech-constraints.md.
+
+**Files for Regan (outside the repo, `~/Downloads/revie-console-texts/`, not committed)**
+- `marketplace-texts-trimmed.json` (90 keys, from 1,397) and `marketplace-texts-keep-or-drop.md` (every kept key and every differing key dropped, with a reason).
+- `email-texts-paste-into-dev.json` (21 keys) and `email-texts-notes.md`.
+
+**Findings**
+- Release-2 sends **no cancellation emails**: the process has no notification on `transition/cancel` and the booking templates have no cancelled template. The Oct 28 email decision lists Sharetribe cancellation emails to client and coach, which do not exist yet; the second email seen on a cancel was not from the process.
+- The coach's "operator accepted" email has **no body for fixed-length sessions** (only hour, day, night branches). Fixing it and adding cancellation emails both need a template change, so a new process version (release-3) on Dev.
+- Dev's Console texts differ from the v12.3.0 template in only 85 keys; the other 1,312 were pure copies that were hiding repo changes.
+
+**What's next**
+- Regan: paste the trimmed marketplace texts and the email texts into Dev's Console; run scenario 5 of the test script on Render.
+- Decide: build release-3 (coach body, cancellation emails) before the Postmark module.
+- Several `EditListingPricingForm.priceVariant.*` texts still say "extension"; variants are now different session lengths.
+
+**Blocked / needs a decision**
+- Approval to publish is off in Dev and on in Test; confirm the intended value (listed in the cutover list).
+
+---
+
 ## HANDOFF — 2026-10-28 (calendar sessions: release-2 on enable, session lengths, invite, wording, cancel panel)
 
 **Branch / PR:** `calendar-sessions-wording`, one PR, not merged. It also carries the two doc commits from the closed docs branch that missed PR #7 (the "Console cannot pin a listing type" corrections and the Oct 27 handoff).

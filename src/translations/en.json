@@ -81,6 +81,7 @@
   "CheckoutPage.initiateOrderStripeError": "The payment processor gave the following errors: {stripeErrors}",
   "CheckoutPage.listingNotFoundError": "Unfortunately, this listing is no longer available.",
   "CheckoutPage.listingTitle": "{listingTitle}",
+  "CheckoutPage.networkError": "We couldn't reach our servers. You haven't been charged. Check your connection and try again.",
   "CheckoutPage.notEnoughStockMessage": "Unfortunately, you can't complete your order. There's not enough stock left.",
   "CheckoutPage.paymentExpiredMessage": "Payment was not completed in time. Please go back to {listingLink} and try again.",
   "CheckoutPage.providerCommissionBiggerThanMinPrice": "This listing is currently unavailable. Please contact support.",
