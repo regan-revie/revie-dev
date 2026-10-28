@@ -3,6 +3,7 @@
 // You can find these api endpoints from 'server/api/...' directory
 
 import appSettings from '../config/settings';
+import { withNetworkRetry } from './networkError';
 import { types as sdkTypes, transit } from './sdkLoader';
 import Decimal from 'decimal.js';
 
@@ -167,7 +168,11 @@ export const nylasBookingStatus = ({ transactionId }) => {
 // See `server/api/transaction-line-items.js` to see what data should
 // be sent in the body.
 export const transactionLineItems = body => {
-  return post('/api/transaction-line-items', body);
+  // Revie: a price estimate changes nothing, so one dropped connection is retried quietly instead
+  // of showing the client an error for a number that could simply be asked for again. Deliberately
+  // NOT done for initiatePrivileged below: a network error does not say whether that request
+  // reached the server, so repeating it could start a second transaction.
+  return withNetworkRetry(() => post('/api/transaction-line-items', body));
 };
 
 // Initiate a privileged transaction.

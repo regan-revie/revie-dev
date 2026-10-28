@@ -213,6 +213,11 @@ const buildConfigurationBody = ({
   event_booking: {
     title,
     description,
+    // Nylas's own booked/cancelled/rescheduled emails are off. Sharetribe already emails the
+    // client and the coach on booking and on cancellation, and with both on, each person got two
+    // emails for the same event (found testing a cancel). Postmark covers what Sharetribe cannot.
+    // The calendar invite itself comes from the calendar provider and is unaffected.
+    disable_emails: true,
     // Only sent where Nylas can create one (a Google grant gets Meet, a Microsoft grant Teams).
     ...(conferencing ? { conferencing } : {}),
   },

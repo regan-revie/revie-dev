@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { FormattedMessage } from '../../util/reactIntl';
+import { isNetworkError } from '../../util/networkError';
 import {
   isTransactionInitiateAmountTooLowError,
   isTransactionInitiateMissingStripeAccountError,
@@ -77,6 +78,10 @@ export const getErrorMessages = (
     speculateErrorMessage = (
       <FormattedMessage id="CheckoutPage.providerCommissionBiggerThanMinPrice" />
     );
+  } else if (isNetworkError(initiateOrderError)) {
+    // Revie: the request never got an answer (offline, dropped connection, blocked, server
+    // restarting). Nothing has been charged, and saying so is what the client needs to hear.
+    initiateOrderErrorMessage = <FormattedMessage id="CheckoutPage.networkError" />;
   } else if (initiateOrderError) {
     // Generic initiate order error
     initiateOrderErrorMessage = (
@@ -103,6 +108,8 @@ export const getErrorMessages = (
     speculateErrorMessage = (
       <FormattedMessage id="CheckoutPage.providerCommissionBiggerThanMinPrice" />
     );
+  } else if (isNetworkError(speculateTransactionError)) {
+    speculateErrorMessage = <FormattedMessage id="CheckoutPage.networkError" />;
   } else if (speculateTransactionError) {
     speculateErrorMessage = <FormattedMessage id="CheckoutPage.speculateFailedMessage" />;
   }

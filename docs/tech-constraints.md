@@ -62,6 +62,8 @@ Every email today is a Sharetribe built-in. The default-booking process (`ext/tr
 - Times in these emails come from the transaction's booking, which Sharetribe never updates, so they show the original time after a reschedule.
 - Account emails (verify email, password reset, user approval) are Sharetribe built-ins configured in Console, not in the repo.
 - Unverified: Google/Nylas may also send its own calendar invitation to the client when the booking event is created.
+- **Nylas's own emails are off (Oct 28).** Every configuration is created and updated with `event_booking.disable_emails: true`, because a cancel produced two emails for each person. The calendar provider's invitation is separate and still goes out. **Open:** the email decision of Oct 28 lists Sharetribe cancellation emails to client and coach, but release-2 sends none (see "Not covered at all" above), so the other email seen on a cancel was not from the process. Cancellation emails need two new templates and notifications on `transition/cancel` (a new process version); proposed text is in the Oct 28 HANDOFF.
+- **Console email texts shadow the templates' inline defaults** for any key Console already has, exactly as marketplace texts shadow `en.json`. `BookingFailed.*` and `BookingExpiredRequest.ContentForFixed` are release-2 keys Console does not have yet.
 
 ## Session lengths and price variations
 - **The template (12.3) fully supports price variations for the `fixed` unit type.** The coach editor offers up to 20 variants per listing, each with a name, a price and a length (15-minute steps, up to 12 hours), stored in `publicData.priceVariants` as `{name, priceInSubunits, bookingLengthInMinutes}`. Dev's `signature-session` listing type has `priceVariations.enabled: true`.
@@ -98,7 +100,7 @@ Every email today is a Sharetribe built-in. The default-booking process (`ext/tr
 - Brand assets: logo, hero image, social share images (1200×630, 600×314), replacing the biketribe placeholders. Status: the desktop (cream) and mobile logos are wired in `configBranding.js` as the local fallback, but Console's hosted logo still overrides them. The hero and social-share images are still the biketribe placeholders; Revie versions are in `src/assets/` but not yet imported.
 
 ## House rules for the repo
-- Make Sharetribe Console config changes in **Test** and copy forward; don't edit Dev directly. (Listing types are not an exception: they cannot be pinned to release-2 in Console, so a Test to Dev copy does not affect which process a listing uses.)
+- **Until the Dec 14 cutover, edit Dev's Console directly. No Test → Dev copies.** Test stays a mirror of Live; a copy would replace Dev's cream wordmark, turn off file attachments and change listing approval. Every Dev-only Console change is logged in `go-live-plan.md` under "Dev-only Console changes to apply to Test and Live at cutover", and applied to Test and Live together at cutover. (This replaces the older "change Test, then copy forward" rule until then.)
 - Use `npx flex-cli` for every flex-cli command and always pass `--marketplace revie1-dev` for Dev. Never push a process to Test or Live without being told to.
 - Don't patch core template logic (e.g. `CustomLinksMenu.js`) to fix styling. Prefer additive files so upstream merges stay clean.
 - Branch for anything global.

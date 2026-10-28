@@ -78,6 +78,7 @@ const summarise = async (grantId, id) => {
     title: c.event_booking?.title,
     description: (c.event_booking?.description || '').slice(0, 60) + '…',
     conferencing: c.event_booking?.conferencing?.provider || 'none',
+    disableEmails: c.event_booking?.disable_emails,
     durationMinutes: c.availability?.duration_minutes,
     intervalMinutes: c.availability?.interval_minutes,
     roundTo: c.availability?.round_to,

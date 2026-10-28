@@ -112,6 +112,10 @@ describe('buildConfigurationBody()', () => {
     expect(body.scheduler.rescheduling_url).toBe(`${MANAGE}?booking=:booking_ref`);
   });
 
+  it("turns Nylas's own emails off, so Sharetribe's are the only ones people get", () => {
+    expect(body.event_booking.disable_emails).toBe(true);
+  });
+
   it('asks for conferencing only when the provider can create it', () => {
     expect(body.event_booking.conferencing).toEqual({ provider: 'Google Meet', autocreate: {} });
     expect(build({ conferencing: null }).event_booking).not.toHaveProperty('conferencing');
