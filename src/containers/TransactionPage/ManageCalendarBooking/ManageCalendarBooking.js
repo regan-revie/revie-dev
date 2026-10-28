@@ -42,6 +42,10 @@ const ManageCalendarBooking = ({
   const [availability, setAvailability] = useState({ state: 'idle', slots: [] });
   const [actionInProgress, setActionInProgress] = useState(false);
   const [actionError, setActionError] = useState(null);
+  // Set the moment our own cancel succeeds. The booking-status endpoint only learns of the
+  // cancellation when Nylas's webhook arrives a moment later, so the page cannot wait for it to
+  // say "cancelled" - and the refund outcome shown is the one the client was told when confirming.
+  const [justCancelled, setJustCancelled] = useState(null);
 
   const loadStatus = () => {
     setStatus({ state: 'loading' });
@@ -64,7 +68,8 @@ const ManageCalendarBooking = ({
     setMode('reschedule');
     setActionError(null);
     setAvailability({ state: 'loading', slots: [] });
-    nylasAvailability({ listingId })
+    // The booked length picks the Nylas configuration, so only slots of that length come back.
+    nylasAvailability({ listingId, ...(durationMinutes ? { lengthMinutes: durationMinutes } : {}) })
       .then(data => {
         const slots = (data.slots || []).filter(
           s => !durationMinutes || Math.round((s.end - s.start) / 60000) === durationMinutes
@@ -81,7 +86,8 @@ const ManageCalendarBooking = ({
       .then(() => {
         setActionInProgress(false);
         setMode('idle');
-        loadStatus();
+        // What the confirmation step promised, so the page cannot contradict it afterwards.
+        setJustCancelled({ free: status.freeCancellationNow ?? null });
       })
       .catch(e => {
         setActionInProgress(false);
@@ -124,6 +130,39 @@ const ManageCalendarBooking = ({
         )}`
       : null;
 
+  const cancelledState = justCancelled
+    ? justCancelled.free
+    : status.status === 'cancelled'
+    ? status.freeCancellation ?? null
+    : undefined;
+  const isCancelled = cancelledState !== undefined;
+
+  // A session that has already happened has nothing left to change.
+  const sessionIsOver = status.bookingEnd && new Date(status.bookingEnd) < new Date();
+  if (!isCancelled && sessionIsOver) {
+    return null;
+  }
+
+  if (isCancelled) {
+    const messageId =
+      cancelledState === true
+        ? 'ManageCalendarBooking.cancelledFree'
+        : cancelledState === false
+        ? 'ManageCalendarBooking.cancelledCharged'
+        : 'ManageCalendarBooking.cancelledUnknown';
+    return (
+      <div className={css.root}>
+        <H4 as="h2" className={css.heading}>
+          <FormattedMessage id="ManageCalendarBooking.heading" />
+        </H4>
+        {formattedTime ? <p className={css.time}>{formattedTime}</p> : null}
+        <p className={css.cancelledMessage} role="status">
+          <FormattedMessage id={messageId} />
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className={css.root}>
       <H4 as="h2" className={css.heading}>
@@ -158,7 +197,15 @@ const ManageCalendarBooking = ({
       {mode === 'confirm-cancel' ? (
         <div className={css.confirmCancel}>
           <p>
-            <FormattedMessage id="ManageCalendarBooking.confirmCancelText" />
+            <FormattedMessage
+              id={
+                status.freeCancellationNow === true
+                  ? 'ManageCalendarBooking.confirmCancelTextFree'
+                  : status.freeCancellationNow === false
+                  ? 'ManageCalendarBooking.confirmCancelTextCharged'
+                  : 'ManageCalendarBooking.confirmCancelText'
+              }
+            />
           </p>
           <div className={css.actions}>
             <PrimaryButton inProgress={actionInProgress} onClick={handleCancel}>

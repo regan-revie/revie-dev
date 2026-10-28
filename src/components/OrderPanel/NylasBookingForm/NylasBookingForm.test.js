@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import { renderWithProviders as render, testingLibrary } from '../../../util/testHelpers';
 import * as api from '../../../util/api';
 import NylasBookingForm from './NylasBookingForm';
+import PriceVariantPicker from '../PriceVariantPicker/PriceVariantPicker';
 
 const { screen, waitFor, userEvent } = testingLibrary;
 
@@ -92,10 +93,10 @@ describe('NylasBookingForm', () => {
     render(<NylasBookingForm {...baseProps} />);
     await waitFor(() => expect(screen.getByText('15:30')).toBeInTheDocument());
 
-    expect(screen.getByRole('button', { name: /request to book/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /NylasBookingForm.bookButton/i })).toBeDisabled();
     await userEvent.click(screen.getByText('15:30'));
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /request to book/i })).toBeEnabled()
+      expect(screen.getByRole('button', { name: /NylasBookingForm.bookButton/i })).toBeEnabled()
     );
   });
 
@@ -136,6 +137,64 @@ describe('NylasBookingForm', () => {
     );
     await waitFor(() => expect(screen.getByText(/No times are available/i)).toBeInTheDocument());
     expect(screen.queryByText('15:30')).not.toBeInTheDocument();
+  });
+});
+
+describe('session lengths', () => {
+  // Each length has its own Nylas configuration on the server, so changing the length must fetch
+  // that length's slots - not filter one list in the browser.
+  const twoLengths = {
+    ...baseProps,
+    isPriceVariationsInUse: true,
+    priceVariantFieldComponent: PriceVariantPicker,
+    priceVariants: [
+      { name: 'Quick', bookingLengthInMinutes: 30, priceInSubunits: 2500 },
+      { name: 'Deep', bookingLengthInMinutes: 90, priceInSubunits: 9000 },
+    ],
+  };
+
+  it('asks for the preselected length, then refetches when another is chosen', async () => {
+    const spy = jest
+      .spyOn(api, 'nylasAvailability')
+      .mockImplementation(async ({ priceVariantName }) => ({
+        slots: [
+          priceVariantName === 'Deep'
+            ? slot('2026-09-11T22:30:00Z', 90)
+            : slot('2026-09-11T20:00:00Z', 30),
+        ],
+        connected: true,
+      }));
+    render(<NylasBookingForm {...twoLengths} />);
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ priceVariantName: 'Quick' }))
+    );
+
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: /session length|variant/i }),
+      'Deep'
+    );
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ priceVariantName: 'Deep' }))
+    );
+  });
+
+  it('clears a chosen slot when the length changes', async () => {
+    jest.spyOn(api, 'nylasAvailability').mockImplementation(async () => ({
+      slots: [slot('2026-09-11T22:30:00Z', 30), slot('2026-09-11T22:30:00Z', 90)],
+      connected: true,
+    }));
+    render(<NylasBookingForm {...twoLengths} />);
+    await waitFor(() => expect(screen.getByText('15:30')).toBeInTheDocument());
+    await userEvent.click(screen.getByText('15:30'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /NylasBookingForm.bookButton/i })).toBeEnabled()
+    );
+
+    await userEvent.selectOptions(screen.getAllByRole('combobox')[0], 'Deep');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /NylasBookingForm.bookButton/i })).toBeDisabled()
+    );
   });
 });
 

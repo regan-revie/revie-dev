@@ -39,3 +39,9 @@
 .reschedule {
   margin-top: 8px;
 }
+
+/* The settled state after cancelling: a plain statement, not an error and not a call to action. */
+.cancelledMessage {
+  margin: 0;
+  color: var(--colorGrey700);
+}

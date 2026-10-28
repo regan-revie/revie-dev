@@ -7,6 +7,24 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Calendar listings move to release-2 when booking is enabled
+**Date:** Oct 28, 2026
+**Decision:** enableListing writes publicData.transactionProcessAlias from a server setting (BOOKING_PROCESS_ALIAS) in the same update as the Nylas configuration id, and refuses to write it if the setting is missing. Listing types stay on release-1 everywhere. The server rejects a booking on a calendar listing with any alias other than the listing's own.
+**Why:** Console can't pin a listing type to a process version. Tying the alias to calendar enablement keeps them in sync.
+**Affects:** enableListing, transaction initiate check, Render env (Dev now, production at cutover).
+
+### DECISION: Booking is instant, and the wording and invite say so
+**Date:** Oct 28, 2026
+**Decision:** The booking button says "Book a session", the confirmed state says "You're booked.", and a failed booking says "That one didn't go through, and you haven't been charged. Pick another time and we'll get you booked." No "request", "accepted" or "declined" wording for calendar sessions. Calendar events are titled "{session name} with {coach name}", include the client's name, a Revie link and an auto-created Google Meet link. Nylas's own cancel/reschedule links are hidden; all changes go through Revie.
+**Why:** Bookings are confirmed instantly by the calendar. "Declined" made clients think the coach rejected them. Nylas's links bypassed our 48-hour rule and refunds.
+**Affects:** Marketplace texts or translations, email templates, Nylas configuration.
+
+### DECISION: Cancelling is confirmed before and after
+**Date:** Oct 28, 2026
+**Decision:** Clients confirm before cancelling, with the refund outcome stated (full refund over 48 hours, charged inside 48). After cancelling, the page says so clearly, and Reschedule and Cancel are hidden for cancelled, completed or declined sessions.
+**Why:** In testing the cancel worked but gave no confirmation and left the buttons visible.
+**Affects:** Transaction page session panel, cancel flow, translations.
+
 ### DECISION: Dev's Test Session listing runs release-2; listing types stay on release-1
 **Date:** Oct 27, 2026
 **Decision:** The Dev "Test Session" listing carries `publicData.transactionProcessAlias: default-booking/release-2` (no provider accept/decline; the server confirms or declines bookings). Release-2 is not pushed to Test or Live.

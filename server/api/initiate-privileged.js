@@ -1,5 +1,6 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
 const { transactionLineItems } = require('../api-util/lineItems');
+const { assertProcessAliasMatchesListing } = require('./nylas/processAliasCheck');
 const { isIntentionToMakeOffer } = require('../api-util/negotiation');
 const {
   createCookieTokenStore,
@@ -61,6 +62,9 @@ module.exports = (req, res) => {
   Promise.all([listingPromise(sdk, bodyParams?.params?.listingId), fetchCommission(sdk)])
     .then(([showListingResponse, fetchAssetsResponse]) => {
       const listing = showListingResponse.data.data;
+      // Revie: a calendar listing may only be booked under its own process alias. See
+      // nylas/processAliasCheck.js.
+      assertProcessAliasMatchesListing(listing, bodyParams);
       const commissionAsset = fetchAssetsResponse.data.data[0];
 
       const currency = listing.attributes.price?.currency || orderData.currency;

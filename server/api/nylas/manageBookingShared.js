@@ -4,6 +4,8 @@
  * calendar-booking-enabled) cannot quietly drift apart between the three.
  */
 
+const { configurationIdFor } = require('./bookingConfig');
+
 /** Sharetribe's own pattern for reading a relationship out of an `include`d response (see
  * server/api/transition-privileged.js's getListingRelationShip) - relationships only carry a
  * {id, type} reference, and the real resource lives alongside it in `included`. */
@@ -16,8 +18,9 @@ const findIncluded = (included, ref) =>
  * payment-failure recovery all go through it, so nothing else reads
  * publicData.nylasConfigurationId directly.
  *
- * Today a listing has a single configuration. Session lengths (price variations) will need one
- * configuration per length; when that lands, only the configurationId line below changes.
+ * A listing has one configuration per session length (see bookingConfig.js), so the booking's own
+ * length picks the configuration. A length with no configuration resolves to null, which callers
+ * treat as "this listing is not set up for that session" rather than guessing another length's.
  *
  * Pure: takes already-loaded resources, so it works with a Marketplace SDK response (a customer's
  * own session) and an Integration SDK response (the sweeper, which has no user) alike.
@@ -35,7 +38,7 @@ const resolveBookingTarget = ({ tx, listing, booking }) => {
 
   return {
     configurationId: publicData.calendarBookingEnabled
-      ? publicData.nylasConfigurationId || null
+      ? configurationIdFor(publicData, lengthMinutes)
       : null,
     start,
     end,
@@ -65,9 +68,9 @@ const loadCalendarBookingTransaction = async (sdk, transactionId) => {
   const listing = findIncluded(included, tx.relationships?.listing?.data);
   const booking = findIncluded(included, tx.relationships?.booking?.data);
 
-  const { configurationId } = resolveBookingTarget({ tx, listing, booking });
+  const { configurationId, lengthMinutes } = resolveBookingTarget({ tx, listing, booking });
 
-  return { tx, listing, booking, configurationId };
+  return { tx, listing, booking, configurationId, lengthMinutes };
 };
 
 module.exports = { findIncluded, resolveBookingTarget, loadCalendarBookingTransaction };

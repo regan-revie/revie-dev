@@ -19,6 +19,31 @@ const {
   toBookableSlot,
 } = require('./availability');
 const { isConfigured } = require('./config');
+const {
+  lengthForVariant,
+  offeredLengths,
+  defaultLength,
+  configurationIdFor,
+} = require('./bookingConfig');
+
+/**
+ * Which session length a request is asking about. A named price variant wins (it is what the booking
+ * form sends); `lengthMinutes` is for callers that already know the length, such as rescheduling an
+ * existing session. Anything unknown is an error rather than a quiet fallback to some other length.
+ */
+const resolveRequestedLength = (publicData, { priceVariantName, lengthMinutes }) => {
+  if (priceVariantName) {
+    const length = lengthForVariant(publicData, priceVariantName);
+    return length ? { length } : { error: 'Unknown price variant' };
+  }
+  if (lengthMinutes) {
+    const length = Number(lengthMinutes);
+    return offeredLengths(publicData).includes(length)
+      ? { length }
+      : { error: 'This listing is not sold in that length' };
+  }
+  return { length: defaultLength(publicData) };
+};
 
 /** Nylas caps the window at available_days_in_future anyway; this stops absurd requests earlier. */
 const MAX_WINDOW_DAYS = 120;
@@ -39,7 +64,8 @@ const parseWindow = (startRaw, endRaw) => {
 };
 
 module.exports = async (req, res) => {
-  const { listingId, start: startRaw, end: endRaw } = req.query || {};
+  const { listingId, start: startRaw, end: endRaw, priceVariantName, lengthMinutes } =
+    req.query || {};
 
   if (!isConfigured()) {
     res.status(503).json({ error: 'Calendar availability is not configured' });
@@ -63,11 +89,18 @@ module.exports = async (req, res) => {
     const response = await sdk.listings.show({ id: listingId });
     const publicData = response.data.data.attributes.publicData || {};
 
-    const configurationId = publicData.nylasConfigurationId;
+    const requested = resolveRequestedLength(publicData, { priceVariantName, lengthMinutes });
+    if (requested.error) {
+      res.status(400).json({ error: requested.error });
+      return;
+    }
+
+    const configurationId = configurationIdFor(publicData, requested.length);
     if (!configurationId) {
-      // Not an error: the coach simply has not connected a calendar and opted in yet. The form
-      // renders an explanatory state rather than an empty calendar that looks broken.
-      res.status(200).json({ slots: [], connected: false });
+      // Not an error: the coach simply has not connected a calendar and opted in yet, or has not
+      // set up this session length. The form renders an explanatory state rather than an empty
+      // calendar that looks broken.
+      res.status(200).json({ slots: [], connected: Boolean(publicData.calendarBookingEnabled) });
       return;
     }
 
@@ -100,4 +133,5 @@ module.exports = async (req, res) => {
 };
 
 module.exports.parseWindow = parseWindow;
+module.exports.resolveRequestedLength = resolveRequestedLength;
 module.exports.MAX_WINDOW_DAYS = MAX_WINDOW_DAYS;

@@ -7,11 +7,15 @@
  *
  * Body: { listingId, eventTypeKey, calendarId?, minBookingNoticeMinutes? }
  *
- * Does three things, the third of which is easy to miss:
- *  1. Pushes a Nylas Scheduler configuration for the coach's grant.
- *  2. Records the configuration id and notice period on the listing, where the availability
+ * Does four things, the last two of which are easy to miss:
+ *  1. Pushes a Nylas Scheduler configuration for each session length the listing sells.
+ *  2. Records the configuration ids and notice period on the listing, where the availability
  *     endpoint reads them.
- *  3. Writes a permissive Sharetribe availability plan carrying the calendar's timezone - see
+ *  3. Writes the transaction process alias (BOOKING_PROCESS_ALIAS) onto the listing in that same
+ *     update. Console cannot pin a listing type to a process version, and a transaction uses its
+ *     listing's own alias, so this is what puts calendar listings on the process where the
+ *     calendar - not the coach - confirms a booking. Refused up front if the setting is missing.
+ *  4. Writes a permissive Sharetribe availability plan carrying the calendar's timezone - see
  *     below for why both halves of that matter.
  */
 
@@ -19,11 +23,15 @@ const { createCookieTokenStore, getSdk, handleError, serialize } = require('../.
 const {
   listCalendars,
   defaultCalendarFor,
-  syncConfiguration,
   getEventType,
   SCHEDULING_DEFAULTS,
 } = require('./scheduler');
 const { isConfigured } = require('./config');
+const {
+  resolveBookingProcessAlias,
+  grantProvider,
+  syncListingConfigurations,
+} = require('./listingSync');
 
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
@@ -72,6 +80,15 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Checked before anything is written anywhere: without the alias the listing would be left on the
+  // process that waits for a coach to accept a booking the calendar has already confirmed.
+  const processAlias = resolveBookingProcessAlias();
+  if (processAlias.error) {
+    console.error(`[nylas] Cannot enable calendar booking: ${processAlias.error}`);
+    res.status(503).json({ error: processAlias.error, code: 'no-process-alias' });
+    return;
+  }
+
   const tokenStore = createCookieTokenStore(req, res);
   const sdk = getSdk(req, res, tokenStore);
 
@@ -111,24 +128,22 @@ module.exports = async (req, res) => {
       ? Number(minBookingNoticeMinutes)
       : SCHEDULING_DEFAULTS.minBookingNoticeMinutes;
 
-    const { configuration } = await syncConfiguration({
+    const { publicData, configurationIds } = await syncListingConfigurations({
+      listing,
       grantId,
-      eventTypeKey,
+      provider: await grantProvider(grantId),
       coachName: profile.displayName,
       coachEmail: (profile.privateData || {}).nylasGrantEmail || chosen.id,
       calendarId: chosen.id,
+      eventTypeKey,
       minBookingNoticeMinutes: notice,
+      siteUrl: process.env.REACT_APP_MARKETPLACE_ROOT_URL,
+      processAlias: processAlias.alias,
     });
 
     const updated = await sdk.ownListings.update({
       id: listingId,
-      publicData: {
-        nylasConfigurationId: configuration.id,
-        // Stored beside the configuration id by this same call, so the two cannot drift apart.
-        nylasMinBookingNoticeMinutes: notice,
-        nylasEventTypeKey: eventTypeKey,
-        calendarBookingEnabled: true,
-      },
+      publicData,
       availabilityPlan: permissiveAvailabilityPlan(chosen.timezone),
     });
 
@@ -140,7 +155,7 @@ module.exports = async (req, res) => {
           status: 200,
           statusText: 'OK',
           data: {
-            configurationId: configuration.id,
+            configurationIds,
             calendarId: chosen.id,
             timezone: chosen.timezone,
             minBookingNoticeMinutes: notice,

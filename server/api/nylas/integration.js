@@ -82,7 +82,8 @@ const applyTransition = async (transactionId, transition, params = {}) => {
  *
  * The payment-failure recovery runs from the browser's call and from a timer with no user at all,
  * so unlike manageBookingShared.loadCalendarBookingTransaction it cannot use a customer's session.
- * Returns the same {tx, listing, booking} shape, plus the customer.
+ * Returns the same {tx, listing, booking} shape, plus the customer and the provider (the coach, whose
+ * Nylas grant the calendar event lives under).
  *
  * @param {string} transactionId
  */
@@ -92,7 +93,7 @@ const loadTransactionAsOperator = async transactionId => {
 
   const response = await sdk.transactions.show({
     id: transactionId,
-    include: ['listing', 'booking', 'customer'],
+    include: ['listing', 'booking', 'customer', 'provider'],
   });
   const tx = response.data.data;
   const included = response.data.included || [];
@@ -104,6 +105,7 @@ const loadTransactionAsOperator = async transactionId => {
     listing: find(tx.relationships?.listing?.data),
     booking: find(tx.relationships?.booking?.data),
     customer: find(tx.relationships?.customer?.data),
+    provider: find(tx.relationships?.provider?.data),
   };
 };
 

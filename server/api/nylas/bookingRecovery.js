@@ -30,6 +30,7 @@ const integration = require('./integration');
 const { createBooking, cancelBooking } = require('./availability');
 const { resolveBookingTarget } = require('./manageBookingShared');
 const { TRANSACTION_FIELD } = require('./scheduler');
+const { describeBookedEvent } = require('./eventDescription');
 const log = require('../../log');
 
 /** Exposed so tests can run without real waits. */
@@ -93,9 +94,13 @@ const ensureBooking = async ({ transactionId, source = 'unknown' }) => {
   let lastError = claim.last_error ? new Error(claim.last_error) : null;
 
   try {
-    const { tx, listing, booking, customer } = await integration.loadTransactionAsOperator(
-      transactionId
-    );
+    const {
+      tx,
+      listing,
+      booking,
+      customer,
+      provider,
+    } = await integration.loadTransactionAsOperator(transactionId);
 
     // Not paid-and-waiting any more: something else already settled it.
     const lastTransition = tx.attributes.lastTransition;
@@ -155,6 +160,14 @@ const ensureBooking = async ({ transactionId, source = 'unknown' }) => {
         });
         // eslint-disable-next-line no-await-in-loop
         await db.finishBookingAttempt(transactionId, 'booked');
+        // eslint-disable-next-line no-await-in-loop
+        await describeBookedEvent({
+          grantId: provider?.attributes?.profile?.privateData?.nylasGrantId,
+          calendarId: listing?.attributes?.publicData?.nylasCalendarId,
+          eventId: created?.event_id,
+          clientName: guest.name,
+          transactionId,
+        });
         return { outcome: 'booked', detail: created?.booking_id || created?.id || source };
       } catch (e) {
         lastError = e;

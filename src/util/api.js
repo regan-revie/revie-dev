@@ -108,8 +108,17 @@ const post = (path, body, options = {}) => {
 //
 // Returns { slots: [{ start, end }], connected } with times in epoch milliseconds. `connected`
 // false means the coach has not linked a calendar yet, which is a normal state rather than an error.
-export const nylasAvailability = ({ listingId, start, end }) => {
+//
+// Slots are for one session length: pass `priceVariantName` (the booking form) or `lengthMinutes`
+// (rescheduling an existing session). Each length has its own Nylas configuration on the server.
+export const nylasAvailability = ({ listingId, start, end, priceVariantName, lengthMinutes }) => {
   const params = new URLSearchParams({ listingId });
+  if (priceVariantName) {
+    params.set('priceVariantName', priceVariantName);
+  }
+  if (lengthMinutes) {
+    params.set('lengthMinutes', String(lengthMinutes));
+  }
   if (start) {
     params.set('start', start);
   }
