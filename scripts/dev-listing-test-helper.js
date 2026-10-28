@@ -5,9 +5,10 @@
  *
  * Commands
  *   status          show (read-only) the listing's Nylas configuration state and process alias
- *   break           swap the listing's Nylas configuration id for a deliberately invalid one, so
- *                   the next booking fails. The original id is saved first and never overwritten.
- *   restore         put the saved original id back and check that it stuck
+ *   break           swap the listing's Nylas configuration ids (the single id and, if the listing
+ *                   has them, the per-length map) for deliberately invalid ones, so the next
+ *                   booking fails. The originals are saved first and never overwritten.
+ *   restore         put the saved originals back and check that they stuck
  *   use-release-2   set the listing's transactionProcessAlias to default-booking/release-2
  *   use-release-1   set it back to default-booking/release-1
  *
@@ -68,17 +69,26 @@ const write = async publicData => {
   await sdk.listings.update({ id: listingId, publicData });
   return read();
 };
+const isBroken = publicData =>
+  publicData.nylasConfigurationId === BOGUS_CONFIGURATION_ID ||
+  Object.values(publicData.nylasConfigurationIds || {}).includes(BOGUS_CONFIGURATION_ID);
+
+const configurationState = publicData => {
+  if (isBroken(publicData)) return 'INVALID (deliberately broken)';
+  return publicData.nylasConfigurationId || publicData.nylasConfigurationIds
+    ? 'set (real)'
+    : 'missing';
+};
+
 const describe = publicData =>
   console.log(
     JSON.stringify(
       {
-        nylasConfigurationId:
-          publicData.nylasConfigurationId === BOGUS_CONFIGURATION_ID
-            ? 'INVALID (deliberately broken)'
-            : publicData.nylasConfigurationId
-            ? 'set (real)'
-            : 'missing',
+        nylasConfiguration: configurationState(publicData),
+        // Lengths only, never the ids themselves.
+        configuredLengthsMinutes: Object.keys(publicData.nylasConfigurationIds || {}).map(Number),
         transactionProcessAlias: publicData.transactionProcessAlias,
+        calendarBookingEnabled: Boolean(publicData.calendarBookingEnabled),
         originalSavedForRestore: fs.existsSync(savedFile),
       },
       null,
@@ -86,29 +96,53 @@ const describe = publicData =>
     )
   );
 
+const sameIds = (a, b) => JSON.stringify(a || null) === JSON.stringify(b || null);
+
 (async () => {
   const current = await read();
 
   if (command === 'status') {
     describe(current);
   } else if (command === 'break') {
-    if (current.nylasConfigurationId === BOGUS_CONFIGURATION_ID && !fs.existsSync(savedFile)) {
+    if (isBroken(current) && !fs.existsSync(savedFile)) {
       fail('Already broken and no saved original exists. Refusing to continue.');
     }
-    // Saved once and never overwritten, so a second "break" cannot lose the real id.
+    // Saved once and never overwritten, so a second "break" cannot lose the real ids.
     if (!fs.existsSync(savedFile)) {
       fs.writeFileSync(
         savedFile,
-        JSON.stringify({ nylasConfigurationId: current.nylasConfigurationId })
+        JSON.stringify({
+          nylasConfigurationId: current.nylasConfigurationId,
+          nylasConfigurationIds: current.nylasConfigurationIds,
+        })
       );
     }
-    describe(await write({ nylasConfigurationId: BOGUS_CONFIGURATION_ID }));
+    const brokenIds = current.nylasConfigurationIds
+      ? {
+          nylasConfigurationIds: Object.fromEntries(
+            Object.keys(current.nylasConfigurationIds).map(length => [
+              length,
+              BOGUS_CONFIGURATION_ID,
+            ])
+          ),
+        }
+      : {};
+    describe(await write({ nylasConfigurationId: BOGUS_CONFIGURATION_ID, ...brokenIds }));
     console.log('\nThe listing is now BROKEN on purpose. Run `restore` when you have finished.');
   } else if (command === 'restore') {
     if (!fs.existsSync(savedFile)) fail('Nothing saved to restore.');
     const original = JSON.parse(fs.readFileSync(savedFile, 'utf8'));
-    const after = await write({ nylasConfigurationId: original.nylasConfigurationId });
-    if (after.nylasConfigurationId !== original.nylasConfigurationId) {
+    const after = await write({
+      nylasConfigurationId: original.nylasConfigurationId,
+      ...(original.nylasConfigurationIds
+        ? { nylasConfigurationIds: original.nylasConfigurationIds }
+        : {}),
+    });
+    if (
+      after.nylasConfigurationId !== original.nylasConfigurationId ||
+      (original.nylasConfigurationIds &&
+        !sameIds(after.nylasConfigurationIds, original.nylasConfigurationIds))
+    ) {
       fail('The restore did not stick. The saved original has been kept; try again.');
     }
     fs.unlinkSync(savedFile);

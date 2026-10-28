@@ -12,6 +12,16 @@ const { createCookieTokenStore, getSdk, handleError } = require('../../api-util/
 const { isConfigured } = require('./config');
 const { loadCalendarBookingTransaction } = require('./manageBookingShared');
 const db = require('./db');
+const { isFreeCancellation } = require('./scheduler');
+
+/** isFreeCancellation throws on a bad time; for display, "unknown" (null) is the honest answer. */
+const freeAt = (bookingStart, at) => {
+  try {
+    return isFreeCancellation({ bookingStart, cancelledAt: at });
+  } catch (e) {
+    return null;
+  }
+};
 
 module.exports = async (req, res) => {
   if (!isConfigured()) {
@@ -40,6 +50,24 @@ module.exports = async (req, res) => {
           status: active.status,
           bookingStart: active.booking_start,
           bookingEnd: active.booking_end,
+          // Whether cancelling right now would be refunded. The 48-hour rule lives in one place
+          // (isFreeCancellation), so the confirmation the client sees cannot disagree with the
+          // refund the webhook will actually make.
+          freeCancellationNow: freeAt(active.booking_start, new Date()),
+        });
+        return;
+      }
+
+      // Newest first, so this is the most recent cancellation. The cancel webhook stamps
+      // updated_at, which is when the client cancelled.
+      const cancelled = mappings.find(m => m.status === 'cancelled');
+      if (cancelled) {
+        res.status(200).json({
+          source: 'database',
+          status: 'cancelled',
+          bookingStart: cancelled.booking_start,
+          bookingEnd: cancelled.booking_end,
+          freeCancellation: freeAt(cancelled.booking_start, cancelled.updated_at),
         });
         return;
       }

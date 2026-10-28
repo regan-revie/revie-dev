@@ -96,8 +96,50 @@ const defaultCalendarFor = calendars => {
 const listConfigurations = grantId =>
   nylasRequest(`/v3/grants/${grantId}/scheduling/configurations`);
 
+/** "{session name} with {coach name}", as the calendar event and Nylas's emails title it. */
+const eventTitle = (listingTitle, coachName) =>
+  [listingTitle, coachName].filter(Boolean).length === 2
+    ? `${listingTitle} with ${coachName}`
+    : listingTitle || coachName || 'Coaching session';
+
+const freeCancellationHours = () => SCHEDULING_DEFAULTS.freeCancellationMinutes / 60;
+
+/**
+ * The event description every configuration carries. It cannot name the client - one configuration
+ * serves every booking - so it links to the Revie orders page. bookingEventDescription() below
+ * replaces it on each event with the client's name and a link to their own session.
+ */
+const configurationDescription = manageUrl =>
+  [
+    'Booked through Revie.',
+    `Change or cancel this session in Revie: ${manageUrl}`,
+    `Cancel more than ${freeCancellationHours()} hours ahead for a full refund; inside that window the session is still charged.`,
+  ].join('\n\n');
+
+/** The per-booking description written onto the calendar event once the booking exists. */
+const bookingEventDescription = ({ clientName, manageUrl }) =>
+  [
+    'Booked through Revie.',
+    clientName ? `Client: ${clientName}` : null,
+    `Change or cancel this session in Revie: ${manageUrl}`,
+    `Cancel more than ${freeCancellationHours()} hours ahead for a full refund; inside that window the session is still charged.`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+/** The conferencing Nylas can auto-create for a grant's provider; null where it cannot. */
+const conferencingFor = provider => {
+  if (provider === 'google') return { provider: 'Google Meet', autocreate: {} };
+  if (provider === 'microsoft') return { provider: 'Microsoft Teams', autocreate: {} };
+  return null;
+};
+
 const buildConfigurationBody = ({
-  eventType,
+  title,
+  description,
+  durationMinutes,
+  manageUrl,
+  conferencing,
   coachName,
   coachEmail,
   calendarId,
@@ -127,10 +169,13 @@ const buildConfigurationBody = ({
     },
   ],
   availability: {
-    duration_minutes: eventType.durationMinutes,
-    // Without this Nylas steps hourly from *now*, so slot times are whatever minute the page was
-    // loaded - 15:45 one visit, 09:12 the next. Rounding pins them to the hour.
-    round_to: 60,
+    duration_minutes: durationMinutes,
+    // Slots start on the hour and half hour for every session length: a 90-minute session on a
+    // strictly hourly grid wastes half an hour, and Live sells 45 and 75 minute sessions.
+    // Without round_to Nylas steps from *now*, so slot times are whatever minute the page was
+    // loaded - 15:45 one visit, 09:12 the next. Rounding pins them to the grid.
+    interval_minutes: 30,
+    round_to: 30,
     // Note what is deliberately absent: availability_rules.default_open_hours. Nylas stores the
     // timezone on it and then computes the window as UTC, so a coach asking for 09:00-17:00 local
     // is offered at 02:00 their time, and the offset drifts again at every daylight saving change.
@@ -146,6 +191,15 @@ const buildConfigurationBody = ({
     // below and enforced by which Sharetribe transition the webhook handler calls - not by blocking
     // Nylas's cancel button, which would leave the coach expecting a client who is not coming.
     min_cancellation_notice: 0,
+    // Nylas's own cancel and reschedule links are dead ends for us: the configuration is private,
+    // so its hosted page has no session and cannot act. Hide them, and point the URLs that remain
+    // at Revie, so every change goes through the 48-hour rule and the refund logic.
+    hide_cancellation_options: true,
+    hide_rescheduling_options: true,
+    // Nylas rejects a URL without its :booking_ref token ("must contain :booking_ref token"), so it
+    // rides along as a harmless query parameter on the Revie page.
+    cancellation_url: `${manageUrl}?booking=:booking_ref`,
+    rescheduling_url: `${manageUrl}?booking=:booking_ref`,
     // Nested under `scheduler`, not top-level: confirmed by probing the live API, since a
     // top-level `additional_fields` is accepted with no error and silently dropped.
     additional_fields: {
@@ -157,20 +211,30 @@ const buildConfigurationBody = ({
     },
   },
   event_booking: {
-    title: eventType.title,
-    description: eventType.description,
+    title,
+    description,
+    // Only sent where Nylas can create one (a Google grant gets Meet, a Microsoft grant Teams).
+    ...(conferencing ? { conferencing } : {}),
   },
 });
 
 /**
- * Create or update the configuration for one event type on one coach's grant.
+ * Create or update one Nylas configuration: one session length for one listing.
  *
- * Idempotent by title: if a configuration for this event type already exists it is updated rather
- * than duplicated, so a coach re-opting-in does not end up selling the same session twice.
+ * Updates in place when `configurationId` is given (the listing already carries one), otherwise
+ * creates. It no longer matches by title: titles now carry the listing and coach names, and a
+ * coach with two listings of the same name must not have one overwrite the other.
+ *
+ * @returns {Promise<{configuration: object, created: boolean}>}
  */
 const syncConfiguration = async ({
   grantId,
+  configurationId,
   eventTypeKey,
+  listingTitle,
+  durationMinutes,
+  manageUrl,
+  conferencing,
   coachName,
   coachEmail,
   calendarId,
@@ -183,24 +247,29 @@ const syncConfiguration = async ({
   }
 
   const body = buildConfigurationBody({
-    eventType,
+    title: eventTitle(listingTitle || eventType.title, coachName),
+    description: configurationDescription(manageUrl),
+    durationMinutes: durationMinutes || eventType.durationMinutes,
+    manageUrl,
+    conferencing,
     coachName,
     coachEmail,
     calendarId,
     minBookingNoticeMinutes,
     availableDaysInFuture,
   });
-  const existing = await listConfigurations(grantId);
-  const match = (existing || []).find(
-    c => c.event_booking && c.event_booking.title === eventType.title
-  );
 
-  if (match) {
-    const updated = await nylasRequest(
-      `/v3/grants/${grantId}/scheduling/configurations/${match.id}`,
-      { method: 'PUT', body }
-    );
-    return { configuration: updated, created: false };
+  if (configurationId) {
+    try {
+      const updated = await nylasRequest(
+        `/v3/grants/${grantId}/scheduling/configurations/${configurationId}`,
+        { method: 'PUT', body }
+      );
+      return { configuration: updated, created: false };
+    } catch (e) {
+      // A configuration someone deleted in the Nylas dashboard: make a fresh one rather than fail.
+      if (e.status !== 404) throw e;
+    }
   }
 
   const created = await nylasRequest(`/v3/grants/${grantId}/scheduling/configurations`, {
@@ -250,4 +319,8 @@ module.exports = {
   defaultCalendarFor,
   buildConfigurationBody,
   syncConfiguration,
+  eventTitle,
+  configurationDescription,
+  bookingEventDescription,
+  conferencingFor,
 };

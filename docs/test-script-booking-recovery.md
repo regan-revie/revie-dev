@@ -82,7 +82,7 @@ A safe way to make every booking fail, for one listing only.
 3. Pay on the checkout page.
 4. **Restore it straight afterwards, whatever happened:**
    `op run --env-file=.env -- node scripts/dev-listing-test-helper.js restore --listing 6aa17447-bd2d-4465-9a24-38498e5daa62 --yes`
-   then run `status`; it must say `nylasConfigurationId: set (real)`.
+   then run `status`; it must say `nylasConfiguration: set (real)`.
 
 | Who | What you should see |
 |---|---|
@@ -96,6 +96,29 @@ A safe way to make every booking fail, for one listing only.
 **What this does not test:** the retry. A 404 is treated as permanent and not retried, so there is one attempt, not two. The retry is covered by the automated tests only.
 
 **If you forget to restore:** nobody can see available times on that listing until you do. The original id is saved in your temporary folder and `restore` reads it from there.
+
+---
+
+## Scenario 5: the wording, the invite and the session panel (added Oct 28)
+
+**Before you start:** the PR is deployed to Render, `BOOKING_PROCESS_ALIAS` is on the service, and you have changed the Console marketplace texts in Test and copied them to Dev (the list is in the HANDOFF of Oct 28). Book on **revie-dev.onrender.com**, not localhost: the instant path and cancelling need Render's database.
+
+**Do:**
+1. Book a session more than 48 hours out. Look at the button, the checkout heading and the confirmed page.
+2. Open the Google Calendar invite.
+3. Open the order page, cancel, and watch the panel. Then reload the page.
+4. Book another session less than 48 hours out and cancel that one.
+
+| Where | What you should see |
+|---|---|
+| Booking button / checkout | **"Book a session"** and a heading with no "request" in it |
+| Confirmed page | **"You're booked."** |
+| Calendar event | Titled **"{session} with {coach}"**; description names the client and links to **that session's order page**; a **Google Meet** link; **no** Nylas cancel or reschedule link |
+| Cancel (over 48 hours) | Asks first: **"Cancel this session? You'll get a full refund."**; afterwards **"Session cancelled. Your refund is on its way."**; Reschedule and Cancel gone, and still gone after a reload; Stripe shows a refund |
+| Cancel (inside 48 hours) | Asks first, saying you will still be charged; afterwards says you have been charged; no refund in Stripe |
+| Session length | If the listing has two lengths, switching the length changes the times offered (and they start on the hour and half hour) |
+
+**Watch for:** the booking failing outright because Meet could not be created. If it does, the payment is released like any failed booking, and the Sentry issue will say why.
 
 ---
 

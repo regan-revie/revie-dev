@@ -52,9 +52,20 @@ module.exports = async (req, res) => {
   const sdk = getSdk(req, res, tokenStore);
 
   try {
-    const { configurationId } = await loadCalendarBookingTransaction(sdk, transactionId);
+    const { configurationId, lengthMinutes } = await loadCalendarBookingTransaction(
+      sdk,
+      transactionId
+    );
     if (!configurationId) {
       res.status(422).json({ error: 'Listing is not set up for calendar booking' });
+      return;
+    }
+    // A reschedule moves the session, it does not resell it: the length was paid for at booking.
+    const requestedMinutes = Math.round((endDate - startDate) / 60000);
+    if (lengthMinutes && requestedMinutes !== lengthMinutes) {
+      res.status(400).json({
+        error: `This session is ${lengthMinutes} minutes; the new time is ${requestedMinutes}.`,
+      });
       return;
     }
 

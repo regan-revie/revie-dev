@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Form as FinalForm } from 'react-final-form';
+import { Form as FinalForm, FormSpy } from 'react-final-form';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../../util/reactIntl';
@@ -64,6 +64,12 @@ const NylasBookingForm = props => {
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   const listingIdString = listingId?.uuid || listingId;
+  const initialPriceVariant = preselectedPriceVariant || priceVariants[0] || null;
+
+  // The chosen session length. Each length has its own Nylas configuration on the server, so the
+  // slots to show depend on it: changing the variant fetches that variant's slots rather than
+  // filtering one list in the browser.
+  const [variantName, setVariantName] = useState(initialPriceVariant?.name || null);
 
   const timeZoneNames = useMemo(() => getTimeZoneNames(), []);
 
@@ -71,7 +77,10 @@ const NylasBookingForm = props => {
     let cancelled = false;
     setAvailability({ status: 'loading', slots: [], connected: true });
 
-    nylasAvailability({ listingId: listingIdString })
+    nylasAvailability({
+      listingId: listingIdString,
+      ...(isPriceVariationsInUse && variantName ? { priceVariantName: variantName } : {}),
+    })
       .then(response => {
         if (cancelled) return;
         setAvailability({
@@ -97,9 +106,8 @@ const NylasBookingForm = props => {
     return () => {
       cancelled = true;
     };
-  }, [listingIdString]);
-
-  const initialPriceVariant = preselectedPriceVariant || priceVariants[0] || null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingIdString, variantName]);
 
   const clearSelection = form => {
     setSelectedSlot(null);
@@ -178,14 +186,21 @@ const NylasBookingForm = props => {
         return (
           <Form onSubmit={handleSubmit} className={classes} enforcePagePreloadFor="CheckoutPage">
             {isPriceVariationsInUse && PriceVariantField ? (
-              <PriceVariantField
-                priceVariants={priceVariants}
-                // Changing duration invalidates the pick, so clear it rather than leave a selection
-                // that no longer matches what is being bought.
-                onChange={() => clearSelection(form)}
-                {...formRenderProps}
-              />
+              <PriceVariantField priceVariants={priceVariants} {...formRenderProps} />
             ) : null}
+
+            {/* Changing the length invalidates the pick, so clear it rather than leave a selection
+                that no longer matches what is being bought, and fetch that length's slots. */}
+            <FormSpy
+              subscription={{ values: true }}
+              onChange={({ values: current }) => {
+                const next = current.priceVariantName || null;
+                if (next !== variantName) {
+                  clearSelection(form);
+                  setVariantName(next);
+                }
+              }}
+            />
 
             {notReady || (
               // Remounts on a timezone change (via key), which resets its internally-held day
@@ -243,8 +258,8 @@ const NylasBookingForm = props => {
             <div className={css.submitButton}>
               <PrimaryButton type="submit" disabled={!selectedSlot || fetchLineItemsInProgress}>
                 <FormattedMessage
-                  id="NylasBookingForm.requestToBook"
-                  defaultMessage="Request to book"
+                  id="NylasBookingForm.bookButton"
+                  defaultMessage="Book a session"
                 />
               </PrimaryButton>
             </div>

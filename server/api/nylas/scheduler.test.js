@@ -5,6 +5,10 @@ const {
   defaultCalendarFor,
   buildConfigurationBody,
   syncConfiguration,
+  eventTitle,
+  configurationDescription,
+  bookingEventDescription,
+  conferencingFor,
 } = require('./scheduler');
 
 const CAL = 'coach@example.com';
@@ -56,12 +60,20 @@ describe('defaultCalendarFor()', () => {
 });
 
 describe('buildConfigurationBody()', () => {
-  const body = buildConfigurationBody({
-    eventType: { title: 'Signature Session', description: 'desc', durationMinutes: 60 },
-    coachName: 'A Coach',
-    coachEmail: CAL,
-    calendarId: CAL,
-  });
+  const MANAGE = 'https://revie.example/inbox/orders';
+  const build = overrides =>
+    buildConfigurationBody({
+      title: 'Find your focus with A Coach',
+      description: 'desc',
+      durationMinutes: 90,
+      manageUrl: MANAGE,
+      conferencing: { provider: 'Google Meet', autocreate: {} },
+      coachName: 'A Coach',
+      coachEmail: CAL,
+      calendarId: CAL,
+      ...overrides,
+    });
+  const body = build();
 
   it('makes the coach the organizer', () => {
     expect(body.participants).toHaveLength(1);
@@ -73,9 +85,14 @@ describe('buildConfigurationBody()', () => {
     expect(body.participants[0].booking.calendar_id).toBe(CAL);
   });
 
-  it('takes duration and title from the Revie template', () => {
-    expect(body.availability.duration_minutes).toBe(60);
-    expect(body.event_booking.title).toBe('Signature Session');
+  it('takes the duration and title it is given, one configuration per session length', () => {
+    expect(body.availability.duration_minutes).toBe(90);
+    expect(body.event_booking.title).toBe('Find your focus with A Coach');
+  });
+
+  it('starts slots every 30 minutes, on the hour and half hour', () => {
+    expect(body.availability.interval_minutes).toBe(30);
+    expect(body.availability.round_to).toBe(30);
   });
 
   it('creates a PRIVATE configuration, so nobody can book without going through us', () => {
@@ -84,51 +101,99 @@ describe('buildConfigurationBody()', () => {
     // a session for free.
     expect(body.requires_session_auth).toBe(true);
   });
+
+  it("hides Nylas's own cancel and reschedule links and points the rest at Revie", () => {
+    // Nylas's hosted pages cannot act on a private configuration, and would bypass the 48-hour
+    // rule and the refund logic if they could.
+    expect(body.scheduler.hide_cancellation_options).toBe(true);
+    expect(body.scheduler.hide_rescheduling_options).toBe(true);
+    // Nylas insists the URL carries its :booking_ref token, so the Revie link gets it as a query.
+    expect(body.scheduler.cancellation_url).toBe(`${MANAGE}?booking=:booking_ref`);
+    expect(body.scheduler.rescheduling_url).toBe(`${MANAGE}?booking=:booking_ref`);
+  });
+
+  it('asks for conferencing only when the provider can create it', () => {
+    expect(body.event_booking.conferencing).toEqual({ provider: 'Google Meet', autocreate: {} });
+    expect(build({ conferencing: null }).event_booking).not.toHaveProperty('conferencing');
+  });
+});
+
+describe('event wording', () => {
+  it('titles an event "{session name} with {coach name}"', () => {
+    expect(eventTitle('Find your focus', 'Ada Lovelace')).toBe('Find your focus with Ada Lovelace');
+  });
+
+  it('falls back to whichever half it has rather than printing "undefined"', () => {
+    expect(eventTitle('Find your focus', undefined)).toBe('Find your focus');
+    expect(eventTitle(undefined, 'Ada')).toBe('Ada');
+    expect(eventTitle()).toBe('Coaching session');
+  });
+
+  it('links the configuration description to Revie and states the refund rule', () => {
+    const text = configurationDescription('https://revie.example/inbox/orders');
+    expect(text).toContain('https://revie.example/inbox/orders');
+    expect(text).toMatch(/48 hours/);
+  });
+
+  it("names the client and links to that session's own page", () => {
+    const text = bookingEventDescription({
+      clientName: 'Grace Hopper',
+      manageUrl: 'https://revie.example/order/abc',
+    });
+    expect(text).toContain('Client: Grace Hopper');
+    expect(text).toContain('https://revie.example/order/abc');
+  });
+
+  it('omits the client line rather than printing "Client: undefined"', () => {
+    expect(bookingEventDescription({ manageUrl: 'https://x.example' })).not.toMatch(/Client/);
+  });
+
+  it('picks Meet for Google and Teams for Microsoft, and nothing for anyone else', () => {
+    expect(conferencingFor('google').provider).toBe('Google Meet');
+    expect(conferencingFor('microsoft').provider).toBe('Microsoft Teams');
+    expect(conferencingFor('icloud')).toBeNull();
+    expect(conferencingFor(undefined)).toBeNull();
+  });
 });
 
 describe('syncConfiguration()', () => {
+  const base = {
+    grantId: GRANT,
+    eventTypeKey: 'signature-session',
+    listingTitle: 'Find your focus',
+    manageUrl: 'https://revie.example/inbox/orders',
+    coachName: 'A',
+    coachEmail: CAL,
+    calendarId: CAL,
+  };
+
   it('rejects an event type Revie does not define', async () => {
-    await expect(
-      syncConfiguration({
-        grantId: GRANT,
-        eventTypeKey: 'invented',
-        coachEmail: CAL,
-        calendarId: CAL,
-      })
-    ).rejects.toThrow(/Unknown Revie event type/);
+    await expect(syncConfiguration({ ...base, eventTypeKey: 'invented' })).rejects.toThrow(
+      /Unknown Revie event type/
+    );
     expect(nylasRequest).not.toHaveBeenCalled();
   });
 
-  it('creates a configuration when the coach has none', async () => {
-    nylasRequest.mockResolvedValueOnce([]).mockResolvedValueOnce({ id: 'cfg-1' });
-    const { created, configuration } = await syncConfiguration({
-      grantId: GRANT,
-      eventTypeKey: 'signature-session',
-      coachName: 'A',
-      coachEmail: CAL,
-      calendarId: CAL,
-    });
+  it('creates a configuration when the listing has none for this length', async () => {
+    nylasRequest.mockResolvedValueOnce({ id: 'cfg-1' });
+    const { created, configuration } = await syncConfiguration({ ...base, durationMinutes: 45 });
     expect(created).toBe(true);
     expect(configuration.id).toBe('cfg-1');
     expect(nylasRequest).toHaveBeenLastCalledWith(
       `/v3/grants/${GRANT}/scheduling/configurations`,
       expect.objectContaining({ method: 'POST' })
     );
+    const sent = nylasRequest.mock.calls[0][1].body;
+    expect(sent.availability.duration_minutes).toBe(45);
+    expect(sent.event_booking.title).toBe('Find your focus with A');
   });
 
-  it('updates in place rather than duplicating when one already exists', async () => {
-    // A coach re-opting-in must not end up selling the same session twice.
-    nylasRequest
-      .mockResolvedValueOnce([
-        { id: 'cfg-existing', event_booking: { title: 'Signature Session' } },
-      ])
-      .mockResolvedValueOnce({ id: 'cfg-existing' });
+  it("updates the listing's own configuration in place when it has one", async () => {
+    nylasRequest.mockResolvedValueOnce({ id: 'cfg-existing' });
     const { created, configuration } = await syncConfiguration({
-      grantId: GRANT,
-      eventTypeKey: 'signature-session',
-      coachName: 'A',
-      coachEmail: CAL,
-      calendarId: CAL,
+      ...base,
+      configurationId: 'cfg-existing',
+      durationMinutes: 60,
     });
     expect(created).toBe(false);
     expect(configuration.id).toBe('cfg-existing');
@@ -138,18 +203,30 @@ describe('syncConfiguration()', () => {
     );
   });
 
-  it('ignores a configuration for a different event type', async () => {
+  it('does not look configurations up by title, so two same-named listings cannot collide', async () => {
+    nylasRequest.mockResolvedValueOnce({ id: 'cfg-new' });
+    await syncConfiguration({ ...base, durationMinutes: 60 });
+    expect(nylasRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a fresh configuration if the stored one was deleted in Nylas', async () => {
     nylasRequest
-      .mockResolvedValueOnce([{ id: 'cfg-other', event_booking: { title: 'Something Else' } }])
-      .mockResolvedValueOnce({ id: 'cfg-new' });
-    const { created } = await syncConfiguration({
-      grantId: GRANT,
-      eventTypeKey: 'signature-session',
-      coachName: 'A',
-      coachEmail: CAL,
-      calendarId: CAL,
+      .mockRejectedValueOnce(Object.assign(new Error('gone'), { status: 404 }))
+      .mockResolvedValueOnce({ id: 'cfg-replacement' });
+    const { created, configuration } = await syncConfiguration({
+      ...base,
+      configurationId: 'cfg-deleted',
+      durationMinutes: 60,
     });
     expect(created).toBe(true);
+    expect(configuration.id).toBe('cfg-replacement');
+  });
+
+  it('does not hide any other failure behind a silent re-create', async () => {
+    nylasRequest.mockRejectedValueOnce(Object.assign(new Error('bad key'), { status: 401 }));
+    await expect(
+      syncConfiguration({ ...base, configurationId: 'cfg-x', durationMinutes: 60 })
+    ).rejects.toThrow('bad key');
   });
 });
 

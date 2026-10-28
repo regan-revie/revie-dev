@@ -19,9 +19,69 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-10-28 (calendar sessions: release-2 on enable, session lengths, invite, wording, cancel panel)
+
+**Branch / PR:** `calendar-sessions-wording`, one PR, not merged. It also carries the two doc commits from the closed docs branch that missed PR #7 (the "Console cannot pin a listing type" corrections and the Oct 27 handoff).
+
+**Test results that prompted this (Regan, on Render):** happy path and slot-taken behave; cancel worked (calendar event removed, Stripe refunded) but gave no confirmation and left the buttons up; the page still said "booking request"/"declined". Scenarios 2 and 4 earlier ran through localhost checkout with Render's sweeper and webhooks doing the work, so the fast browser path has now only been run for scenarios 1 and 3.
+
+**What changed**
+1. **New listings land on release-2.** `enableListing` writes `transactionProcessAlias` from `BOOKING_PROCESS_ALIAS` in the same update as the configuration ids and refuses (503) if it is unset; initiate refuses a calendar listing booked under any other alias. `BOOKING_PROCESS_ALIAS=default-booking/release-2` is in `render.yaml` (Dev). Listing types stay on release-1.
+2. **Session lengths.** One Nylas configuration per variant length (`publicData.nylasConfigurationIds`, old single id kept as the 60-minute entry), slots every 30 minutes, availability/booking/cancel/reschedule all resolve through `resolveBookingTarget`, the booking form refetches when the length changes, reschedule refuses a different length. The `length` field is NOT removed (see below).
+3. **Every configuration:** title "{listing title} with {coach name}", generic Revie description, Google Meet (Teams for Microsoft grants), Nylas's hosted cancel/reschedule links hidden, URLs pointed at the Revie orders page (Nylas requires `:booking_ref` in them, so it is a query parameter). After a booking is made the event is updated with the client's name and a link to that session's order page (best effort; failures go to Sentry as `nylas-event-description-failed`).
+4. **Wording and cancel panel:** "Book a session"; confirm before cancelling stating the refund outcome (full refund over 48 hours, still charged inside), a settled "Session cancelled" state, and the panel hides itself for cancelled or finished sessions. `booking-status` now reports cancelled sessions and the live refund outcome.
+5. **Dev data changed (approved):** `scripts/dev-resync-listing.js sync` was run on the Dev Test Session listing only. It now has the new title, Meet, hidden links, 30-minute slots, and `nylasCalendarId`; verified Nylas now offers starts on :00 and :30. `scripts/dev-listing-test-helper.js` break/restore now handle the per-length map.
+
+**Findings**
+- **Console marketplace texts shadow the repo.** The app merges `{...en.json, ...hostedTranslations}` and Dev's Console holds a copy of essentially every template key, so changing the value of a stock key in `en.json` does nothing on Dev. This also means the five string changes in PR #6 (customer/provider declined and preauthorized) are not live on Dev. Revie-specific text is on new keys; stock keys are in the Console list below. Email texts work the same way.
+- Nylas requires `:booking_ref` in `cancellation_url` / `rescheduling_url`.
+- Cancel failing earlier was almost certainly localhost having no `DATABASE_URL`, not release-2.
+
+**Console marketplace texts to change in Test, then copy to Dev** (values equal the repo's `en.json`):
+- `TransactionPage.default-booking.customer.accepted.title` → You're booked.
+- `TransactionPage.default-booking.customer.declined.title` and `...customer.expired.title` → That one didn't go through, and you haven't been charged. Pick another time and we'll get you booked.
+- `TransactionPage.default-booking.customer.preauthorized.title` → Confirming your session… and `...preauthorized.extraInfo` → the repo text.
+- `CheckoutPage.default-booking.title` → Complete your booking
+- `OrderPanel.ctaButtonMessageBooking` and `BookingDatesForm.requestToBook` → Book a session
+- `TransactionPage.ActivityFeed.default-booking.accepted`, `.declined`, `.expired`, `.preauthorized` → the repo text
+- `InboxPage.default-booking.preauthorized.status` → Confirming; `.accepted.status` → Booked; `.declined.status` → Didn't go through
+- Coach side: `TransactionPage.default-booking.provider.declined.title`, `...provider.preauthorized.title` → the repo text
+- Console **email texts**: `BookingAcceptedRequest.Subject/Title/DescriptionFixed`, `BookingExpiredRequest.Title/Subject` (no process push needed).
+
+**What's next**
+- Regan: add nothing to Render if the Blueprint syncs; otherwise set `BOOKING_PROCESS_ALIAS=default-booking/release-2` on `revie-dev`. Change the Console texts. Run scenario 5 of the test script on Render, including whether Meet creation breaks booking.
+- Remove the Dev `length` field only after Regan approves the exact change (listed in the PR conversation).
+- Friendlier checkout network-error message and a safe retry (analysed, not built).
+- Coach emails still say "booking request accepted on your behalf" and lack a fixed-length branch.
+
+**Blocked / needs a decision**
+- Whether a failed Google Meet creation fails the whole booking is unknown until one test booking.
+
+---
+
+## HANDOFF — 2026-10-27 (release-2 test results; cancellation investigation)
+
+**Test results on Dev (Regan ran them):** happy path and sweeper scenarios passed. Slot-taken and forced-failure scenarios passed functionally (Stripe payment cancelled, Sentry alerted) but the customer's order page still read as "declined"; probably the activity-feed line "The booking request was declined." rather than the new title, to be confirmed. Both runs of `break` and `restore` on the Test Session listing worked and `status` confirmed it was restored. **Customer cancel failed** ("Something went wrong. Please try again shortly.").
+
+**Findings (nothing was changed; no fixes made):**
+- Release-2 did not break cancellation: `transition/cancel` is identical to release-1 (operator, accepted to cancelled, full refund), and the cancel panel only checks for the ACCEPTED state, which release-2 did not change.
+- Nylas accepts our cancel call's authorisation: a cancel of a nonexistent booking id returned 404 "Booking not found", not an auth error. So the failure is for a real booking or earlier in our endpoint. The exact status was not readable from here (no Render/Sentry access); it is in the browser's Network tab for `cancel-booking`, and in Sentry as `local-api-request-failed`.
+- The cancel endpoint takes the Nylas configuration id from the listing's current value, so a cancel attempted while the listing was broken for scenario 4 would fail with this same message.
+- Hosted Nylas cancel/reschedule links come from `scheduler.cancellation_url` / `rescheduling_url` (default book.nylas.com); `hide_cancellation_options` and `hide_rescheduling_options` are both false on the Dev configuration. They cannot work (private configuration) and change nothing in Sharetribe.
+
+**Next:** get the status of the failing `cancel-booking` request, then fix; then turn off the hosted links in the same configuration change as event title and Google Meet.
+
+---
+
 ## HANDOFF — 2026-10-27 (release-2 pushed to Dev)
 
 **Branch / PR:** `docs-release-2-rollout`, docs and one helper script only. PR #6 (the recovery code) is merged and live on Render dev.
+
+**Corrections and follow-up (later the same day)**
+- **Console cannot point a listing type at release-2** (it only offers default processes), so the Console step below is void and the "listing type points at release-2" wording in this entry, `decisions.md`, `tech-constraints.md` and `CLAUDE.md` was wrong; corrected. Listing types stay on release-1 everywhere, so a Test to Dev copy is harmless again.
+- Regan approved it and I ran `use-release-2` on the Dev "Test Session" listing (`6aa17447-...`) and nothing else. `status` before: `default-booking/release-1`; after: `default-booking/release-2`.
+- Added the `revie1-dev` flex-cli note to `CLAUDE.md`.
+- Open: how NEW listings get release-2 before the Dec 14 cutover (plan given in chat, not built).
 
 **What changed**
 - **Pushed process release-2 to Dev only** (`npx flex-cli`, marketplace `revie1-dev`). First validated locally with `flex-cli process --path` (it parsed the file and described exactly the intended machine), and confirmed Dev's live version 1 was identical to the file I edited from. Output: `Version 2 successfully saved for process default-booking`, then `Alias default-booking/release-2 successfully created to point to version 2.` `process list` now shows version 2 (`release-2`, 0 transactions) and version 1 (`release-1`, 4 transactions). Pulled version 2 back and confirmed it matches git (the server drops comments and stores templates with CRLF line endings). **Nothing was pushed to Test or Live.**
