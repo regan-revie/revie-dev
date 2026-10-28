@@ -7,17 +7,17 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Which emails come from Sharetribe and which from Postmark
+**Date:** Oct 28, 2026
+**Decision:** Sharetribe (release-3) sends: Accepted request (client, "You're booked"), Operator accepted request (coach, "You've got a session", with a fixed-length body), Operator declined request and Expired request (client, "That one didn't go through, and you haven't been charged"), cancellation emails to client and coach (new in release-3), Money paid, and the review emails. New request and Declined request aren't sent. Postmark sends late-cancellation, reschedule and reminder emails only. Nylas Scheduler's own emails are off (disable_emails). Klaviyo is marketing only.
+**Why:** Release-2 had no cancellation email; the only one in testing came from Nylas, now turned off. Sharetribe templates cover normal cancellations with no new service; Postmark fills only what Sharetribe can't.
+**Affects:** transaction process release-3 (Dev and Test now, Live at cutover), Console Email texts, BOOKING_PROCESS_ALIAS on Render, server/email (Postmark).
+
 ### DECISION: Edit Dev's Console directly until cutover
 **Date:** Oct 28, 2026
 **Decision:** Until the Dec 14 cutover, Console changes for the new platform are made directly in Dev, and logged in docs/go-live-plan.md under "Dev-only Console changes". No Test → Dev copies. At cutover, the logged changes are applied to Test and Live together. Test stays a mirror of Live until then.
 **Why:** Test must preview Live (old look, hosted frontend) while Dev carries the new brand; a Test → Dev copy would replace Dev's cream wordmark, turn off file attachments and change listing approval. Replaces the "change Test, then copy forward" house rule until cutover.
 **Affects:** CLAUDE.md, docs/tech-constraints.md house rules, docs/go-live-plan.md cutover checklist.
-
-### DECISION: Which emails come from Sharetribe and which from Postmark
-**Date:** Oct 28, 2026
-**Decision:** Sharetribe sends: Accepted request (client, "You're booked"), Operator accepted request (coach, "You've got a session"), Operator declined request and Expired request (client, "That one didn't go through, and you haven't been charged"), cancellation emails to client and coach, Money paid, and the review emails. New request and Declined request aren't sent under release-2. Postmark sends late-cancellation, reschedule and reminder emails only. Nylas Scheduler's own emails are turned off (disable_emails). Klaviyo is marketing only.
-**Why:** In testing, a cancel sent both a Sharetribe and a Nylas email to each person. Sharetribe already covers cancellations; Postmark fills only what it can't (no transition for late cancels, fixed times after a reschedule).
-**Affects:** Console Email texts, Nylas configuration, server/email (Postmark).
 
 ### DECISION: Console texts hold only Revie's overrides
 **Date:** Oct 28, 2026
