@@ -8,19 +8,20 @@
 
 .buttonLinkSecondary {
   composes: buttonSecondary from global;
+  color: var(--revieMaroon);
 }
 
 .customButton {
   composes: buttonDefault from global;
 
   padding: 0;
-  border-radius: 8px;
+  border-radius: var(--borderRadius);
   height: 100px;
 }
 
 .customIcon {
   width: 24px;
   height: 24px;
-  stroke: #fff;
+  stroke: var(--colorWhite);
   margin-right: 10px;
 }

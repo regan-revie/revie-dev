@@ -52,14 +52,14 @@
 .radioButtonLabel {
   display: inline-block;
   border: 2px solid transparent;
-  border-radius: 2px;
+  border-radius: var(--borderRadius);
   cursor: pointer;
   padding: 0;
 }
 
 /* Radio buttob selected */
 .radioButtonInput:checked + .radioButtonLabel {
-  border-radius: 10px;
+  border-radius: var(--borderRadiusMedium);
   border: 2px solid var(--marketplaceColor);
 }
 
@@ -67,7 +67,7 @@
   width: 42px;
   height: 42px;
   background-color: transparent;
-  border-radius: 2px;
+  border-radius: var(--borderRadius);
   padding: 2px;
 }
 
@@ -76,7 +76,7 @@
   border: 1px solid var(--colorGrey100);
   width: 100%;
   height: 100%;
-  border-radius: 6px;
+  border-radius: var(--borderRadius);
 }
 
 .previewText {

@@ -30,7 +30,7 @@
 
 .paymentHeading {
   margin: 0 0 14px 0;
-  color: var(--colorGrey300);
+  color: var(--colorTextMuted);
 
   padding-top: 8px;
   padding-bottom: 0px;
@@ -41,7 +41,7 @@
 }
 
 .messageHeading {
-  color: var(--colorGrey300);
+  color: var(--colorTextMuted);
   margin: 40px 0 14px 0;
 
   padding-top: 4px;
@@ -64,7 +64,7 @@
 }
 
 .messageOptional {
-  color: var(--colorGrey300);
+  color: var(--colorTextMuted);
 }
 
 .message {

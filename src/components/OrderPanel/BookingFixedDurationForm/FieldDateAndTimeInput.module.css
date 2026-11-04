@@ -70,7 +70,7 @@
   flex-grow: 1;
 }
 .disabled {
-  color: var(--colorGrey300);
+  color: var(--colorTextDisabled);
 }
 
 .fieldDateInput {

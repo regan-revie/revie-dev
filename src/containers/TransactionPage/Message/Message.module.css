@@ -44,7 +44,7 @@
   composes: textSmall from global;
   box-shadow: var(--boxShadow);
   background-color: var(--colorWhite);
-  border-radius: 8px;
+  border-radius: var(--borderRadius);
   display: flex;
   padding: var(--spacing-md, 8px) var(--spacing-lg, 12px);
   flex-direction: column;
@@ -65,13 +65,13 @@
 
 .ownMessageContent {
   background-color: var(--marketplaceColor);
-  color: var(--colorWhite);
+  color: var(--revieCream);
   float: right;
   max-width: min(420px, 100%);
 }
 
 .ownMessageContentLink {
-  color: var(--colorWhite);
+  color: var(--revieCream);
   text-decoration: underline;
 
   word-break: break-word;
@@ -113,7 +113,7 @@
 }
 
 .ownMessageContentUnverified {
-  background-color: var(--colorGrey600);
+  background-color: var(--colorGrey700);
   color: var(--colorGrey100);
 }
 
@@ -135,11 +135,11 @@
 }
 
 .fileAttachmentIconMessage {
-  color: var(--colorGrey500);
+  color: var(--colorTextMuted);
 }
 
 .fileAttachmentIconOwnMessage {
-  color: var(--colorWhite);
+  color: var(--revieCream);
 }
 
 .fileAttachmentIconOwnMessageUnverified {

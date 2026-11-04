@@ -32,7 +32,7 @@
 
 .open {
   & .input {
-    border-radius: 6px 6px 0 0;
+    border-radius: var(--borderRadius) var(--borderRadius) 0 0;
   }
 }
 

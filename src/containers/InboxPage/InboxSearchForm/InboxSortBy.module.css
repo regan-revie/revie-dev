@@ -67,7 +67,7 @@
   }
 
   &:disabled {
-    color: var(--colorGrey300);
+    color: var(--colorTextDisabled);
     cursor: default;
   }
   &:disabled:hover .menuItemBorder {

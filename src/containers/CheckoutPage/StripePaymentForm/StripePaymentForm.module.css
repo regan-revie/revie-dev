@@ -114,7 +114,7 @@
 }
 
 .messageOptional {
-  color: var(--colorGrey300);
+  color: var(--colorTextMuted);
 }
 
 .message {

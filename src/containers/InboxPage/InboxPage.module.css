@@ -361,7 +361,7 @@
 }
 
 .bookingNoActionNeeded {
-  color: var(--colorGrey300);
+  color: var(--colorTextMuted);
 }
 
 .lastTransitionedAtEmphasized {
@@ -370,13 +370,13 @@
 }
 
 .lastTransitionedAtNotEmphasized {
-  color: var(--colorGrey300);
+  color: var(--colorTextDisabled);
 }
 
 .bannedUserLink {
   & .itemUsername,
   &:hover .itemUsername,
   & .stateName {
-    color: var(--colorGrey300);
+    color: var(--colorTextMuted);
   }
 }

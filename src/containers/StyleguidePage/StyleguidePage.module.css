@@ -124,18 +124,18 @@
 
 .element {
   border-style: solid;
-  border-color: #aaa;
+  border-color: var(--colorGrey300);
   border-width: 1px;
 }
 
 .description {
   flex-grow: 1;
   width: 100%;
-  background-color: #f1f1f1;
+  background-color: var(--colorGrey100);
   padding: 7px 12px;
 
   border-style: solid;
-  border-color: #aaa;
+  border-color: var(--colorGrey300);
   border-width: 1px;
   border-top-color: transparent;
 
@@ -196,7 +196,7 @@
 .colorDescription {
   flex-grow: 1;
   width: 100%;
-  background-color: #fff;
+  background-color: var(--colorWhite);
   padding: calc(2 * var(--spacingUnit));
 
   @media (--viewportMedium) {

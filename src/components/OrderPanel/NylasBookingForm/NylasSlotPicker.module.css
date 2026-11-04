@@ -44,6 +44,7 @@
   border: 1px solid var(--colorGrey300);
   border-radius: var(--borderRadiusMedium);
   background-color: var(--colorWhite);
+  color: var(--colorGrey900);
   cursor: pointer;
   font-weight: var(--fontWeightMedium);
 }
@@ -55,5 +56,5 @@
 .slotSelected {
   border-color: var(--marketplaceColor);
   background-color: var(--marketplaceColor);
-  color: var(--colorWhite);
+  color: var(--revieCream);
 }

@@ -122,6 +122,15 @@
   --colorGrey800: hsl(336 25% 18%);
   --colorGrey900: var(--revieMaroon);
 
+  /**
+   * Text on the cream and white surfaces. Grey 300/400/500 are 1.8 / 2.4 / 3.4 : 1 on cream,
+   * so they are fine for borders and fills but not for reading. Grey 600 is the lightest grey that
+   * clears AA (4.9 : 1 on cream, 5.7 : 1 on white). Disabled controls are exempt from AA, so they
+   * take grey 500, still distinguishable from live text.
+   */
+  --colorTextMuted: var(--colorGrey600);
+  --colorTextDisabled: var(--colorGrey500);
+
   /* ================ Buttons ================ */
   /**
    * Maroon and lavender are Revie's primary colours. Stock primary button is
@@ -243,12 +252,12 @@
   --datepickerFgColor: var(--revieCream);
   --datepickerBgColor: var(--revieMaroon);
   --datepickerBorderColor: var(--revieMaroonSoft);
-  --datepickerDisabledFgColor: rgba(239, 238, 237, 0.35);
+  --datepickerDisabledFgColor: rgba(239, 238, 237, 0.55);
   --datepickerDisabledTextDeco: unset;
   --datepickerHoveredFgColor: inherit;
   --datepickerHoveredBgColor: rgba(255, 255, 255, 0.15);
   --datepickerHeaderFgColor: var(--revieCream);
-  --datepickerHeaderFgColorDisabled: rgba(239, 238, 237, 0.35);
+  --datepickerHeaderFgColorDisabled: rgba(239, 238, 237, 0.55);
   --datepickerHeaderArrowColor: var(--revieLavender);
   --datepickerDateOutline: var(--revieLavender) solid 1px;
   --datepickerButtonOutlineColor: var(--revieLavender);
@@ -364,9 +373,14 @@ html [class*='LinksMenu_linkMenuLabel__'] svg {
    STILL OUTSTANDING, tracked separately:
    - Replace the biketribe-* assets in src/assets/ and the imports in
      src/config/configBranding.js.
-   - Audit components for hardcoded hex, px radii and font-family
-     declarations. Unknown how many exist; they'd override these tokens.
-   - --colorSuccess / --colorFail / --colorAttention are left at stock
-     values deliberately. They carry meaning rather than brand, and
+   - (Done Nov 2026, "Layer 2") Hardcoded hex, px radii and text/background
+     pairings in components now use these tokens; repeat the audit with
+     scripts/audit-css.js. Left on purpose: the vendored react-image-gallery
+     stylesheets and sanitize.css, calc()-based pill radii, and the monospace
+     stack of the code block.
+   - --colorSuccess / --colorFail / --colorAttention / --colorStatusActionNeeded
+     are left at stock values deliberately (and fail AA as text on cream: error
+     red 4.1:1, success green 4.3:1, action-needed 4.2:1; see docs/brand.md,
+     "Semantic colours"). They carry meaning rather than brand, and
      none of them is in the Revie palette. Worth a decision later.
    ================================================================ */

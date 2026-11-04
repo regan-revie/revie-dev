@@ -7,29 +7,29 @@
   border-right: 1px solid var(--datepickerBorderColor);
   border-bottom: 1px solid var(--datepickerBorderColor);
   border-left: 1px solid var(--datepickerBorderColor);
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 var(--borderRadius) var(--borderRadius);
   color: var(--datepickerFgColor);
   background-color: var(--datepickerBgColor);
 }
 
 .light {
-  --datepickerFgColor: var(--colorGrey700);
+  --datepickerFgColor: var(--revieMaroon);
   --datepickerBgColor: transparent;
   --datepickerBorderColor: transparent;
-  --datepickerDisabledFgColor: var(--colorGrey300);
+  --datepickerDisabledFgColor: var(--colorTextMuted);
   --datepickerDisabledTextDeco: line-through;
   --datepickerHoveredFgColor: inherit;
   --datepickerHoveredBgColor: var(--colorGrey100);
-  --datepickerHeaderFgColor: var(--colorGrey700);
-  --datepickerHeaderFgColorDisabled: var(--colorGrey300);
+  --datepickerHeaderFgColor: var(--revieMaroon);
+  --datepickerHeaderFgColorDisabled: var(--colorTextMuted);
   --datepickerHeaderArrowColor: var(--marketplaceColor);
   --datepickerDateOutline: auto;
   --datepickerButtonOutlineColor: var(--colorGrey600);
-  --datepickerSelectedFgColor: var(--colorWhite);
-  --datepickerSelectedBgColor: var(--colorSuccess);
-  --datepickerSelectedBorder: solid 1px var(--colorSuccess);
-  --datepickerSelectedHoveredFgColor: var(--colorWhite);
-  --datepickerSelectedHoveredBgColor: var(--colorSuccess);
+  --datepickerSelectedFgColor: var(--revieMaroon);
+  --datepickerSelectedBgColor: var(--revieLavender);
+  --datepickerSelectedBorder: solid 1px var(--revieMaroon);
+  --datepickerSelectedHoveredFgColor: var(--revieMaroon);
+  --datepickerSelectedHoveredBgColor: var(--revieLavenderDeep);
 }
 
 .datepicker {
@@ -67,8 +67,8 @@
   }
 
   .dateSelected:hover > * {
-    color: var(--colorWhite);
-    background-color: #0000ff;
+    color: var(--datepickerSelectedHoveredFgColor);
+    background-color: var(--datepickerSelectedHoveredBgColor);
   }
 }
 
@@ -106,7 +106,7 @@
   justify-content: center;
   align-items: center;
   border: none;
-  border-radius: 2px;
+  border-radius: var(--borderRadius);
   background-color: transparent;
   cursor: pointer;
 
@@ -237,7 +237,7 @@
     align-items: center;
     background-color: var(--datepickerSelectedBgColor);
     border-radius: calc(37px / 2);
-    color: var(--datepickerFgColor);
+    color: var(--datepickerSelectedFgColor);
   }
 }
 
@@ -248,7 +248,7 @@
     border-bottom-left-radius: 0;
     border-top-right-radius: calc(37px / 2);
     border-bottom-right-radius: calc(37px / 2);
-    color: var(--colorWhite);
+    color: var(--datepickerSelectedFgColor);
   }
 
   &:hover .renderedDay {
@@ -264,7 +264,7 @@
     border-bottom-left-radius: calc(37px / 2);
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
-    color: var(--colorWhite);
+    color: var(--datepickerSelectedFgColor);
   }
 
   &:hover .renderedDay {
@@ -332,7 +332,7 @@
 .dateMinimumNights {
   & .renderedDay {
     background-color: var(--datepickerSelectedBgColor);
-    color: var(--datepickerDisabledFgColor);
+    color: var(--datepickerSelectedFgColor);
     opacity: 0.8;
   }
 }
@@ -348,7 +348,7 @@
 .todayButton {
   color: var(--datepickerFgColor);
   padding: 4px 8px;
-  border-radius: 2px;
+  border-radius: var(--borderRadius);
 
   &:focus {
     outline: var(--datepickerButtonOutlineColor) solid 1px;

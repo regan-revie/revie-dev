@@ -4,7 +4,7 @@
   padding: 24px;
   margin-bottom: 24px;
   border: 1px solid var(--colorGrey100);
-  border-radius: 8px;
+  border-radius: var(--borderRadius);
 }
 
 .heading {
@@ -17,8 +17,11 @@
   margin-bottom: 16px;
 }
 
+/* Maroon on cream is an approved pairing (15.6:1). The stock error red is 4.1:1 on cream, below AA,
+   and no red is in the brand palette, so the message is carried by weight instead of colour. */
 .error {
-  color: var(--colorFail);
+  color: var(--revieMaroon);
+  font-weight: var(--fontWeightBold);
 }
 
 .actions {
@@ -29,7 +32,8 @@
 }
 
 .cancelLink {
-  color: var(--colorFail);
+  color: var(--revieMaroon);
+  text-decoration: underline;
 }
 
 .confirmCancel {

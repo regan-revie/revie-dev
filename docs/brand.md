@@ -46,6 +46,17 @@ From the "Color Combinations & Contrast" page of the guidelines. Every one clear
 | Pink `#FF90C2` | Maroon | 8.64 | Maroon **only** |
 | Chartreuse `#EAEA73` | Maroon | 14.24 | Maroon **only** |
 
+## Text colours on cream and white (added Nov 2026)
+Greys are for borders and fills as well as text, so grey 300 to 500 fail as body text on the cream ground (1.8 / 2.4 / 3.4 : 1). Two tokens carry the text roles:
+| Token | Value | On cream | Use |
+|---|---|---|---|
+| `--colorTextMuted` | grey 600 | 4.9 : 1 | secondary text, labels, hints, "optional" |
+| `--colorTextDisabled` | grey 500 | 3.4 : 1 | disabled controls only (WCAG exempts disabled text) |
+Primary text is maroon (`--colorGrey900`) or grey 700. On a maroon ground use off-white (`--revieCream`), never pure white.
+
+## Semantic colours (open decision)
+Error red `#E7000B`, success green `#138041`, action-needed `#B25900` and attention amber `#FFAA00` are Sharetribe's stock values and are not in the palette. As text on cream they measure 4.1, 4.3, 4.2 and 1.7 : 1, so they fail AA. Options: (a) darken each to clear 4.5 : 1 (about `#B8000A`, `#0E6B36`, `#8F4700`), (b) drop colour as the signal and use maroon text with an icon or weight. Not changed yet: it needs a brand decision.
+
 ## Type
 | Role | Typeface | CSS variable |
 |---|---|---|

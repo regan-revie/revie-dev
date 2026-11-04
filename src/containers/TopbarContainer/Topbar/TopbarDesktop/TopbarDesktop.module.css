@@ -103,7 +103,7 @@
   /* Ground is now maroon (--revieMaroon): grey700/black text and a marketplaceColor
      (maroon) hover underline would both disappear against it. */
   &:hover {
-    color: var(--colorWhite);
+    color: var(--revieCream);
     border-bottom: 4px solid var(--revieLavender);
     border-radius: 0;
     text-decoration: none;

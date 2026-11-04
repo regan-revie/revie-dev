@@ -70,7 +70,7 @@
 
 .disabled {
   pointer-events: none;
-  color: var(--colorGrey300);
+  color: var(--colorTextDisabled);
   text-decoration: none;
 }
 

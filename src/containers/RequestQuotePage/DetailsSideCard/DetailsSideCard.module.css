@@ -17,7 +17,7 @@
     /* Coloring */
     background-color: var(--colorWhite);
     border: 1px solid var(--colorGrey100);
-    border-radius: 2px;
+    border-radius: var(--borderRadius);
   }
 }
 
@@ -36,7 +36,7 @@
   width: 100%;
 
   @media (--viewportLarge) {
-    border-radius: 2px 2px 0 0;
+    border-radius: var(--borderRadius) var(--borderRadius) 0 0;
   }
 }
 

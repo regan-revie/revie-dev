@@ -1,7 +1,7 @@
 @import '../../../styles/customMediaQueries.css';
 
 .root {
-  border-radius: 2px;
+  border-radius: var(--borderRadius);
 }
 
 .searchInputIcon {

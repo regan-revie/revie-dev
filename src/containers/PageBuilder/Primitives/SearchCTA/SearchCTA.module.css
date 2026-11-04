@@ -12,7 +12,7 @@
   @media (--viewportLarge) {
     padding-bottom: 0;
     padding: 0;
-    color: var(--colorGrey300);
+    color: var(--colorTextMuted);
   }
 }
 
@@ -28,8 +28,8 @@
   background-color: var(--colorWhite);
   border-color: var(--colorGrey800);
   border-width: 1px;
-  color: var(--colorGrey500);
-  border-radius: 8px;
+  color: var(--colorTextMuted);
+  border-radius: var(--borderRadius);
   box-shadow: var(--boxShadowPopup);
   width: calc(100vw - 83px);
   padding: 0 8px 8px 8px;

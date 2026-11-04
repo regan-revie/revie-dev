@@ -53,7 +53,7 @@
   border: 1px solid var(--colorGrey100);
   border-radius: var(--borderRadiusMedium);
 
-  background-color: var(--colorWhite);
+  background-color: var(--revieCream);
 
   &:hover,
   &:focus {
@@ -78,7 +78,7 @@
 
   /* Button colors: secondary */
   background-color: var(--marketplaceColor);
-  color: var(--colorWhite);
+  color: var(--revieCream);
 
   &:hover,
   &:focus {
@@ -86,7 +86,7 @@
   }
   &:disabled {
     background-color: var(--colorGrey100);
-    color: var(--colorWhite);
+    color: var(--colorGrey700);
   }
 }
 

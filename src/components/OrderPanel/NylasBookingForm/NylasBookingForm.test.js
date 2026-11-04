@@ -203,7 +203,9 @@ describe('the calendar', () => {
   // Date or null, so its internal value never synced and the selection could not move off the
   // first available day - every other day looked selectable but did nothing.
   const threeDays = () => {
-    const base = Date.parse('2026-09-14T16:00:00Z');
+    // Relative to now: a fixed date drifts into the past and the calendar then blocks it, which turned
+    // this suite red on its own once the date had passed.
+    const base = Date.now() + 3 * 86400000;
     return [0, 1, 2].map(d => {
       const start = base + d * 86400000;
       return { start, end: start + 3600000 };

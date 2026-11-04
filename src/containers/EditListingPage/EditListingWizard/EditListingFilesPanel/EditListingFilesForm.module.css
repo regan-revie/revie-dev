@@ -33,7 +33,7 @@
   max-width: 400px;
   margin-top: -4px;
   margin-bottom: 5px;
-  color: var(--colorGrey400);
+  color: var(--colorTextMuted);
 }
 
 .fileLink {
