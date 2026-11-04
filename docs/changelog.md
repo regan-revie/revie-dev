@@ -19,6 +19,22 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-04 (Layer 2 consistency pass, PR #11)
+
+**What changed**
+- **Pairings follow docs/brand.md across components.** Muted text on cream is grey 600 via `--colorTextMuted` (4.9:1; grey 300-500 were 1.8-3.4:1), disabled text `--colorTextDisabled`, text on maroon is off-white not white. Date picker selected day maroon on lavender (was 1.62:1), disabled days 5.3:1, light theme aligned. Disabled buttons, own-message bubbles, the listing action bar, card menu, limited-access banner and the session panel moved to approved pairings. 43 px radii and the hardcoded hex values now use tokens (vendored image-gallery CSS, sanitize.css, calc() pill radii and the code block's monospace left on purpose). Full list by screen: `docs/layer2-before-after.md`.
+- **Visual-check fixes (from Regan's pass on Render):** maroon wordmark on light grounds (`Logo tone="onLight"`: checkout header, footer); hero search button 40px with the label centred; topbar search is one cream pill with the icon inside; `REACT_APP_MARKETPLACE_NAME` is now `Revie` in `render.yaml` (it was the environment name `revie_dev` and showed in the Stripe mandate line, page titles and logo alt text; build-time, needs the Render value set and a redeploy).
+- **Semantic colours (decision of Nov 4):** error `#B8000A` (`--revieError`, the one colour outside the palette, errors only), success Forest, warnings as an orange tag with a maroon label, never orange text. Inbox "action needed" and the listing page's pending-approval and payout notices are tags.
+- **Repeatable checks:** `scripts/audit-css.js` (0 unapproved explicit pairs; the original list of 68 was not in the repo, so this is a re-derived audit), styleguide examples with fixtures (booking form, session panel, topbar, hero search, checkout header, footer).
+
+**Found**
+- Dev/Test are private, so the styleguide needs a login; pages were checked by making it public locally (reverted each time, never committed). Checkout and the order page were not screenshotted.
+- The booking form test used a fixed September date and went red once it had passed; now relative to today.
+
+**What's next:** inbox fixes (notification colour, review wording, "cancelled" spelling); coach profile redesign (Layer 3); Nylas EU migration when the keys exist (PR #12).
+
+---
+
 ## HANDOFF — 2026-10-28 (third session: process release-3)
 
 **Branch / PR:** `process-release-3`, one PR, not merged. PR #9 was merged and deployed first.
