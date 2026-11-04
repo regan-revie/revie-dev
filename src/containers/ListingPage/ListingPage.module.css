@@ -182,7 +182,13 @@
 }
 
 .ownListingTextPendingApproval {
-  color: var(--revieOrange);
+  /* Warning tag: orange ground, maroon label (8.23:1); orange is never used as text. */
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--colorAttention);
+  color: var(--revieMaroon);
 }
 
 .closedListingText {
@@ -219,7 +225,13 @@
 }
 
 .missingPayoutDetailsText {
-  color: var(--revieOrange);
+  /* Warning tag: orange ground, maroon label (8.23:1); orange is never used as text. */
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--colorAttention);
+  color: var(--revieMaroon);
 }
 
 .payoutDetailsWarning {

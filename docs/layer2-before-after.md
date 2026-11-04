@@ -370,3 +370,17 @@ Every change below is in a stylesheet. "Before" is the line on `main`, "after" t
 - **Hero search button.** `.submitButton` in `SearchCTA.module.css`: 48px tall with 20px of padding around a 24px line (64px of content in a 48px box, so the label sat low) is now 40px, the same as the fields, with the label centred by flex.
 - **Topbar search.** One cream pill (maroon text on off-white) with the icon inside; the divider line and the separate white icon box are gone, with a lavender focus ring. `TopbarDesktop.module.css` (`.searchLink`, new `.searchLink .topbarSearchWithLeftPadding`) and `TopbarSearchForm.module.css` (`.desktopIcon`, `.desktopInput`).
 - **Checkout "I authorise revie_dev".** The name comes from `REACT_APP_MARKETPLACE_NAME` (`config.marketplaceName`), which `render.yaml` set to the environment name `revie_dev`. Now `Revie`. A Render change, not Console or Stripe.
+
+## Round 3: semantic colours (decision of Nov 4)
+
+One token change in `src/styles/revieTokens.css` (new "Semantic colours" block):
+- `--colorFail` `#E7000B` → `var(--revieError)` = `#B8000A` (4.12 → 5.96 : 1 on cream); `--colorFailDark` `#CC0000` → `#8F0008` (hover on filled error buttons).
+- `--colorSuccess` `#138041` → `var(--revieGreen)` Forest (4.32 → 13.75 : 1). `--colorSuccessDark` follows.
+- `--colorAttention` `#FFAA00` → `var(--revieOrange)`; `--colorAttentionDark` `#B25900` → maroon.
+
+Because a warning is an orange tag with a maroon label (never orange text), three places changed in component CSS:
+- Inbox `.stateActionNeeded`: was `#B25900` text (4.19 : 1), now a tag.
+- Listing page `.ownListingTextPendingApproval` and `.missingPayoutDetailsText`: were amber / orange text, now tags.
+- Session panel `.error` goes back to the error token (it had been maroon while no compliant red existed). Inbox `.lastTransitionedAtNotEmphasized` is muted text, not disabled.
+
+`node scripts/audit-css.js --list --loose` afterwards: 0 unapproved explicit pairs, and nothing red, green or amber is left in the below-AA list. What remains there is disabled controls (exempt), light text meant for dark grounds, and the vendored image-gallery hover colour.

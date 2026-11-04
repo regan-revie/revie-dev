@@ -131,6 +131,27 @@
   --colorTextMuted: var(--colorGrey600);
   --colorTextDisabled: var(--colorGrey500);
 
+  /* ================ Semantic colours ================ */
+  /**
+   * Decision (docs/decisions.md, "Semantic colours"). Sharetribe's stock red, green and amber measured
+   * 4.1, 4.3 and 1.7 : 1 as text on cream, so each is replaced; all three now clear 4.5 : 1.
+   *
+   * Error     #B8000A, the ONE colour outside the brand palette, reserved for errors (text, borders and
+   *           the notification badge). 5.96 : 1 on cream, 6.9 : 1 on white. Errors must read as errors.
+   * Success   Forest (--revieGreen) text. 13.75 : 1 on cream.
+   * Attention Orange is a GROUND, never text: an orange tag with a maroon label (8.23 : 1, an approved
+   *           pairing). --colorAttentionDark becomes maroon so anything that took the "dark attention"
+   *           text colour (e.g. the Inbox "action needed" state) is maroon, to be set on orange.
+   */
+  --revieError: #b8000a;
+
+  --colorFail: var(--revieError);
+  --colorFailDark: #8f0008; /* hover on filled error buttons; 9.7 : 1 with white */
+  --colorSuccess: var(--revieGreen);
+  --colorSuccessDark: var(--revieGreen);
+  --colorAttention: var(--revieOrange);
+  --colorAttentionDark: var(--revieMaroon);
+
   /* ================ Buttons ================ */
   /**
    * Maroon and lavender are Revie's primary colours. Stock primary button is
@@ -378,9 +399,7 @@ html [class*='LinksMenu_linkMenuLabel__'] svg {
      scripts/audit-css.js. Left on purpose: the vendored react-image-gallery
      stylesheets and sanitize.css, calc()-based pill radii, and the monospace
      stack of the code block.
-   - --colorSuccess / --colorFail / --colorAttention / --colorStatusActionNeeded
-     are left at stock values deliberately (and fail AA as text on cream: error
-     red 4.1:1, success green 4.3:1, action-needed 4.2:1; see docs/brand.md,
-     "Semantic colours"). They carry meaning rather than brand, and
+   - --colorSuccess / --colorFail / --colorAttention are set above (decision
+     "Semantic colours", Nov 2026); see docs/brand.md. They carry meaning rather than brand, and
      none of them is in the Revie palette. Worth a decision later.
    ================================================================ */

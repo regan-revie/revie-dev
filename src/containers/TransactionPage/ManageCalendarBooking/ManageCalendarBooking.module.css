@@ -17,11 +17,8 @@
   margin-bottom: 16px;
 }
 
-/* Maroon on cream is an approved pairing (15.6:1). The stock error red is 4.1:1 on cream, below AA,
-   and no red is in the brand palette, so the message is carried by weight instead of colour. */
 .error {
-  color: var(--revieMaroon);
-  font-weight: var(--fontWeightBold);
+  color: var(--colorFail);
 }
 
 .actions {
