@@ -157,8 +157,8 @@
   top: 2px;
   right: -9px;
 
-  /* Style: red dot */
-  background-color: var(--colorFail);
+  /* Style: pink dot on the maroon bar (a notification is not an error) */
+  background-color: var(--reviePink);
 
   animation-name: notificationPop;
   animation-duration: 0.1s;

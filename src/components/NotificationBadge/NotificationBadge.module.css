@@ -3,12 +3,14 @@
 .root {
   /* Font */
   composes: h6 from global;
-  color: var(--colorWhite);
+  /* Revie: a count is not an error, so pink with a maroon number (8.64:1, approved), never the
+     error red (--revieError), which is reserved for errors. */
+  color: var(--revieMaroon);
   text-align: center;
 
-  background-color: var(--colorFail);
+  background-color: var(--reviePink);
 
-  /* Layout of a red dot */
+  /* Layout of a dot */
   display: inline-block;
   width: auto;
   min-width: 20px;

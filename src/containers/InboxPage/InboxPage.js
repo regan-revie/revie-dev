@@ -170,6 +170,7 @@ export const InboxItem = props => {
     isSaleNotification,
     isOrderNotification,
     isFinal,
+    isWaiting,
   } = stateData;
   const isCustomer = transactionRole === TX_TRANSITION_ACTOR_CUSTOMER;
 
@@ -191,7 +192,8 @@ export const InboxItem = props => {
   const stateClasses = classNames(css.stateName, {
     [css.stateConcluded]: isFinal,
     [css.stateActionNeeded]: actionNeeded,
-    [css.stateNoActionNeeded]: !actionNeeded,
+    [css.stateWaiting]: isWaiting,
+    [css.stateNoActionNeeded]: !actionNeeded && !isWaiting,
   });
 
   return (

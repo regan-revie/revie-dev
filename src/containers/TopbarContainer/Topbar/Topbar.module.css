@@ -129,9 +129,10 @@
   top: 17px;
   right: 17px;
 
-  /* Style: red dot with white border */
-  background-color: var(--colorFail);
-  border: 2px solid var(--colorWhite);
+  /* Style: pink dot with a border in the topbar's own maroon, so it reads as cut out of the icon.
+     Pink, not the error red: a notification is not an error. */
+  background-color: var(--reviePink);
+  border: 2px solid var(--revieMaroon);
 
   animation-name: notificationPop;
   animation-duration: 0.1s;

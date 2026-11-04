@@ -79,6 +79,7 @@ import * as TopbarDesktop from './containers/TopbarContainer/Topbar/TopbarDeskto
 import * as SearchCTA from './containers/PageBuilder/Primitives/SearchCTA/SearchCTA.example';
 import * as TopbarSimplified from './components/TopbarSimplified/TopbarSimplified.example';
 import * as SectionFooter from './containers/PageBuilder/SectionBuilder/SectionFooter/SectionFooter.example';
+import * as InboxBooking from './containers/InboxPage/InboxPage.booking.example';
 import * as OrderPanel from './components/OrderPanel/OrderPanel.example';
 import * as NylasBookingForm from './components/OrderPanel/NylasBookingForm/NylasBookingForm.example';
 import * as ManageCalendarBooking from './containers/TransactionPage/ManageCalendarBooking/ManageCalendarBooking.example';
@@ -232,6 +233,7 @@ export {
   NamedLink,
   OrderBreakdown,
   OrderPanel,
+  InboxBooking,
   TopbarSimplified,
   SectionFooter,
   TopbarDesktop,

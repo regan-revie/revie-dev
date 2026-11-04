@@ -57,7 +57,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="itemState"
     >
       <div
-        class="stateName stateActionNeeded"
+        class="stateName stateNoActionNeeded"
       >
         <span>
           InboxPage.default-booking.accepted.status
@@ -193,7 +193,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="itemState"
     >
       <div
-        class="stateName stateActionNeeded"
+        class="stateName stateWaiting"
       >
         <span>
           InboxPage.default-booking.delivered.status
@@ -795,7 +795,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="itemState"
     >
       <div
-        class="stateName stateActionNeeded"
+        class="stateName stateNoActionNeeded"
       >
         <span>
           InboxPage.default-booking.accepted.status
@@ -863,7 +863,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="itemState"
     >
       <div
-        class="stateName stateActionNeeded"
+        class="stateName stateWaiting"
       >
         <span>
           InboxPage.default-booking.delivered.status
@@ -1203,7 +1203,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="itemState"
     >
       <div
-        class="stateName stateNoActionNeeded"
+        class="stateName stateWaiting"
       >
         <span>
           InboxPage.default-booking.reviewed-by-provider.status
@@ -1407,7 +1407,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="itemState"
     >
       <div
-        class="stateName stateActionNeeded"
+        class="stateName stateNoActionNeeded"
       >
         <span>
           InboxPage.default-booking.accepted.status
@@ -2145,7 +2145,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="itemState"
     >
       <div
-        class="stateName stateActionNeeded"
+        class="stateName stateNoActionNeeded"
       >
         <span>
           InboxPage.default-booking.accepted.status
@@ -2485,7 +2485,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="itemState"
     >
       <div
-        class="stateName stateNoActionNeeded"
+        class="stateName stateWaiting"
       >
         <span>
           InboxPage.default-booking.reviewed-by-customer.status
