@@ -75,7 +75,13 @@ import * as BookingTimeForm from './components/OrderPanel/BookingTimeForm/Bookin
 import * as BookingFixedDurationForm from './components/OrderPanel/BookingFixedDurationForm/BookingFixedDurationForm.example';
 import * as ProductOrderForm from './components/OrderPanel/ProductOrderForm/ProductOrderForm.example';
 import * as FieldDateAndTimeInput from './components/OrderPanel/BookingTimeForm/FieldDateAndTimeInput.example';
+import * as TopbarDesktop from './containers/TopbarContainer/Topbar/TopbarDesktop/TopbarDesktop.example';
+import * as SearchCTA from './containers/PageBuilder/Primitives/SearchCTA/SearchCTA.example';
+import * as TopbarSimplified from './components/TopbarSimplified/TopbarSimplified.example';
+import * as SectionFooter from './containers/PageBuilder/SectionBuilder/SectionFooter/SectionFooter.example';
 import * as OrderPanel from './components/OrderPanel/OrderPanel.example';
+import * as NylasBookingForm from './components/OrderPanel/NylasBookingForm/NylasBookingForm.example';
+import * as ManageCalendarBooking from './containers/TransactionPage/ManageCalendarBooking/ManageCalendarBooking.example';
 import * as OutsideClickHandler from './components/OutsideClickHandler/OutsideClickHandler.example';
 import * as PaginationLinks from './components/PaginationLinks/PaginationLinks.example';
 import * as PropertyGroup from './components/PropertyGroup/PropertyGroup.example';
@@ -226,6 +232,12 @@ export {
   NamedLink,
   OrderBreakdown,
   OrderPanel,
+  TopbarSimplified,
+  SectionFooter,
+  TopbarDesktop,
+  SearchCTA,
+  NylasBookingForm,
+  ManageCalendarBooking,
   OutsideClickHandler,
   PageBuilder,
   PaginationLinks,

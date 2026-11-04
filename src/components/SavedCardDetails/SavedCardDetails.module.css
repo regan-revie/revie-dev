@@ -84,17 +84,17 @@
   text-align: left;
   font-weight: var(--fontWeightMedium);
   padding: 0;
-  border-radius: 6px;
-  border: 1px solid #d8dce6;
+  border-radius: var(--borderRadius);
+  border: 1px solid var(--colorGrey100);
   transition: all 0.2s ease-out;
   z-index: calc(var(--zIndexPopup) + 1);
   position: relative;
 
-  background-color: #fff;
+  background-color: var(--colorWhite);
   box-shadow: 0 2px 3px 0 rgba(216, 220, 230, 0.7);
 
   &:hover {
-    border: 1px solid #b8bfd1;
+    border: 1px solid var(--colorGrey300);
     box-shadow: 0 2px 3px 0 rgba(216, 220, 230, 0.7);
   }
 
@@ -102,9 +102,9 @@
     outline: none;
     box-shadow: none;
     background-color: var(--colorWhite);
-    border: 1px solid #d8dce6;
+    border: 1px solid var(--colorGrey100);
     text-decoration: none;
-    border-radius: 6px 6px 0px 0px;
+    border-radius: var(--borderRadius) var(--borderRadius) 0 0;
   }
 }
 
@@ -138,7 +138,7 @@
 
   background-color: var(--colorWhite);
   box-shadow: var(--boxShadowFilterButton);
-  border-radius: 6px;
+  border-radius: var(--borderRadius);
   border: 1px solid var(--colorGrey100);
 
   /* When the dropdown is open, we need to hack the box-shadow's position
@@ -156,7 +156,7 @@
 .menuItem {
   color: var(--colorGrey700);
   &:hover {
-    background-color: #f2f2f2;
+    background-color: var(--colorGrey100);
   }
 }
 
@@ -175,7 +175,7 @@
 
   &:focus {
     outline: 0;
-    background-color: #f2f2f2;
+    background-color: var(--colorGrey100);
   }
 }
 

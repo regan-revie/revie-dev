@@ -4,7 +4,7 @@
   padding: 24px;
   margin-bottom: 24px;
   border: 1px solid var(--colorGrey100);
-  border-radius: 8px;
+  border-radius: var(--borderRadius);
 }
 
 .heading {
@@ -29,7 +29,8 @@
 }
 
 .cancelLink {
-  color: var(--colorFail);
+  color: var(--revieMaroon);
+  text-decoration: underline;
 }
 
 .confirmCancel {

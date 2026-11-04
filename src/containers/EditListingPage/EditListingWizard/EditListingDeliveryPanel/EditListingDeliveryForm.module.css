@@ -31,7 +31,7 @@
 }
 
 .disabled {
-  color: var(--colorGrey300);
+  color: var(--colorTextDisabled);
 }
 
 .hidden {

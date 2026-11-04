@@ -35,13 +35,15 @@
 }
 
 /* Search */
+/* Revie: the search field is one cream pill on the maroon bar (maroon text on off-white, 15.6:1)
+   with the icon inside it. The stock bar drew a white box for the input and a separate white box
+   for the icon with a divider line between them, which read as two broken pieces. */
 .searchLink {
   min-width: 320px;
   height: 100%;
-  border-left-style: solid;
-  border-left-width: 1px;
-  border-left-color: var(--colorGrey100);
   margin-right: auto;
+  display: flex;
+  align-items: center;
 }
 
 .spacer {
@@ -83,6 +85,23 @@
   }
 }
 
+/* The field itself (keyword or location). Only inside the real search form, not the spacer that
+ reuses the class when there is no search. */
+.searchLink .topbarSearchWithLeftPadding {
+  flex: 1 1 auto;
+  height: 40px;
+  margin: 0 24px 0 24px;
+  padding: 0 16px;
+  align-items: center;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--revieCream);
+
+  &:focus-within {
+    outline: 2px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
 /* These is used with Inbox, Sign up, and Log in */
 .topbarLink {
   flex-shrink: 0;
@@ -103,7 +122,7 @@
   /* Ground is now maroon (--revieMaroon): grey700/black text and a marketplaceColor
      (maroon) hover underline would both disappear against it. */
   &:hover {
-    color: var(--colorWhite);
+    color: var(--revieCream);
     border-bottom: 4px solid var(--revieLavender);
     border-radius: 0;
     text-decoration: none;

@@ -39,7 +39,7 @@
   background-image: url(./images/map_icon216x105.png);
   background-size: cover;
 
-  border-radius: 3px;
+  border-radius: var(--borderRadius);
   width: 72px;
   height: 35px;
   padding: 9px 22px;
@@ -110,5 +110,5 @@
 .showListingsButton {
   background-color: var(--marketplaceColor);
   display: inline-block;
-  border-radius: 3px;
+  border-radius: var(--borderRadius);
 }

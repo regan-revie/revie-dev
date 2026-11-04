@@ -10,7 +10,7 @@
 }
 
 .labelDisabled {
-  color: var(--colorGrey500);
+  color: var(--colorTextDisabled);
 }
 
 /**

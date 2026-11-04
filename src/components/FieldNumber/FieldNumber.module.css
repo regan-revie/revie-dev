@@ -35,7 +35,7 @@
 
 .numberButton:hover {
   .iconContainer {
-    stroke: #b8bfd1;
+    stroke: var(--colorGrey300);
   }
 }
 
@@ -43,13 +43,13 @@
   outline: none;
 
   .iconContainer {
-    stroke: #b8bfd1;
+    stroke: var(--colorGrey300);
   }
 }
 .numberButton:active {
   .iconContainer {
     fill: var(--colorGrey50);
-    stroke: #b8bfd1;
+    stroke: var(--colorGrey300);
   }
 }
 .numberButton:disabled {
@@ -57,7 +57,7 @@
 
   .disabled.iconContainer {
     fill: var(--colorSecondaryButton);
-    stroke: #d8dce6;
+    stroke: var(--colorGrey100);
   }
 }
 
@@ -74,7 +74,7 @@
   fill: var(--colorWhite);
   /* stroke color set to match the color of the input 
   borders defined in marketplaceDefaults.css  */
-  stroke: #d8dce6;
+  stroke: var(--colorGrey100);
   stroke-width: 1px;
 }
 

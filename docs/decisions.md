@@ -7,6 +7,12 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Semantic colours
+**Date:** Nov 4, 2026
+**Decision:** Success uses Forest text. Warnings use an orange tag with a maroon label. Errors use #B8000A text, the only colour outside the brand palette, reserved for errors. All three clear 4.5:1 on cream.
+**Why:** Sharetribe's stock red, green and amber failed contrast on cream (4.1, 4.3 and 1.7:1). Errors need to read as errors, and maroon is the body text colour.
+**Affects:** revieTokens.css (--colorFail, --colorSuccess, --colorAttention), docs/brand.md.
+
 ### DECISION: Which emails come from Sharetribe and which from Postmark
 **Date:** Oct 28, 2026
 **Decision:** Sharetribe (release-3) sends: Accepted request (client, "You're booked"), Operator accepted request (coach, "You've got a session", with a fixed-length body), Operator declined request and Expired request (client, "That one didn't go through, and you haven't been charged"), cancellation emails to client and coach (new in release-3), Money paid, and the review emails. New request and Declined request aren't sent. Postmark sends late-cancellation, reschedule and reminder emails only. Nylas Scheduler's own emails are off (disable_emails). Klaviyo is marketing only.

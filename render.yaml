@@ -52,8 +52,12 @@ services:
       - key: REACT_APP_CSP
         value: report
 
+      # The name customers see: page titles, the logo's alt text, and the card-payment
+      # authorisation line at checkout ("I authorise Revie to send instructions..."). It was the
+      # internal environment name, revie_dev, which showed up on screen. Build-time, so a change
+      # needs a redeploy. Not a Console or Stripe setting.
       - key: REACT_APP_MARKETPLACE_NAME
-        value: revie_dev
+        value: Revie
 
       # US region: the Nylas free sandbox is US-only. Production must move to a
       # non-sandbox EU application - see CLAUDE.md, this is a go-live blocker.

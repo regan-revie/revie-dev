@@ -66,6 +66,8 @@ const TopbarSimplified = props => {
     <nav className={classes}>
       <LinkedLogo
         layout={isMobile ? 'mobile' : 'desktop'}
+        // White bar: the cream wordmark would vanish, so use the maroon one.
+        tone="onLight"
         alt={intl.formatMessage({ id: 'TopbarSimplified.goToLandingPage' })}
         linkToExternalSite={linkToExternalSite}
       />

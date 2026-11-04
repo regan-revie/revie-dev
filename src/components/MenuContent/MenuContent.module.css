@@ -5,7 +5,7 @@
   background-color: var(--colorWhite);
   border-top: 1px solid var(--colorGrey100);
   box-shadow: var(--boxShadowPopup);
-  border-radius: 0 0 2px 2px;
+  border-radius: 0 0 var(--borderRadius) var(--borderRadius);
   transition: var(--transitionStyleButton);
 }
 

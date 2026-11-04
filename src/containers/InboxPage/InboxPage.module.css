@@ -339,8 +339,13 @@
 }
 
 .stateActionNeeded {
+  /* A warning is an orange tag with a maroon label (8.23:1), never orange text. */
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--colorAttention);
   font-weight: var(--fontWeightMedium);
-  color: var(--colorStatusActionNeeded);
+  color: var(--revieMaroon);
 }
 
 .stateNoActionNeeded {
@@ -361,7 +366,7 @@
 }
 
 .bookingNoActionNeeded {
-  color: var(--colorGrey300);
+  color: var(--colorTextMuted);
 }
 
 .lastTransitionedAtEmphasized {
@@ -370,13 +375,13 @@
 }
 
 .lastTransitionedAtNotEmphasized {
-  color: var(--colorGrey300);
+  color: var(--colorTextMuted);
 }
 
 .bannedUserLink {
   & .itemUsername,
   &:hover .itemUsername,
   & .stateName {
-    color: var(--colorGrey300);
+    color: var(--colorTextMuted);
   }
 }

@@ -1,5 +1,5 @@
 .root {
-  background-color: #df492a;
+  background-color: var(--revieMaroon);
   text-align: center;
   padding: 10px 20px 9px;
 }
@@ -7,23 +7,23 @@
 .text {
   margin: 0;
   display: inline-block;
-  color: #fff;
+  color: var(--revieCream);
   font-size: 16px;
   margin-bottom: 16px;
   line-height: 20px;
 }
 
 .button {
-  background: #2a3d4b;
+  background: var(--revieLavender);
   margin: 0 16px;
   padding: 8px 16px;
   border-radius: var(--borderRadiusMedium);
   font-size: 14px;
-  color: #fff;
+  color: var(--revieMaroon);
   border: 0;
 
   &:hover {
     text-decoration: none;
-    background: #364f61;
+    background: var(--reviePink);
   }
 }
