@@ -122,6 +122,28 @@ A safe way to make every booking fail, for one listing only.
 
 ---
 
+## Scenario 6: cancellation emails (added Oct 28, release-3)
+
+**Before you start:** release-3 is on Dev, the Dev Test Session listing is on it, and the nine keys in `email-texts-release-3-paste-into-dev.json` are in Dev's Email texts. Use a client account and a coach account whose inboxes you can open, and test on **revie-dev.onrender.com**.
+
+**Do:**
+1. As the client, book a session **more than 48 hours** ahead.
+2. On the order page, cancel it and confirm.
+3. Open both inboxes (client and coach). Wait a minute.
+
+| Who | What you should see |
+|---|---|
+| **Client inbox** | **Exactly one** cancellation email from Sharetribe: subject "Your session is cancelled.", saying the refund is on its way. No date in it. |
+| **Coach inbox** | **Exactly one** email: "A session was cancelled." |
+| **Nylas** | **Nothing** from Nylas for either person, no "booking cancelled" email. (Google Calendar may still send its own calendar notice; that is separate.) |
+| **Stripe** | A refund, as in the cancel check above. |
+
+Also book a second session and look at the **coach's "You've got a session"** email from the booking: it should now have a sentence naming the client and the time.
+
+**Not covered here:** a cancellation **inside 48 hours** sends no Sharetribe email by design (no transition runs). The Postmark email for that comes later.
+
+---
+
 ## Afterwards
 
 - Cancel any accepted test bookings from the order page ("Your session" panel) so the calendar is clear. A cancellation more than 48 hours ahead should also refund in Stripe, which tests that path too.

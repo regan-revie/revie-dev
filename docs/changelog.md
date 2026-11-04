@@ -19,6 +19,34 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-10-28 (third session: process release-3)
+
+**Branch / PR:** `process-release-3`, one PR, not merged. PR #9 was merged and deployed first.
+
+**What changed**
+1. **Release-3 of `default-booking`:** `transition/cancel` now emails the client and the coach (new templates `booking-canceled-to-customer` and `booking-canceled-to-provider`), and the coach's "operator accepted" template gains a `fixed` branch (`BookingOperatorAcceptedRequest.ContentForFixed`). The process validates locally (`flex-cli process --path`).
+2. **Pushed to Dev (`revie1-dev`) and Test (`revie1-test`) only**, version 3 and alias `release-3` on each. Live (`revie1`) untouched.
+   - Dev: v3 release-3 (0 transactions), v2 release-2 (6), v1 release-1 (4).
+   - Test: v3 release-3 (0), v2 release-2 (0), v1 release-1 (4).
+3. **Dev Test Session listing moved to release-3** (`use-release-3` in the Dev helper): `transactionProcessAlias` was `default-booking/release-2` before, `default-booking/release-3` after; the Nylas configuration was untouched and still real.
+4. `render.yaml` now sets `BOOKING_PROCESS_ALIAS=default-booking/release-3`.
+5. Decision "Which emails come from Sharetribe and which from Postmark" replaced (the diff removes only the old entry). Tech-constraints, go-live plan (cutover list) and test script (scenario 6) updated.
+
+**Departure from the proposed copy:** the cancellation emails carry **no session date**. Sharetribe's booking record never changes after a reschedule, so a date there could be the original time. They link to the order page, which shows the current time.
+
+**Why the refund wording is safe:** `transition/cancel` always runs `calculate-full-refund` and `stripe-refund-payment`, and a cancellation inside 48 hours calls no transition, so the client email is only ever sent when a refund happens.
+
+**For Regan**
+- Render: set `BOOKING_PROCESS_ALIAS` to `default-booking/release-3` on `revie-dev` (the Blueprint carries it; set it by hand if the Blueprint is not re-synced). Until then, a newly enabled listing would be stamped release-2.
+- Dev Email texts: paste the nine keys in `~/Downloads/revie-console-texts/email-texts-release-3-paste-into-dev.json`.
+- Run scenario 6 on Render.
+
+**Not verified:** the new templates have not been rendered by Sharetribe (the push accepted them); the first real cancel will show the email. The timezone of dates in the older emails is still the listing's (coach's) timezone, not the client's.
+
+**What's next:** Postmark module for late-cancellation, reschedule and reminder emails; push release-3 to Live at cutover with `BOOKING_PROCESS_ALIAS` on the production service.
+
+---
+
 ## HANDOFF — 2026-10-28 (second session: emails off in Nylas, Console texts, checkout message, release-2 on Test)
 
 **Branch / PR:** `emails-texts-checkout-docs`, one PR, not merged. PR #8 was already merged; its decisions.md diff deleted nothing.

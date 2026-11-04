@@ -22,6 +22,8 @@
                   {{t "BookingOperatorAcceptedRequest.ContentForDaily" "{marketplaceName} administrator accepted a booking by {customerDisplayName} for {listingTitle} from {dateStart, date, ::YYYYMMMd} to {dateEnd, date, ::YYYYMMMd} on your behalf." marketplaceName=marketplace.name customerDisplayName=customer.display-name listingTitle=listing.title dateStart=booking.start dateEnd=(date-transform booking.end days=-1)}}
                   {{/ eq}}{{#eq "night" protected-data.unitType}}
                   {{t "BookingOperatorAcceptedRequest.ContentForNightly" "{marketplaceName} administrator accepted a booking by {customerDisplayName} for {listingTitle} from {dateStart, date, ::YYYYMMMd} to {dateEnd, date, ::YYYYMMMd} on your behalf." marketplaceName=marketplace.name customerDisplayName=customer.display-name listingTitle=listing.title dateStart=booking.start dateEnd=booking.end}}
+                  {{/ eq}}{{#eq "fixed" protected-data.unitType}}
+                  {{t "BookingOperatorAcceptedRequest.ContentForFixed" "{customerDisplayName} booked {listingTitle}, {dateStart, date, ::jmmYYYYMMMd} to {dateEnd, date, ::jmmYYYYMMMd}. It's already on your calendar, so there's nothing for you to do." customerDisplayName=customer.display-name listingTitle=listing.title dateStart=booking.start dateEnd=booking.end}}
                   {{/ eq}}</p>
                 <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
