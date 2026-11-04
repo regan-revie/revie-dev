@@ -363,3 +363,10 @@ Every change below is in a stylesheet. "Before" is the line on `main`, "after" t
 
 **`containers/TopbarContainer/Topbar/TopbarDesktop/TopbarDesktop.module.css`**
 - `color: var(--colorWhite);` → `color: var(--revieCream);`
+
+## Round 2 (visual check on Render)
+
+- **Logo on light grounds.** `Logo` takes `tone="onLight"` and then uses the maroon desktop wordmark (`src/assets/revie-logo-desktop.png`) instead of the branded cream one. Used by `TopbarSimplified` (checkout, make-offer and request-quote header) and by the footer, which switches back to cream if Console gives it a dark background colour. The maroon topbar still uses the cream wordmark; the mobile mark (lavender R on maroon) reads on any ground and is unchanged.
+- **Hero search button.** `.submitButton` in `SearchCTA.module.css`: 48px tall with 20px of padding around a 24px line (64px of content in a 48px box, so the label sat low) is now 40px, the same as the fields, with the label centred by flex.
+- **Topbar search.** One cream pill (maroon text on off-white) with the icon inside; the divider line and the separate white icon box are gone, with a lavender focus ring. `TopbarDesktop.module.css` (`.searchLink`, new `.searchLink .topbarSearchWithLeftPadding`) and `TopbarSearchForm.module.css` (`.desktopIcon`, `.desktopInput`).
+- **Checkout "I authorise revie_dev".** The name comes from `REACT_APP_MARKETPLACE_NAME` (`config.marketplaceName`), which `render.yaml` set to the environment name `revie_dev`. Now `Revie`. A Render change, not Console or Stripe.

@@ -99,15 +99,24 @@
 }
 
 .submitButton {
+  /* Revie: the stock button is 48px tall with 20px of padding top and bottom around a 24px line,
+     which is 64px of content in a 48px box, so the label sat low in the pill. It is now the same
+     40px as the fields beside it, with the label centred by flex rather than by padding. */
+  height: 40px;
   min-height: 40px;
   min-width: 86px;
-  padding-left: 16px;
-  padding-right: 16px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   @media (--viewportMedium) {
-    height: 48px;
+    height: 40px;
+    padding-top: 0;
+    padding-bottom: 0;
   }
   @media (--viewportLarge) {
     max-width: 270px;

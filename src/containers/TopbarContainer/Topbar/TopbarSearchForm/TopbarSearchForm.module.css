@@ -65,21 +65,26 @@
 }
 
 .desktopIcon {
-  height: var(--topbarHeightDesktop);
+  height: 100%;
   border: none;
-  padding-top: 2px;
+  padding-top: 0;
 
   display: flex;
+  align-items: center;
   width: 24px;
   align-self: stretch;
-  background-color: var(--colorWhite);
+  /* Sits inside the cream field in TopbarDesktop, so it takes the field's ground. */
+  background-color: transparent;
 }
 
 .desktopInput {
   composes: p from global;
   flex-grow: 1;
-  /* Font */
-  height: var(--topbarHeightDesktop);
+  min-width: 0;
+  /* Font. Maroon on the cream field; the field, not the input, draws the box. */
+  height: 100%;
+  background-color: transparent;
+  color: var(--revieMaroon);
   line-height: unset;
   border: none;
   padding-top: 0;
@@ -91,11 +96,11 @@
 
   margin-top: 0;
   margin-bottom: 0;
-  margin-left: 10px;
+  margin-left: 8px;
 
   &:hover,
   &:focus {
-    border-bottom-color: var(--marketplaceColor);
+    border-bottom-color: transparent;
     outline: none;
     border: 0;
     box-shadow: none;
@@ -108,6 +113,7 @@
 
   /* Placeholder text might be too wide */
   &::placeholder {
+    color: var(--colorTextMuted);
     text-overflow: ellipsis;
     overflow-x: hidden;
     transition: var(--transitionStyleButton);
