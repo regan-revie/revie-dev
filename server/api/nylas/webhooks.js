@@ -37,6 +37,13 @@ const HANDLED_TRIGGERS = [
 const challenge = (req, res) => {
   const value = req.query && req.query.challenge;
 
+  // One line per challenge, never the value: it is how Nylas checks the endpoint is ours.
+  console.log(
+    `[nylas] webhook GET ${req.path} challenge=${
+      typeof value === 'string' && value ? 'present' : 'missing'
+    }`
+  );
+
   if (typeof value !== 'string' || value.length === 0) {
     res
       .status(400)
@@ -57,10 +64,19 @@ const challenge = (req, res) => {
  * Requires `req.rawBody` to hold the unparsed request bytes; the signature is computed over what
  * Nylas actually sent, and a reserialised body will not match.
  */
+// Keep what we log about an unverified request short and harmless: it is attacker-controlled text.
+const safeTrigger = value =>
+  typeof value === 'string' && /^[\w.]{1,40}$/.test(value) ? value : 'unknown';
+
 const receive = (req, res) => {
   // Without a secret we cannot tell a genuine Nylas notification from a forged one, so refuse to
   // act on it. 503 rather than 401: the fault is our missing configuration, not their request.
   if (!canVerifyWebhooks()) {
+    console.log(
+      `[nylas] webhook ${req.method} ${
+        req.path
+      } signature=unchecked (no secret) trigger=${safeTrigger(req.body && req.body.type)}`
+    );
     console.error(
       '[nylas] Webhook received but NYLAS_WEBHOOK_SECRET is not set, so the signature cannot be ' +
         'verified. Refusing to process. Set the secret returned when the webhook destination was ' +
@@ -71,8 +87,18 @@ const receive = (req, res) => {
   }
 
   const signature = req.get(SIGNATURE_HEADER);
+  const signatureValid = verifySignature(req.rawBody, signature, WEBHOOK_SECRET);
 
-  if (!verifySignature(req.rawBody, signature, WEBHOOK_SECRET)) {
+  // An access log for this one route, so "did Nylas reach us at all?" can be answered from the
+  // logs: Render's own request log does not show the path in its message. Method, path, whether the
+  // signature checked out, and the trigger type. No payload, no signature value, no secret.
+  console.log(
+    `[nylas] webhook ${req.method} ${req.path} signature=${
+      signature ? (signatureValid ? 'valid' : 'invalid') : 'missing'
+    } trigger=${safeTrigger(req.body && req.body.type)}`
+  );
+
+  if (!signatureValid) {
     console.error('[nylas] Rejected a webhook with a missing or invalid signature.');
     res.status(401).json({ error: 'Invalid signature' });
     return;
