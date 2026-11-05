@@ -37,7 +37,7 @@ describe('runBookingSweep()', () => {
   it('only looks at transactions older than the cut-off, so it stays clear of live checkouts', async () => {
     await runBookingSweep();
     expect(integration.findPaidUnconfirmedTransactions).toHaveBeenCalledWith({
-      olderThanMinutes: 3,
+      olderThanMinutes: 2,
     });
   });
 

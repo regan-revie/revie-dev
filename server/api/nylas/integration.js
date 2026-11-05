@@ -114,26 +114,33 @@ const loadTransactionAsOperator = async transactionId => {
  * accepted or declined yet, and that have been sitting there at least `olderThanMinutes`.
  *
  * The age cut-off is what keeps the sweeper off bookings that are being made right now by the
- * browser's own call.
+ * browser's own call (and the order page's one retry, ten seconds in).
  *
  * @returns {Promise<string[]>} transaction ids
  */
-const findPaidUnconfirmedTransactions = async ({ olderThanMinutes = 3, maxPages = 5 } = {}) => {
+const findPaidUnconfirmedTransactions = async ({ olderThanMinutes = 2, maxPages = 5 } = {}) => {
   const sdk = getIntegrationSdk();
   if (!sdk) throw new Error('Integration API credentials are not configured');
 
-  const olderThan = new Date(Date.now() - olderThanMinutes * 60 * 1000);
+  const olderThan = Date.now() - olderThanMinutes * 60 * 1000;
   const ids = [];
   for (let page = 1; page <= maxPages; page += 1) {
+    // The age cutoff is applied below, in our own code. The API has a `lastTransitionedAtEnd`
+    // parameter in its documentation, but it silently ignores it (checked: the same transactions
+    // come back for any value, even a made-up parameter), so passing it gave a sweeper that grabbed
+    // every paid booking on its next tick, however new.
     // eslint-disable-next-line no-await-in-loop
     const response = await sdk.transactions.query({
       lastTransitions: ['transition/confirm-payment'],
-      lastTransitionedAtEnd: olderThan,
       processName: 'default-booking',
       perPage: 100,
       page,
     });
-    response.data.data.forEach(tx => ids.push(tx.id.uuid));
+    response.data.data.forEach(tx => {
+      const at = tx.attributes?.lastTransitionedAt;
+      // A transaction we cannot date is left for a later run rather than guessed at.
+      if (at && new Date(at).getTime() <= olderThan) ids.push(tx.id.uuid);
+    });
     if (page >= (response.data.meta?.totalPages || 1)) break;
   }
   return ids;
