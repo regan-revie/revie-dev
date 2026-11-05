@@ -254,12 +254,14 @@
 }
 
 .notificationDot {
-  color: var(--colorWhite);
+  color: var(--revieMaroon);
 
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background-color: var(--colorFail);
+  /* Unread/needs-you dot: pink with a maroon ring so it holds up on a light row. */
+  background-color: var(--reviePink);
+  box-shadow: 0 0 0 1px var(--revieMaroon);
 }
 
 .itemUsername {
@@ -346,6 +348,11 @@
   background-color: var(--colorAttention);
   font-weight: var(--fontWeightMedium);
   color: var(--revieMaroon);
+}
+
+.stateWaiting {
+  /* Waiting on someone else: plain muted text, not a tag. */
+  color: var(--colorTextMuted);
 }
 
 .stateNoActionNeeded {

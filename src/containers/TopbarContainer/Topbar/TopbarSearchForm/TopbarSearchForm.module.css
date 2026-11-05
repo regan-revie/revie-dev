@@ -98,12 +98,30 @@
   margin-bottom: 0;
   margin-left: 8px;
 
+  /* The cream pill draws the box; the input never draws its own. The template gives every input
+     \`background-color: #fff\` plus a blue border and glow on :focus (and animates there with
+     \`transition: all\`), which turned this field white inside the pill. Transparent in every state,
+     so only the pill's lavender focus ring shows. */
   &:hover,
-  &:focus {
+  &:focus,
+  &:focus-visible,
+  &:active {
+    background-color: transparent;
     border-bottom-color: transparent;
     outline: none;
     border: 0;
     box-shadow: none;
+  }
+
+  /* Browser autofill paints its own ground (pale yellow or blue) over the field. Cover it with the
+     pill's cream and keep the maroon text. Must come after the rule above: same specificity. */
+  &:-webkit-autofill,
+  &:-webkit-autofill:hover,
+  &:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--revieMaroon);
+    caret-color: var(--revieMaroon);
+    box-shadow: 0 0 0 1000px var(--revieCream) inset;
+    transition: background-color 9999s ease-in-out 0s;
   }
 
   &:hover::placeholder,

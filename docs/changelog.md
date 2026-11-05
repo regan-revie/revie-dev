@@ -19,6 +19,23 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-04 (inbox fixes)
+
+**Branch / PR:** `inbox-fixes`, one PR, not merged.
+
+**What changed**
+- Notification indicators (inbox count badge, desktop and mobile topbar dots, inbox row dot) are pink with a maroon number/ring; `--revieError` stays for errors.
+- Review wording by role: client "Leave a review" (orange tag), coach "Waiting for the client's review" (muted text); a confirmed booking is no longer tagged as a warning. New `isWaiting` state flag and `.stateWaiting` class.
+- "Cancelled" spelling in the inbox status, activity feed and order-page titles.
+- Topbar search input stays transparent in every state (the template's `input:focus` made it white inside the pill); autofill covered.
+- Inbox fixtures (`InboxPage.booking.example.js`) for both roles.
+
+**Console:** only `InboxPage.default-booking.reviewed-by-customer.status` is in Dev's Console of the keys involved; paste `inbox-texts-paste-into-dev.json` or the old wording keeps shadowing the repo. `delivered`, `reviewed-by-provider` and the four `canceled` keys are repo-only.
+
+**Found:** the inbox count is the client's unreviewed completed sessions (a state-name collision with the negotiation process), not unread messages; the coach never gets a count. See tech-constraints.md.
+
+---
+
 ## HANDOFF — 2026-11-04 (Layer 2 consistency pass, PR #11)
 
 **What changed**

@@ -384,3 +384,10 @@ Because a warning is an orange tag with a maroon label (never orange text), thre
 - Session panel `.error` goes back to the error token (it had been maroon while no compliant red existed). Inbox `.lastTransitionedAtNotEmphasized` is muted text, not disabled.
 
 `node scripts/audit-css.js --list --loose` afterwards: 0 unapproved explicit pairs, and nothing red, green or amber is left in the below-AA list. What remains there is disabled controls (exempt), light text meant for dark grounds, and the vendored image-gallery hover colour.
+
+## Round 4: inbox (notifications, review wording, spelling)
+
+- **Notifications are pink, not red.** `--revieError` is for errors only. The inbox count badge (`NotificationBadge`), the desktop topbar dot, the mobile topbar dot and the row dot in the inbox are now pink (`--reviePink`); the badge number is maroon (8.64:1) and the dots get a maroon ring or border so they hold on light rows and on the maroon bar.
+- **Review states by role** (`InboxPage.stateDataBooking.js`): the client's "Leave a review" is the orange tag (it needs them); the coach's "Waiting for the client's review" is plain muted text (`.stateWaiting`). The same applies after one side has reviewed. A confirmed ("Booked") session is no longer tagged as a warning.
+- **Topbar search focus.** The template gives every input `background-color: #fff`, a blue border and glow on `:focus`, animated by `transition: all`, which turned the field white inside the cream pill. The input is now transparent in default, hover, focus, active and filled states, and autofill is painted cream with maroon text; only the pill's lavender ring shows.
+- **"Cancelled" spelling** in `en.json` for the inbox status, activity feed and both order-page titles.
