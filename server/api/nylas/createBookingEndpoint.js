@@ -45,6 +45,15 @@ module.exports = async (req, res) => {
 
     const customerId = tx.relationships?.customer?.data?.id?.uuid;
     if (!customerId || customerId !== userResponse.data.data.id.uuid) {
+      // Short ids only. Without this line a 403 here and a 403 from Sharetribe (below) look the same.
+      console.error(
+        `[nylas] create-booking refused: caller is not the customer tx=${String(
+          transactionId
+        ).slice(0, 8)} ` +
+          `customer=${customerId ? customerId.slice(0, 8) : 'missing'} caller=${String(
+            userResponse.data.data.id.uuid
+          ).slice(0, 8)}`
+      );
       res.status(403).json({ error: 'Only the customer can create the booking' });
       return;
     }
@@ -59,6 +68,9 @@ module.exports = async (req, res) => {
     res.status(200).json(result);
   } catch (e) {
     if (e.status) {
+      console.error(
+        `[nylas] create-booking failed tx=${String(transactionId).slice(0, 8)} status=${e.status}`
+      );
       handleError(res, e);
       return;
     }

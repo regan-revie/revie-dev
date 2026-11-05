@@ -183,6 +183,53 @@ describe('receive()', () => {
     expect(res.body).toEqual({ received: true, handled: false });
   });
 
+  describe('access log', () => {
+    const accessLines = () =>
+      console.log.mock.calls.flat().filter(line => String(line).startsWith('[nylas] webhook '));
+
+    it('logs every request: method, path, signature result and trigger, and nothing else', async () => {
+      const { receive } = loadWebhooks(SECRET);
+      const body = {
+        type: 'booking.created',
+        data: { object: { booking_id: 'bk_1', guest: { email: 'guest@example.com' } } },
+      };
+      const req = signedRequest(body, SECRET);
+      req.method = 'POST';
+      req.path = '/api/nylas/webhooks';
+      await receive(req, mockRes());
+
+      const [line] = accessLines();
+      expect(line).toBe(
+        '[nylas] webhook POST /api/nylas/webhooks signature=valid trigger=booking.created'
+      );
+      expect(line).not.toContain('guest@example.com');
+      expect(line).not.toContain(SECRET);
+    });
+
+    it('logs a request with a wrong signature, as invalid', async () => {
+      const { receive } = loadWebhooks(SECRET);
+      const body = { type: 'booking.created', data: { object: { booking_id: 'bk_2' } } };
+      await receive(signedRequest(body, 'a-different-secret'), mockRes());
+      expect(accessLines()[0]).toMatch(/signature=invalid trigger=booking\.created/);
+    });
+
+    it('logs a request with no signature, as missing', async () => {
+      const { receive } = loadWebhooks(SECRET);
+      const req = signedRequest({ type: 'booking.cancelled', data: {} }, SECRET);
+      req.get = () => undefined;
+      await receive(req, mockRes());
+      expect(accessLines()[0]).toMatch(/signature=missing trigger=booking\.cancelled/);
+    });
+
+    it('does not echo an odd trigger value into the log', async () => {
+      const { receive } = loadWebhooks(SECRET);
+      const body = { type: 'x\ninjected line', data: {} };
+      await receive(signedRequest(body, SECRET), mockRes());
+      expect(accessLines()[0]).toMatch(/trigger=unknown/);
+      expect(accessLines()[0]).not.toContain('injected');
+    });
+  });
+
   it('does not log participant details from the payload', async () => {
     const { receive } = loadWebhooks(SECRET);
     const withPii = {

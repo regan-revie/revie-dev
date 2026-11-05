@@ -19,6 +19,20 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-05 (EU switch: slow first booking, webhook investigation)
+
+**Branch / PR:** `nylas-webhook-logging`, one PR, not merged.
+
+**Finding (read-only; nothing in Nylas, Render or the listing was changed):** Nylas **does** reach us on the EU app. The EU destination is active with the four triggers and the right URL. For the 21:45 booking, Render shows `POST /api/nylas/webhooks 200` from Nylas at 21:46:38 (`booking.created … customFields=true`, then `-> accepted`). The ~50 seconds were not the webhook: the browser's `POST /api/nylas/create-booking` returned **403 in 148 ms** right after payment, so the fast path never ran; the 60-second sweeper then created the booking, Nylas's webhook arrived two seconds later, and acceptance followed. Payment 21:45:49 → accepted 21:46:39.9 (50.8 s); on the old US app the same flow took 5.3 s.
+
+**Why "no webhook in the logs":** Render's request log lines carry the path in labels, not in the message text, so a text search for the path finds nothing.
+
+**What changed:** one access-log line for every webhook request (`[nylas] webhook POST <path> signature=valid|invalid|missing trigger=<type>`; no payload, signature or secret), a log line for the challenge, and a log line for a create-booking refusal. Server tests: 413 pass.
+
+**Still open (not fixed):** why create-booking answered 403 (not the same user: customer and coach are different accounts; likely our own customer check or a session-token race, which the new log line will show on the next booking); the sweeper's age cutoff is ignored by the API (see tech-constraints.md). Proposed: send create-booking again from the order page if the booking has not confirmed after ~10 seconds, and make the sweeper's cutoff real (filter on `lastTransitionedAt`) with a short cutoff and tick.
+
+---
+
 ## HANDOFF — 2026-11-05 (Dev moves to the EU Nylas app: code and config side)
 
 **Branch / PR:** `nylas-eu-switch`, one PR, not merged. PR #12 (the decision and migration steps) is merged and the two old US-app test bookings are cancelled.
