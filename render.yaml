@@ -59,10 +59,12 @@ services:
       - key: REACT_APP_MARKETPLACE_NAME
         value: Revie
 
-      # US region: the Nylas free sandbox is US-only. Production must move to a
-      # non-sandbox EU application - see CLAUDE.md, this is a go-live blocker.
+      # EU region (decision of Nov 4, 2026, docs/decisions.md): coach calendar data stays in the EU,
+      # matching Frankfurt. The region is fixed per Nylas application, so this must always be the
+      # host of the application whose API key and client id are set below; the old US sandbox
+      # (api.us.nylas.com) is retired for this environment.
       - key: NYLAS_API_BASE_URL
-        value: https://api.us.nylas.com
+        value: https://api.eu.nylas.com
 
       # The transaction process every calendar listing is put on when a coach enables booking.
       # Console cannot pin a listing type to a process version, so enableListing writes this onto

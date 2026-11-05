@@ -190,10 +190,10 @@ SHARETRIBE_INTEGRATION_CLIENT_SECRET=op://Revie Dev/sharetribe_dev_nylas/client_
 
 # Nylas calendar integration. No REACT_APP_ prefix: that prefix publishes a value to every
 # visitor's browser, so an API key must never carry it.
-NYLAS_API_KEY=op://Revie Dev/nylas_sandbox_api_key/revie_dev
-NYLAS_CLIENT_ID=op://Revie Dev/nylas_sandbox_client_id/client_id
-NYLAS_API_BASE_URL=https://api.us.nylas.com
-NYLAS_WEBHOOK_SECRET=op://Revie Dev/nylas_dev_webhook_secret/credential
+NYLAS_API_KEY=op://Revie Dev/nylas_eu_api_key/credential
+NYLAS_CLIENT_ID=op://Revie Dev/nylas_eu_client_id/credential
+NYLAS_API_BASE_URL=https://api.eu.nylas.com
+NYLAS_WEBHOOK_SECRET=op://Revie Dev/nylas_eu_webhook_secret/credential
 
 # Google sign-in
 REACT_APP_GOOGLE_CLIENT_ID=op://Revie Dev/google_login_oauth/client_id
