@@ -18,7 +18,11 @@ const log = require('../log');
 /**
  * @returns {Promise<{skipped?: boolean, checked: number, outcomes: object}>}
  */
-const runBookingSweep = async ({ olderThanMinutes = 3 } = {}) => {
+// Two minutes: long past the browser's own call (a few seconds) and the order page's retry (ten
+// seconds), so the sweeper is a backstop for a closed tab or a crashed worker and never races them.
+const OLDER_THAN_MINUTES = 2;
+
+const runBookingSweep = async ({ olderThanMinutes = OLDER_THAN_MINUTES } = {}) => {
   if (!db.isAvailable() || !integration.isConfigured())
     return { skipped: true, checked: 0, outcomes: {} };
 

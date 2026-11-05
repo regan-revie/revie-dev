@@ -19,6 +19,7 @@ const { createCookieTokenStore, getSdk, handleError } = require('../../api-util/
 const { isConfigured } = require('./config');
 const { loadCalendarBookingTransaction } = require('./manageBookingShared');
 const { ensureBooking } = require('./bookingRecovery');
+const { verifyCaller } = require('./verifyCaller');
 
 module.exports = async (req, res) => {
   if (!isConfigured()) {
@@ -38,20 +39,22 @@ module.exports = async (req, res) => {
   try {
     // transactions.show refuses (403) a transaction the caller is not a party to; on top of that
     // only the customer who paid may trigger this.
-    const [{ tx }, userResponse] = await Promise.all([
+    const [{ customerId }, userResponse] = await Promise.all([
       loadCalendarBookingTransaction(sdk, transactionId),
       sdk.currentUser.show(),
     ]);
 
-    const customerId = tx.relationships?.customer?.data?.id?.uuid;
-    if (!customerId || customerId !== userResponse.data.data.id.uuid) {
+    const callerId = userResponse.data.data.id.uuid;
+    const verdict = await verifyCaller({ sdk, transactionId, customerId, callerId });
+    if (!verdict.ok) {
       // Short ids only. Without this line a 403 here and a 403 from Sharetribe (below) look the same.
       console.error(
-        `[nylas] create-booking refused: caller is not the customer tx=${String(
-          transactionId
-        ).slice(0, 8)} ` +
+        `[nylas] create-booking refused (${verdict.reason}) tx=${String(transactionId).slice(
+          0,
+          8
+        )} ` +
           `customer=${customerId ? customerId.slice(0, 8) : 'missing'} caller=${String(
-            userResponse.data.data.id.uuid
+            callerId
           ).slice(0, 8)}`
       );
       res.status(403).json({ error: 'Only the customer can create the booking' });

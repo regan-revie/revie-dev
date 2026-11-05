@@ -113,3 +113,82 @@ describe('useConfirmingBookingPoll()', () => {
     expect(refetch).not.toHaveBeenCalled();
   });
 });
+
+describe('useConfirmingBookingPoll(): asking the server to create the booking again', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  const withId = lastTransition => ({ ...tx(lastTransition), id: { uuid: 'tx-1' } });
+
+  it('asks once, ten seconds in, while the booking is still unconfirmed', async () => {
+    const retry = jest.fn().mockResolvedValue({});
+    renderHook(() =>
+      useConfirmingBookingPoll({
+        transaction: withId('transition/confirm-payment'),
+        transactionRole: 'customer',
+        refetch: jest.fn(),
+        retryCreateBooking: retry,
+      })
+    );
+    jest.advanceTimersByTime(9000);
+    expect(retry).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1500);
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(retry).toHaveBeenCalledWith({ transactionId: 'tx-1' });
+
+    // Only once, however long the page stays open.
+    jest.advanceTimersByTime(120000);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask if the booking is confirmed before the ten seconds are up', () => {
+    const retry = jest.fn().mockResolvedValue({});
+    const { rerender } = renderHook(
+      ({ transaction }) =>
+        useConfirmingBookingPoll({
+          transaction,
+          transactionRole: 'customer',
+          refetch: jest.fn(),
+          retryCreateBooking: retry,
+        }),
+      { initialProps: { transaction: withId('transition/confirm-payment') } }
+    );
+    jest.advanceTimersByTime(6000);
+    rerender({ transaction: withId('transition/operator-accept') });
+    jest.advanceTimersByTime(60000);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('does not ask for the coach, or when the failure of the retry itself is swallowed', async () => {
+    const retry = jest.fn().mockRejectedValue(new Error('403'));
+    renderHook(() =>
+      useConfirmingBookingPoll({
+        transaction: withId('transition/confirm-payment'),
+        transactionRole: 'provider',
+        refetch: jest.fn(),
+        retryCreateBooking: retry,
+      })
+    );
+    jest.advanceTimersByTime(30000);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('survives a failing retry and refreshes the page afterwards', async () => {
+    const retry = jest.fn().mockRejectedValue(new Error('403'));
+    const refetch = jest.fn();
+    renderHook(() =>
+      useConfirmingBookingPoll({
+        transaction: withId('transition/confirm-payment'),
+        transactionRole: 'customer',
+        refetch,
+        retryCreateBooking: retry,
+      })
+    );
+    jest.advanceTimersByTime(10500);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(refetch).toHaveBeenCalled();
+  });
+});

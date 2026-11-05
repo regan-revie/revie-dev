@@ -61,7 +61,9 @@ const resolveBookingTarget = ({ tx, listing, booking }) => {
 const loadCalendarBookingTransaction = async (sdk, transactionId) => {
   const response = await sdk.transactions.show({
     id: transactionId,
-    include: ['listing', 'booking'],
+    // 'customer' must be included: a Marketplace API transaction only carries a relationship's
+    // reference when that relationship is asked for, so without it the customer id is simply absent.
+    include: ['listing', 'booking', 'customer'],
   });
   const tx = response.data.data;
   const included = response.data.included;
@@ -70,7 +72,9 @@ const loadCalendarBookingTransaction = async (sdk, transactionId) => {
 
   const { configurationId, lengthMinutes } = resolveBookingTarget({ tx, listing, booking });
 
-  return { tx, listing, booking, configurationId, lengthMinutes };
+  const customerId = tx.relationships?.customer?.data?.id?.uuid || null;
+
+  return { tx, listing, booking, configurationId, lengthMinutes, customerId };
 };
 
 module.exports = { findIncluded, resolveBookingTarget, loadCalendarBookingTransaction };

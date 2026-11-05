@@ -19,6 +19,21 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-05 (create-booking customer check, sweeper cutoff, order-page retry)
+
+**Branch / PR:** `create-booking-fix`, one PR, not merged. Keeps the PR #15 logging.
+
+**Root cause (Regan found it in the new log line):** `create-booking refused: caller is not the customer … customer=missing`. The customer check read `tx.relationships.customer`, which a Marketplace API transaction only carries when `include: ['customer']` is requested. So the fast path was refused for every real customer from Oct 27 (PR #6 added the check) until now; the sweeper hid it by booking on its next tick. The "5 seconds" on Nov 4 was a lucky tick, not the US app; the EU switch did not cause this.
+
+**What changed**
+1. `loadCalendarBookingTransaction` includes the customer and returns `customerId`; new `verifyCaller` (strict: a different user is refused; a missing relationship is settled from the caller's own orders, not treated as "not the customer"). Tests: real customer allowed, other user refused, relationship missing (allowed for the owner, refused for a stranger, Sharetribe failures surface).
+2. Sweeper cutoff filtered in our code (`lastTransitionedAt`), two minutes, 60-second tick. The API ignores `lastTransitionedAtEnd`. Tests with a mocked SDK.
+3. The order page asks the server to create the booking once more after ten seconds if it is still "Confirming…" (customer only, once per transaction; initiate is never retried).
+
+**Expect after deploy:** a booking confirms in about 5 seconds again via the fast path (log: `[nylas] webhook POST … signature=valid trigger=booking.created` right after payment, no sweeper line). If it does not, `create-booking refused (…)` now says why.
+
+---
+
 ## HANDOFF — 2026-11-05 (EU switch: slow first booking, webhook investigation)
 
 **Branch / PR:** `nylas-webhook-logging`, one PR, not merged.
