@@ -13,7 +13,7 @@
 
 const API_KEY = process.env.NYLAS_API_KEY;
 const CLIENT_ID = process.env.NYLAS_CLIENT_ID;
-const API_BASE_URL = process.env.NYLAS_API_BASE_URL || 'https://api.us.nylas.com';
+const API_BASE_URL = process.env.NYLAS_API_BASE_URL || 'https://api.eu.nylas.com';
 const WEBHOOK_SECRET = process.env.NYLAS_WEBHOOK_SECRET;
 
 // True once the credentials needed to call the Nylas API are present.

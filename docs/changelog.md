@@ -19,6 +19,22 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-05 (Dev moves to the EU Nylas app: code and config side)
+
+**Branch / PR:** `nylas-eu-switch`, one PR, not merged. PR #12 (the decision and migration steps) is merged and the two old US-app test bookings are cancelled.
+
+**What changed**
+- `render.yaml`: `NYLAS_API_BASE_URL` is `https://api.eu.nylas.com`. The server's fallback default (`server/api/nylas/config.js`) and `SETUP.md` are EU too, so a missing variable can never silently send coach data to the US.
+- `docs/tech-constraints.md`, `SETUP.md`, `CLAUDE.md`: exact 1Password item and field names for the EU credentials (`nylas_eu_api_key`, `nylas_eu_client_id`, `nylas_eu_webhook_secret`, field `credential`) and what to set on Render.
+
+**Regan's part (not done by me):** create the three 1Password items and point `.env` at them; set `NYLAS_API_KEY`, `NYLAS_CLIENT_ID`, `NYLAS_WEBHOOK_SECRET` and `NYLAS_API_BASE_URL` on Render `revie-dev` and redeploy; create the webhook destination in the EU dashboard (`https://revie-dev.onrender.com/api/nylas/webhooks`; `booking.created`, `booking.pending`, `booking.rescheduled`, `booking.cancelled`); register `https://revie-dev.onrender.com/api/nylas/callback` as a callback URI in the Nylas EU app; delete the old US destination.
+
+**Still to do after she confirms those and merges:** connect `hello@revie.love` to the EU app (`/api/nylas/connect?provider=google` while logged in on Render), then `scripts/dev-resync-listing.js` for the Test Session listing (`6aa17447-bd2d-4465-9a24-38498e5daa62`), then scenarios 1 and 3 of the booking test script on Render.
+
+**Watch:** a Google OAuth app in *Testing* status issues refresh tokens that expire after 7 days, so the connected calendar will stop working a week after connecting until the app is published (and verified). Fine for Dev testing; a go-live item.
+
+---
+
 ## HANDOFF — 2026-11-04 (inbox fixes)
 
 **Branch / PR:** `inbox-fixes`, one PR, not merged.
