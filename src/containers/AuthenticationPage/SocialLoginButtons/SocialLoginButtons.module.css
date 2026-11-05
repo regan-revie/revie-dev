@@ -26,7 +26,7 @@
   &:after {
     content: '';
     width: 100%;
-    border-bottom: solid 1px #d2d2d2;
+    border-bottom: solid 1px var(--colorGrey200);
     position: absolute;
     left: 0;
     top: 50%;

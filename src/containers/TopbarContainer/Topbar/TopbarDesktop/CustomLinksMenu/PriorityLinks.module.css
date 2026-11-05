@@ -35,7 +35,7 @@
   margin: 0;
 
   &:hover {
-    color: var(--colorWhite);
+    color: var(--revieCream);
     border-bottom: 4px solid var(--revieLavender);
     border-radius: 0;
     text-decoration: none;

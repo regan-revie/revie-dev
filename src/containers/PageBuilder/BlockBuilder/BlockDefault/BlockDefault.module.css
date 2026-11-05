@@ -3,7 +3,7 @@
 
 .media {
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--borderRadius);
   margin-bottom: 0;
 }
 

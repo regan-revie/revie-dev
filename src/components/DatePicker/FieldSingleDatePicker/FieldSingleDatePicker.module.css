@@ -4,7 +4,7 @@
 }
 
 .labelDisabled {
-  color: var(--colorGrey500);
+  color: var(--colorTextDisabled);
 }
 /**
  * Mobile margins mean that labels, inputs (incl separate borders) get margins,

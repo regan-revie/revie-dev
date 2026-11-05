@@ -19,7 +19,7 @@
   width: 100%;
 
   @media (--viewportLarge) {
-    border-radius: 2px 2px 0 0;
+    border-radius: var(--borderRadius) var(--borderRadius) 0 0;
   }
 }
 

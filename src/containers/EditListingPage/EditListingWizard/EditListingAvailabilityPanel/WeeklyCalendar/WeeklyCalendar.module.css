@@ -133,7 +133,7 @@
 }
 
 .blockedDateLabel {
-  background-color: #f3f3f3;
+  background-color: var(--colorGrey100);
   background-color: var(--colorGrey50);
   color: var(--colorGrey600);
 }
@@ -251,12 +251,12 @@
 }
 
 .blockedDate {
-  background-color: #f3f3f3;
+  background-color: var(--colorGrey100);
   background-color: var(--colorGrey50);
   color: var(--colorGrey600);
 
   & .timeRange {
-    color: var(--colorGrey300);
+    color: var(--colorTextMuted);
   }
 
   &:hover .exception > .timeRange {

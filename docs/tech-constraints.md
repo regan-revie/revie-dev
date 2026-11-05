@@ -107,6 +107,10 @@ Every email today is a Sharetribe built-in. The default-booking process (`ext/tr
 - GTM, the Meta pixel and the Pinterest tag live on Webflow. Booking conversions happen on the platform, so tracking needs adding there too.
 - Brand assets: logo, hero image, social share images (1200×630, 600×314), replacing the biketribe placeholders. Status: the desktop (cream) and mobile logos are wired in `configBranding.js` as the local fallback, but Console's hosted logo still overrides them. The hero and social-share images are still the biketribe placeholders; Revie versions are in `src/assets/` but not yet imported.
 
+## Checking screens visually
+- **Dev and Test are private marketplaces**, so every page, including `/styleguide`, redirects to sign-up when logged out. To look at a component without an account, add a styleguide example with fixtures: `src/util/stubFetchForExamples.js` answers our own `/api/nylas/*` calls with fixture data (see `NylasBookingForm.example.js` and `ManageCalendarBooking.example.js`). Viewing them needs `/styleguide` reachable: for a local session only, remove the `...authForPrivateMarketplace` lines from the styleguide routes in `routeConfiguration.js` and put them back before committing.
+- **Contrast scan:** `scripts/audit-css.js` reads the stylesheets; for inherited backgrounds, run a script in the page that walks each text element, resolves the effective background and compares it with docs/brand.md's approved pairings. Disabled controls are exempt from AA.
+
 ## House rules for the repo
 - **Until the Dec 14 cutover, edit Dev's Console directly. No Test → Dev copies.** Test stays a mirror of Live; a copy would replace Dev's cream wordmark, turn off file attachments and change listing approval. Every Dev-only Console change is logged in `go-live-plan.md` under "Dev-only Console changes to apply to Test and Live at cutover", and applied to Test and Live together at cutover. (This replaces the older "change Test, then copy forward" rule until then.)
 - Use `npx flex-cli` for every flex-cli command and always pass `--marketplace revie1-dev` for Dev. Never push a process to Test or Live without being told to.

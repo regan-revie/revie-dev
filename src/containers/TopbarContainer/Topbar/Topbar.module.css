@@ -303,7 +303,7 @@
   composes: h5 from global;
   font-weight: var(--fontWeightSemiBold);
   margin: 0;
-  color: var(--colorWhite);
+  color: var(--revieCream);
 
   @media (--viewportMedium) {
     margin: 0;

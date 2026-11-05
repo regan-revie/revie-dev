@@ -7,7 +7,7 @@
   gap: 8px;
   padding: 12px;
 
-  border-radius: 4px;
+  border-radius: var(--borderRadius);
   border: 1px solid var(--colorGrey100);
   background: var(--colorWhite);
 }
@@ -60,7 +60,7 @@
 }
 
 .statusText {
-  color: var(--colorGrey500);
+  color: var(--colorTextMuted);
   white-space: nowrap;
 
   @media (min-width: 500px) {

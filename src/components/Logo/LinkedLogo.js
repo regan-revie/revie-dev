@@ -15,6 +15,7 @@ import css from './LinkedLogo.module.css';
  * @param {string?} props.logoClassName andd more style rules in addtion to css.logo
  * @param {string?} props.logoImageClassName overwrite components own css.root
  * @param {('desktop' | 'mobile')} props.layout
+ * @param {('onDark' | 'onLight')} props.tone passed to Logo
  * @param {Object} props.linkToExternalSite
  * @param {string} props.linkToExternalSite.href
  * @param {string?} props.alt alt text for logo image
@@ -28,6 +29,7 @@ const LinkedLogo = props => {
     logoClassName,
     logoImageClassName,
     layout = 'desktop',
+    tone,
     linkToExternalSite,
     alt,
     ...rest
@@ -38,6 +40,7 @@ const LinkedLogo = props => {
     <ExternalLink className={classes} href={linkToExternalSite.href} target="_self" {...rest}>
       <Logo
         layout={layout}
+        tone={tone}
         className={logoClassName}
         logoImageClassName={logoImageClassName}
         alt={alt}
@@ -47,6 +50,7 @@ const LinkedLogo = props => {
     <NamedLink id={id} className={classes} name="LandingPage" {...rest}>
       <Logo
         layout={layout}
+        tone={tone}
         className={logoClassName}
         logoImageClassName={logoImageClassName}
         alt={alt}

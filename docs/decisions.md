@@ -7,6 +7,12 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Semantic colours
+**Date:** Nov 4, 2026
+**Decision:** Success uses Forest text. Warnings use an orange tag with a maroon label. Errors use #B8000A text, the only colour outside the brand palette, reserved for errors. All three clear 4.5:1 on cream.
+**Why:** Sharetribe's stock red, green and amber failed contrast on cream (4.1, 4.3 and 1.7:1). Errors need to read as errors, and maroon is the body text colour.
+**Affects:** revieTokens.css (--colorFail, --colorSuccess, --colorAttention), docs/brand.md.
+
 ### DECISION: Nylas production app is in the EU region
 **Date:** Nov 4, 2026
 **Decision:** Revie's production Nylas application is in the EU region (api.eu.nylas.com), on the Essentials plan, with Revie's own Google OAuth client and only the calendar.readonly and calendar.events scopes (no email or contacts). Dev moves from the US sandbox to this app; the hello@revie.love test calendar is reconnected, configurations are recreated, and the webhook destination is re-created on the EU app.

@@ -53,7 +53,7 @@
   padding: 14px 0 18px;
   margin-top: 0;
   background-color: white;
-  border-radius: 4px;
+  border-radius: var(--borderRadius);
   box-shadow: var(--boxShadowPopup);
   z-index: 1;
 

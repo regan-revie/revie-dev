@@ -122,8 +122,8 @@ bottom of the container.
     &:hover,
     &.highlighted {
       cursor: pointer;
-      border-top-right-radius: 20px;
-      border-bottom-right-radius: 20px;
+      border-top-right-radius: var(--borderRadiusLarge);
+      border-bottom-right-radius: var(--borderRadiusLarge);
     }
   }
   .listItemBlackText {

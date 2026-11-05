@@ -46,6 +46,23 @@ From the "Color Combinations & Contrast" page of the guidelines. Every one clear
 | Pink `#FF90C2` | Maroon | 8.64 | Maroon **only** |
 | Chartreuse `#EAEA73` | Maroon | 14.24 | Maroon **only** |
 
+## Text colours on cream and white (added Nov 2026)
+Greys are for borders and fills as well as text, so grey 300 to 500 fail as body text on the cream ground (1.8 / 2.4 / 3.4 : 1). Two tokens carry the text roles:
+| Token | Value | On cream | Use |
+|---|---|---|---|
+| `--colorTextMuted` | grey 600 | 4.9 : 1 | secondary text, labels, hints, "optional" |
+| `--colorTextDisabled` | grey 500 | 3.4 : 1 | disabled controls only (WCAG exempts disabled text) |
+Primary text is maroon (`--colorGrey900`) or grey 700. On a maroon ground use off-white (`--revieCream`), never pure white.
+
+## Semantic colours (decided Nov 4, 2026)
+Sharetribe's stock red, green and amber measured 4.1, 4.3 and 1.7 : 1 as text on cream. All three are replaced by tokens in `revieTokens.css`; each clears 4.5 : 1 on cream.
+| Role | Token | Value | On cream | Rule |
+|---|---|---|---|---|
+| Error | `--revieError` (`--colorFail`) | `#B8000A` | 5.96 : 1 (6.9 on white) | The **single functional exception to the palette**. Reserved for errors: error text, error borders, the notification badge. Never decorative. |
+| Success | `--colorSuccess` | Forest `#032723` (`--revieGreen`) | 13.75 : 1 | Success text and icons. |
+| Attention / warning | `--colorAttention` | Orange `#FF9352` (`--revieOrange`) | n/a | A **tag**: orange ground with a maroon label (8.23 : 1, approved). **Never orange text.** `--colorAttentionDark` is maroon, for the label. |
+Used today as tags: the Inbox "action needed" state and the listing page's "pending approval" and "payout details missing" notices.
+
 ## Type
 | Role | Typeface | CSS variable |
 |---|---|---|

@@ -22,7 +22,7 @@
 }
 
 .timeZoneLabel {
-  color: var(--colorGrey500);
+  color: var(--colorTextMuted);
   font-size: 13px;
 }
 

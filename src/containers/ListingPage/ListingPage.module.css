@@ -56,8 +56,8 @@
   justify-content: space-between;
   flex-direction: column;
   width: 100%;
-  color: var(--colorGrey100);
-  background-color: var(--colorGrey700);
+  color: var(--revieCream);
+  background-color: var(--revieMaroon);
   z-index: 1; /* bring on top of mobile image */
   padding: 0 24px;
 
@@ -182,7 +182,13 @@
 }
 
 .ownListingTextPendingApproval {
-  color: var(--colorAttention);
+  /* Warning tag: orange ground, maroon label (8.23:1); orange is never used as text. */
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--colorAttention);
+  color: var(--revieMaroon);
 }
 
 .closedListingText {
@@ -200,12 +206,12 @@
 .editListingLink {
   composes: h5 from global;
   margin: 23px 24px 11px 0px;
-  color: var(--colorGrey100);
+  color: var(--revieCream);
 
   transition: var(--transitionStyleButton);
 
   &:hover {
-    color: var(--colorWhite);
+    color: var(--revieLavender);
     text-decoration: none;
   }
 
@@ -219,7 +225,13 @@
 }
 
 .missingPayoutDetailsText {
-  color: var(--colorAttention);
+  /* Warning tag: orange ground, maroon label (8.23:1); orange is never used as text. */
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--colorAttention);
+  color: var(--revieMaroon);
 }
 
 .payoutDetailsWarning {
@@ -731,7 +743,7 @@
   /* Static map: dimensions are 640px */
   max-width: 640px;
   max-height: 640px;
-  background-color: #eee;
+  background-color: var(--colorGrey100);
   padding: 0;
   border: 0;
   cursor: pointer;
@@ -824,7 +836,7 @@
 .video {
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--borderRadius);
 }
 .iframe {
   position: absolute;

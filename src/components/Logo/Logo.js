@@ -4,6 +4,8 @@ import classNames from 'classnames';
 import { useConfiguration } from '../../context/configurationContext';
 import { ResponsiveImage } from '../../components/';
 
+import logoImageDesktopOnLight from '../../assets/revie-logo-desktop.png';
+
 import css from './Logo.module.css';
 
 const HEIGHT_24 = 24;
@@ -117,14 +119,23 @@ export const LogoComponent = props => {
  * @param {string?} props.className add more style rules in addition to components own css.root
  * @param {string?} props.rootClassName overwrite components own css.root
  * @param {('desktop' | 'mobile')} props.layout
+ * @param {('onDark' | 'onLight')} props.tone which ground the logo sits on; onLight swaps the desktop
+ *   wordmark for the maroon one
  * @param {string?} props.alt alt text for logo image
  * @returns {JSX.Element} logo component
  */
 const Logo = props => {
   const config = useConfiguration();
-  const { layout = 'desktop', ...rest } = props;
+  const { layout = 'desktop', tone = 'onDark', ...rest } = props;
   // NOTE: logo images are set in hosted branding.json asset or src/config/brandingConfig.js
-  const { logoImageDesktop, logoImageMobile, logoSettings } = config.branding;
+  const { logoImageDesktop: brandedDesktop, logoImageMobile, logoSettings } = config.branding;
+
+  // Revie: the branded desktop wordmark (Console / configBranding) is the cream one, made for the
+  // maroon topbar. On a light ground (checkout header, footer) it is invisible, so those callers
+  // ask for tone="onLight" and get the maroon wordmark (docs/brand.md: maroon on off-white). The
+  // mobile mark is a lavender R on a maroon square and reads on any ground, so it is left alone.
+  const logoImageDesktop =
+    tone === 'onLight' && layout === 'desktop' ? logoImageDesktopOnLight : brandedDesktop;
 
   return (
     <LogoComponent
