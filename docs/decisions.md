@@ -13,6 +13,12 @@ Newest at the top. When the planning project settles something, it produces a `#
 **Why:** Sharetribe's stock red, green and amber failed contrast on cream (4.1, 4.3 and 1.7:1). Errors need to read as errors, and maroon is the body text colour.
 **Affects:** revieTokens.css (--colorFail, --colorSuccess, --colorAttention), docs/brand.md.
 
+### DECISION: Nylas production app is in the EU region
+**Date:** Nov 4, 2026
+**Decision:** Revie's production Nylas application is in the EU region (api.eu.nylas.com), on the Essentials plan, with Revie's own Google OAuth client and only the calendar.readonly and calendar.events scopes (no email or contacts). Dev moves from the US sandbox to this app; the hello@revie.love test calendar is reconnected, configurations are recreated, and the webhook destination is re-created on the EU app.
+**Why:** Coach calendar data stays in the EU, matching the Frankfurt servers. The region is fixed per app and grants can't be migrated, so it had to be chosen before real coaches connect.
+**Affects:** NYLAS_API_KEY, NYLAS_CLIENT_ID, NYLAS_API_BASE_URL (https://api.eu.nylas.com), NYLAS_WEBHOOK_SECRET on Render; Google Cloud redirect URI; Google verification scope list; docs/tech-constraints.md Nylas section.
+
 ### DECISION: Which emails come from Sharetribe and which from Postmark
 **Date:** Oct 28, 2026
 **Decision:** Sharetribe (release-3) sends: Accepted request (client, "You're booked"), Operator accepted request (coach, "You've got a session", with a fixed-length body), Operator declined request and Expired request (client, "That one didn't go through, and you haven't been charged"), cancellation emails to client and coach (new in release-3), Money paid, and the review emails. New request and Declined request aren't sent. Postmark sends late-cancellation, reschedule and reminder emails only. Nylas Scheduler's own emails are off (disable_emails). Klaviyo is marketing only.

@@ -45,9 +45,16 @@ Three Sharetribe environments, each with its own hosted configuration (listing t
 - Coach subscriptions via Stripe Billing
 
 ## Nylas constraints that affect go-live
-- The dev app is a free **Sandbox** in the **US region**. Coach calendar data is processed in the US until a non-sandbox application is created in the **EU region**. Region is fixed per application and grants can't be migrated, so this must happen before real coaches connect.
-- On Sandbox, coaches see Nylas branding on the Google consent screen. Leaving Sandbox (Essentials, $15/mo) allows Revie's own Google credentials.
-- Google OAuth verification (sensitive calendar scopes) is required beyond the 100-test-user allowance; weeks, not months.
+- **Decided Nov 4 (see `decisions.md`): production Nylas is an EU-region app (`api.eu.nylas.com`) on Essentials**, with Revie's own Google OAuth client requesting only `calendar.readonly` and `calendar.events`. Dev moves onto it. Until Dev has moved, the old dev app is still a free **Sandbox** in the **US region** (`api.us.nylas.com`), with Nylas branding on the Google consent screen and the broader default scopes. The region is fixed per application and grants cannot be migrated, so every coach who connects to the old app must reconnect.
+- **Moving Dev to the EU app, in order:**
+  1. Put the new app's `NYLAS_API_KEY`, `NYLAS_CLIENT_ID` in 1Password (`Revie Dev`) and Render, and set `NYLAS_API_BASE_URL=https://api.eu.nylas.com` **both** in Render and in `render.yaml`. The Blueprint value overrides the dashboard on a re-sync, so changing only one of them silently flips it back.
+  2. Add the EU callback URI to the Google Cloud OAuth client; create the Google connector on the EU app with Revie's client and the two scopes.
+  3. Re-create the webhook destination on the EU app (`POST /v3/webhooks` for `booking.created`, `.pending`, `.rescheduled`, `.cancelled`, pointing at `https://revie-dev.onrender.com/api/nylas/webhooks`). The secret is new and cannot be read back; store it as `NYLAS_WEBHOOK_SECRET` (Render, and the `nylas_dev_webhook_secret` item). The old destination on the US app should be deleted.
+  4. Reconnect the `hello@revie.love` test calendar through the connect flow. This writes a new `nylasGrantId` onto the user; the old US grant is dead.
+  5. Re-create configurations: every listing's `nylasConfigurationIds` point at the US app and will 404. `scripts/dev-resync-listing.js sync` creates new ones (a stored id that 404s is re-created) and rewrites the ids; the Test Session listing is `6aa17447-bd2d-4465-9a24-38498e5daa62`.
+  6. Run scenarios 1 and 3 of `docs/test-script-booking-recovery.md` on Render. Transactions booked on the US app keep their `nylas_bookings` rows but those bookings no longer exist on the new app, so cancelling them from the order page will fail; cancel or let them complete before switching.
+- Google OAuth consent screen: with Revie's own client the consent screen should show Revie, not Nylas, and list only the calendar scopes. Check what it actually displays straight after the switch (the Sandbox showed the broader list even though the grant was narrow).
+- Google OAuth verification (sensitive calendar scopes: `calendar.readonly` and `calendar.events`) is required beyond the 100-test-user allowance; weeks, not months. The scope list submitted must match the two above exactly.
 - The Microsoft connector still requests mail and contacts scopes and must be narrowed before Outlook is offered.
 - Nylas's availability endpoint ignores `min_booking_notice`; we filter on our server. Keep that filtering server-side.
 

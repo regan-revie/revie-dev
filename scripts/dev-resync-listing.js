@@ -73,7 +73,13 @@ const load = async () => {
 
 /** Non-sensitive facts about one configuration, to compare before and after. */
 const summarise = async (grantId, id) => {
-  const c = await nylasRequest(`/v3/grants/${grantId}/scheduling/configurations/${id}`);
+  let c;
+  try {
+    c = await nylasRequest(`/v3/grants/${grantId}/scheduling/configurations/${id}`);
+  } catch (e) {
+    // Expected after moving to a different Nylas app: the stored id belongs to the old one.
+    return { notFoundOnThisNylasApp: e.status === 404 || undefined, status: e.status };
+  }
   return {
     title: c.event_booking?.title,
     description: (c.event_booking?.description || '').slice(0, 60) + '…',
@@ -133,11 +139,19 @@ const show = async (label, listing, grantId) => {
   if (!calendarId) {
     const first = Object.values(configurationIdsOf(publicData))[0];
     if (first) {
-      const c = await nylasRequest(`/v3/grants/${grantId}/scheduling/configurations/${first}`);
-      calendarId = c.participants?.[0]?.booking?.calendar_id;
+      try {
+        const c = await nylasRequest(`/v3/grants/${grantId}/scheduling/configurations/${first}`);
+        calendarId = c.participants?.[0]?.booking?.calendar_id;
+      } catch (e) {
+        // Left over from another Nylas app: fall through to the default calendar below.
+      }
     }
   }
-  if (!calendarId) calendarId = defaultCalendarFor(await listCalendars(grantId))?.id;
+  // The stored calendar may belong to a previous Nylas app or grant; check it exists on this one.
+  const calendars = await listCalendars(grantId);
+  if (!calendars.some(c => c.id === calendarId && !c.read_only)) {
+    calendarId = defaultCalendarFor(calendars)?.id;
+  }
   if (!calendarId) fail('No writable calendar found.');
 
   const result = await syncListingConfigurations({
