@@ -4,6 +4,7 @@ import {
   CONDITIONAL_RESOLVER_WILDCARD,
   ConditionalResolver,
 } from '../../transactions/transaction';
+import { isLateCancelled, lateCancelledState } from '../../transactions/lateCancellation';
 
 /**
  * Get state data against booking process for TransactionPage's UI.
@@ -27,6 +28,24 @@ export const getStateDataForBookingProcess = (txInfo, processInfo) => {
     actionButtonProps,
     leaveReviewProps,
   } = processInfo;
+
+  // Revie: a session cancelled inside 48 hours is still `accepted` (then `delivered`) as far as
+  // Sharetribe is concerned, because the client is charged and the coach paid. Show it as the
+  // cancelled session it is, with no review prompt for something that never happened.
+  if (isLateCancelled(transaction) && [states.ACCEPTED, states.DELIVERED].includes(processState)) {
+    return {
+      processName,
+      processState: lateCancelledState(transaction),
+      showDetailCardHeadings: true,
+      showExtraInfo: true,
+      transitionMessages: [
+        {
+          transition: transitions.COMPLETE,
+          translationId: 'TransactionPage.ActivityFeed.default-booking.late-cancelled-completed',
+        },
+      ],
+    };
+  }
 
   return new ConditionalResolver([processState, transactionRole])
     .cond([states.INQUIRY, CUSTOMER], () => {

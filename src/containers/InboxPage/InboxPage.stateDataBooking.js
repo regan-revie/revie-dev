@@ -4,12 +4,20 @@ import {
   CONDITIONAL_RESOLVER_WILDCARD,
   ConditionalResolver,
 } from '../../transactions/transaction';
+import { isLateCancelled, lateCancelledState } from '../../transactions/lateCancellation';
 
 // Get UI data mapped to specific transaction state & role
 export const getStateDataForBookingProcess = (txInfo, processInfo) => {
-  const { transactionRole } = txInfo;
+  const { transactionRole, transaction } = txInfo;
   const { processName, processState, states } = processInfo;
   const _ = CONDITIONAL_RESOLVER_WILDCARD;
+
+  // Revie: a late-cancelled session is still `accepted`/`delivered` in Sharetribe (the client is
+  // charged, the coach paid). In the inbox it is a finished, cancelled session: not "Booked", and
+  // not a review waiting to be left.
+  if (isLateCancelled(transaction) && [states.ACCEPTED, states.DELIVERED].includes(processState)) {
+    return { processName, processState: lateCancelledState(transaction), isFinal: true };
+  }
 
   return (
     new ConditionalResolver([processState, transactionRole])

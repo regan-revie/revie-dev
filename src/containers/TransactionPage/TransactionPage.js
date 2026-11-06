@@ -359,6 +359,7 @@ export const TransactionPageComponent = props => {
     history,
     messages,
     onManageDisableScrolling,
+    onTransactionCancelledOnCalendar,
     onSendMessage,
     onSendReview,
     onShowMoreMessages,
@@ -1052,7 +1053,11 @@ export const TransactionPageComponent = props => {
         <div className={css.root}>
           {panel}
           {showManageCalendarBooking ? (
-            <ManageCalendarBooking transactionId={transaction?.id} listingId={listing?.id} />
+            <ManageCalendarBooking
+              transactionId={transaction?.id}
+              listingId={listing?.id}
+              onCancelled={onTransactionCancelledOnCalendar}
+            />
           ) : null}
         </div>
         <ReviewModal
@@ -1217,6 +1222,16 @@ const TransactionPage = props => {
     refetch: refetchTransaction,
   });
 
+  // After the client cancels, the booking.cancelled webhook can take a few seconds to reach our
+  // server, and if the cancellation was a late (charged) one it is only then written onto the
+  // transaction. Re-read it a few times so the heading catches up without a manual reload.
+  const cancelRefetchTimers = useRef([]);
+  useEffect(() => () => cancelRefetchTimers.current.forEach(clearTimeout), []);
+  const onTransactionCancelledOnCalendar = useCallback(() => {
+    cancelRefetchTimers.current.forEach(clearTimeout);
+    cancelRefetchTimers.current = [3000, 8000, 20000].map(ms => setTimeout(refetchTransaction, ms));
+  }, [refetchTransaction]);
+
   // Dispatch callbacks
   const onTransition = useCallback(
     (txId, transitionName, params) => dispatch(makeTransition(txId, transitionName, params)),
@@ -1303,6 +1318,7 @@ const TransactionPage = props => {
       callSetInitialValues={callSetInitialValues}
       onInitializeCardPaymentData={onInitializeCardPaymentData}
       onFetchTransactionLineItems={onFetchTransactionLineItems}
+      onTransactionCancelledOnCalendar={onTransactionCancelledOnCalendar}
       onFetchTimeSlots={onFetchTimeSlots}
       onUploadFile={onUploadFile}
       onClearUploadedFiles={onClearUploadedFiles}

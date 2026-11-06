@@ -211,6 +211,66 @@ describe('ActivityFeed', () => {
   });
 });
 
+describe('ActivityFeed for a late-cancelled session', () => {
+  const bookingTransitions = getProcess('default-booking').transitions;
+
+  const feedProps = (processState, metadata) => {
+    const customer = createUser('user1');
+    const provider = createUser('user2');
+    const listing = createListing('listing');
+    const transaction = createTransaction({
+      id: 'tx1',
+      processName: 'default-booking',
+      customer,
+      provider,
+      listing,
+      transitions: [
+        createTxTransition({
+          createdAt: new Date(Date.UTC(2026, 10, 5, 22, 0)),
+          by: 'operator',
+          transition: bookingTransitions.OPERATOR_ACCEPT,
+        }),
+      ],
+    });
+    transaction.attributes.metadata = metadata;
+    return {
+      messages: [],
+      transaction,
+      stateData: { processName: 'default-booking', processState },
+      currentUser: createCurrentUser('user1'),
+      hasOlderMessages: false,
+      fetchMessagesInProgress: false,
+      onOpenReviewModal: noop,
+      onShowOlderMessages: noop,
+      intl: fakeIntl,
+    };
+  };
+
+  it('adds the cancellation after the booking, dated from the metadata', () => {
+    render(
+      <ActivityFeed
+        {...feedProps('late-cancelled', {
+          lateCancelledAt: '2026-11-05T23:49:33.000Z',
+          cancelledBy: 'client',
+        })}
+      />
+    );
+    const items = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(items.length).toBe(2);
+    expect(
+      within(items[0]).getByText('TransactionPage.ActivityFeed.default-booking.accepted')
+    ).toBeInTheDocument();
+    expect(
+      within(items[1]).getByText('TransactionPage.ActivityFeed.default-booking.late-cancelled')
+    ).toBeInTheDocument();
+  });
+
+  it('adds nothing for an ordinary booking', () => {
+    render(<ActivityFeed {...feedProps('accepted', {})} />);
+    expect(within(screen.getByRole('list')).getAllByRole('listitem').length).toBe(1);
+  });
+});
+
 describe('ActivityFeed file display and download', () => {
   it('own message with one attached file renders the file name and icon', () => {
     const customer = createUser('user1');

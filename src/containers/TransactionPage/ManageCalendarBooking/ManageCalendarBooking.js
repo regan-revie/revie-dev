@@ -31,6 +31,7 @@ import css from './ManageCalendarBooking.module.css';
 const ManageCalendarBooking = ({
   transactionId: transactionIdMaybe,
   listingId: listingIdMaybe,
+  onCancelled,
 }) => {
   // Callers pass the SDK entities' own .id (transaction.id, listing.id), which may be a UUID
   // object or already a plain string - normalised here rather than pushed onto every caller.
@@ -88,6 +89,9 @@ const ManageCalendarBooking = ({
         setMode('idle');
         // What the confirmation step promised, so the page cannot contradict it afterwards.
         setJustCancelled({ free: status.freeCancellationNow ?? null });
+        // Lets the page re-read the transaction: a late cancellation is recorded on it by the
+        // booking.cancelled webhook a few seconds from now, and the heading depends on that.
+        if (onCancelled) onCancelled();
       })
       .catch(e => {
         setActionInProgress(false);
