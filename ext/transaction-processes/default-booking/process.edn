@@ -1,3 +1,16 @@
+;; Revie changes (release-4, see docs/decisions.md "Late cancellations have their own state (release-4)"):
+;; - A client cancelling inside 48 hours runs :transition/late-cancel (operator, from accepted) into
+;;   :state/late-cancelled. The client keeps the charge (no refund action), and the coach is paid by
+;;   :transition/complete-late-cancelled, time-triggered at booking end + 2 days exactly like
+;;   :transition/complete. Neither path has any review transition or review notification, so no
+;;   review prompt or review email is sent for a session that did not happen.
+;; - Both sides get a late-cancellation email on :transition/late-cancel; the coach also gets the
+;;   usual "money paid" email at the payout.
+;; - Deliberately no :action/cancel-booking on late-cancel: the payout is timed off the booking's end
+;;   and the booking record is left exactly as it is, as it was in release-3. Availability comes from
+;;   the coach's calendar, not from Sharetribe's booking.
+;; - :transition/cancel is now also the coach-cancels path (always a full refund, at any time); the
+;;   coach email for it (booking-canceled-to-provider) no longer says the client cancelled.
 ;; Revie changes (release-3, see docs/decisions.md "Which emails come from Sharetribe and which from Postmark"):
 ;; - :transition/cancel now emails the client (refund on its way) and the coach (session cancelled).
 ;;   Release-2 sent nothing on a cancel. :transition/cancel always runs a full refund, and a
@@ -111,6 +124,18 @@
     {:name :action/cancel-booking}],
    :from :state/accepted,
    :to :state/cancelled}
+  {:name :transition/late-cancel,
+   :actor :actor.role/operator,
+   :actions [],
+   :from :state/accepted,
+   :to :state/late-cancelled}
+  {:name :transition/complete-late-cancelled,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/booking-end]} {:fn/period ["P2D"]}]},
+   :actions [{:name :action/stripe-create-payout}],
+   :from :state/late-cancelled,
+   :to :state/late-cancelled-completed}
   {:name :transition/review-1-by-provider,
    :actor :actor.role/provider,
    :actions [{:name :action/post-review-by-provider}],
@@ -157,7 +182,19 @@
    :from :state/reviewed-by-provider,
    :to :state/reviewed}],
  :notifications
- [{:name :notification/booking-canceled-to-customer,
+ [{:name :notification/booking-late-cancelled-to-customer,
+   :on :transition/late-cancel,
+   :to :actor.role/customer,
+   :template :booking-late-cancelled-to-customer}
+  {:name :notification/booking-late-cancelled-to-provider,
+   :on :transition/late-cancel,
+   :to :actor.role/provider,
+   :template :booking-late-cancelled-to-provider}
+  {:name :notification/booking-money-paid-late-cancelled,
+   :on :transition/complete-late-cancelled,
+   :to :actor.role/provider,
+   :template :booking-money-paid}
+  {:name :notification/booking-canceled-to-customer,
    :on :transition/cancel,
    :to :actor.role/customer,
    :template :booking-canceled-to-customer}

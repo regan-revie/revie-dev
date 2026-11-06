@@ -56,15 +56,19 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // Leave a note of who asked, before Nylas is told: the booking.cancelled webhook that follows
-    // has no idea whether the client or the coach cancelled, and records it on the transaction if
-    // the cancellation turns out to be a late (charged) one. Best effort - a missing note only
-    // means the late cancellation is attributed to the coach.
+    // Leave a note of who asked, before Nylas is told. The booking.cancelled webhook that follows
+    // cannot tell a client's cancellation from the coach's own calendar edit, and the two are
+    // treated differently: a coach cancellation always refunds, while a client cancelling inside
+    // 48 hours is charged (bookingSync.js). So the note is required: if it cannot be written the
+    // cancellation is refused and the client can simply try again, rather than a late cancel being
+    // refunded as if the coach had made it.
     const note = await updateTransactionMetadata(transactionId, { cancelRequestedBy: 'customer' });
     if (!note.ok) {
       console.error(
         `[nylas] Could not note cancel requester for ${transactionId}: ${note.error.message}`
       );
+      res.status(502).json({ error: 'Could not cancel the calendar booking' });
+      return;
     }
 
     try {
@@ -72,7 +76,7 @@ module.exports = async (req, res) => {
     } catch (e) {
       // Nylas refused, so nobody cancelled: do not leave the note to be misread by a later
       // cancellation made from the coach's calendar.
-      if (note.ok) await updateTransactionMetadata(transactionId, { cancelRequestedBy: null });
+      await updateTransactionMetadata(transactionId, { cancelRequestedBy: null });
       throw e;
     }
 

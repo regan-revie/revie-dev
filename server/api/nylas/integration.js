@@ -98,12 +98,16 @@ const updateTransactionMetadata = async (transactionId, metadata) => {
   }
 };
 
-/** A transaction's current `metadata`, read as the operator. Empty object when there is none. */
-const getTransactionMetadata = async transactionId => {
+/**
+ * A transaction's `metadata` and `lastTransition`, read as the operator. Metadata is an empty object
+ * when there is none.
+ */
+const getTransactionBasics = async transactionId => {
   const sdk = getIntegrationSdk();
   if (!sdk) throw new Error('Integration API credentials are not configured');
   const response = await sdk.transactions.show({ id: transactionId });
-  return response.data.data.attributes?.metadata || {};
+  const attributes = response.data.data.attributes || {};
+  return { metadata: attributes.metadata || {}, lastTransition: attributes.lastTransition };
 };
 
 /**
@@ -180,7 +184,7 @@ module.exports = {
   getIntegrationSdk,
   applyTransition,
   updateTransactionMetadata,
-  getTransactionMetadata,
+  getTransactionBasics,
   loadTransactionAsOperator,
   findPaidUnconfirmedTransactions,
 };

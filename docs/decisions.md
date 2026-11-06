@@ -7,6 +7,24 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Late cancellations have their own state (release-4)
+**Date:** Nov 5, 2026
+**Decision:** A client cancellation inside 48 hours runs transition/late-cancel: the session leaves the calendar, the client is charged, the coach is paid by a time-triggered payout at booking end + 2 days, no review prompts or review emails are sent, and both sides get a late-cancellation email from Sharetribe. Console shows the late-cancelled state.
+**Why:** On release-3 a late cancellation stayed Accepted, auto-completed and asked both sides to review a session that never happened.
+**Affects:** transaction process release-4 (Dev and Test now, Live at cutover), cancel endpoint, webhook, Console email texts, BOOKING_PROCESS_ALIAS.
+
+### DECISION: A coach cancellation always refunds the client
+**Date:** Nov 5, 2026
+**Decision:** If the coach cancels, at any time, the client gets a full refund. A cancellation without the client's cancel note is treated as the coach's. Only a client's own cancellation inside 48 hours is charged.
+**Why:** Clients shouldn't pay for a session the coach called off. Treating an unattributed cancellation as the coach's errs in the client's favour.
+**Affects:** webhook cancel handling, transaction metadata (cancelledBy), test script.
+
+### DECISION: Which emails come from Sharetribe and which from Postmark
+**Date:** Nov 5, 2026
+**Decision:** Sharetribe sends: Accepted request (client, "You're booked"), Operator accepted request (coach, "You've got a session"), Operator declined request and Expired request (client, "That one didn't go through, and you haven't been charged"), cancellation emails to client and coach, late-cancellation emails to client and coach (release-4), Money paid, and review emails (not for late-cancelled sessions). Postmark sends reschedule and reminder emails only. Nylas Scheduler's own emails are off. Klaviyo is marketing only.
+**Why:** Release-4 gives late cancellations a Sharetribe transition, so Sharetribe can email them; Postmark only fills what Sharetribe can't (reschedule times, reminders).
+**Affects:** transaction process release-4, Console Email texts, server/email (Postmark).
+
 ### DECISION: Semantic colours
 **Date:** Nov 4, 2026
 **Decision:** Success uses Forest text. Warnings use an orange tag with a maroon label. Errors use #B8000A text, the only colour outside the brand palette, reserved for errors. All three clear 4.5:1 on cream.
@@ -18,12 +36,6 @@ Newest at the top. When the planning project settles something, it produces a `#
 **Decision:** Revie's production Nylas application is in the EU region (api.eu.nylas.com), on the Essentials plan, with Revie's own Google OAuth client and only the calendar.readonly and calendar.events scopes (no email or contacts). Dev moves from the US sandbox to this app; the hello@revie.love test calendar is reconnected, configurations are recreated, and the webhook destination is re-created on the EU app.
 **Why:** Coach calendar data stays in the EU, matching the Frankfurt servers. The region is fixed per app and grants can't be migrated, so it had to be chosen before real coaches connect.
 **Affects:** NYLAS_API_KEY, NYLAS_CLIENT_ID, NYLAS_API_BASE_URL (https://api.eu.nylas.com), NYLAS_WEBHOOK_SECRET on Render; Google Cloud redirect URI; Google verification scope list; docs/tech-constraints.md Nylas section.
-
-### DECISION: Which emails come from Sharetribe and which from Postmark
-**Date:** Oct 28, 2026
-**Decision:** Sharetribe (release-3) sends: Accepted request (client, "You're booked"), Operator accepted request (coach, "You've got a session", with a fixed-length body), Operator declined request and Expired request (client, "That one didn't go through, and you haven't been charged"), cancellation emails to client and coach (new in release-3), Money paid, and the review emails. New request and Declined request aren't sent. Postmark sends late-cancellation, reschedule and reminder emails only. Nylas Scheduler's own emails are off (disable_emails). Klaviyo is marketing only.
-**Why:** Release-2 had no cancellation email; the only one in testing came from Nylas, now turned off. Sharetribe templates cover normal cancellations with no new service; Postmark fills only what Sharetribe can't.
-**Affects:** transaction process release-3 (Dev and Test now, Live at cutover), Console Email texts, BOOKING_PROCESS_ALIAS on Render, server/email (Postmark).
 
 ### DECISION: Edit Dev's Console directly until cutover
 **Date:** Oct 28, 2026

@@ -24,7 +24,6 @@ import {
   getLateCancellation,
   LATE_CANCELLATION_FEED_ITEM,
   LATE_CANCELLED,
-  LATE_CANCELLED_BY_COACH,
 } from '../../../transactions/lateCancellation';
 
 import css from './ActivityFeed.module.css';
@@ -257,11 +256,13 @@ export const ActivityFeed = props => {
   );
   const todayString = intl.formatMessage({ id: 'TransactionPage.ActivityFeed.today' });
 
-  // Revie: a late cancellation is not a Sharetribe transition (the transaction deliberately stays
+  // Revie: a release-3 late cancellation is not a Sharetribe transition (the transaction stays
   // `accepted`), so it is added to the feed as a stand-in one, dated from the transaction metadata.
+  // Release-4 has a real `transition/late-cancel`, which the feed already lists.
   const lateCancellation = getLateCancellation(transaction);
+  const hasRealLateCancel = transitions.some(t => t.transition === 'transition/late-cancel');
   const feedTransitions =
-    lateCancellation && [LATE_CANCELLED, LATE_CANCELLED_BY_COACH].includes(stateData.processState)
+    lateCancellation && !hasRealLateCancel && stateData.processState === LATE_CANCELLED
       ? [
           ...relevantTransitions,
           {

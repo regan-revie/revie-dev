@@ -7,16 +7,19 @@
  * The policy, decided with Regan and recorded in CLAUDE.md:
  *  - booking.created   → confirm the transaction, capturing payment. Coaches do not approve
  *                        bookings; the calendar already said they were free.
- *  - booking.cancelled → more than 48 hours out, refund. Inside 48 hours, do nothing at all: the
- *                        transaction completes by itself at booking-end + 2 days, so the client
- *                        keeps their charge and the coach is paid.
+ *  - booking.cancelled → a cancellation by the coach (no client note) always refunds, at any time.
+ *                        A client cancelling more than 48 hours out is refunded. A client
+ *                        cancelling inside 48 hours runs transition/late-cancel (release-4): they
+ *                        keep the charge and the coach is paid by a time-triggered payout. On a
+ *                        release-3 transaction, which has no such transition, nothing changes in
+ *                        Sharetribe and only the metadata records it.
  */
 
 const db = require('./db');
 const {
   applyTransition,
   updateTransactionMetadata,
-  getTransactionMetadata,
+  getTransactionBasics,
   isConfigured: integrationConfigured,
 } = require('./integration');
 const { isFreeCancellation, TRANSACTION_FIELD } = require('./scheduler');
@@ -79,24 +82,49 @@ const extractBookingId = data => data?.booking_id ?? data?.bookingId ?? data?.id
  *
  * @returns {Promise<{handled: boolean, reason?: string, action?: string}>}
  */
+/** Transitions that mean a late cancellation has already been made on a release-4 transaction. */
+const LATE_CANCEL_TRANSITIONS = ['transition/late-cancel', 'transition/complete-late-cancelled'];
+
 /**
- * Mark a transaction as late-cancelled in its metadata: `lateCancelledAt` (ISO time) and
- * `cancelledBy` ('client' when the client used our cancel button, which leaves a
- * `cancelRequestedBy` marker first; otherwise 'coach', as only the coach can cancel from their own
- * calendar).
- *
- * Throws on failure so the webhook answers 500 and Nylas redelivers it. Safe to repeat: the first
- * write wins, so a redelivery never moves the timestamp.
+ * Write who cancelled (and, for a late cancellation, when) onto the transaction's metadata, which
+ * Console shows and both parties receive. The first write wins, so a redelivered webhook never moves
+ * the time. Throws on failure so the webhook answers 500 and Nylas delivers it again.
  */
-const recordLateCancellation = async transactionId => {
-  const existing = await getTransactionMetadata(transactionId);
-  if (existing.lateCancelledAt) return;
+const recordCancellation = async (transactionId, metadata, { cancelledBy, late }) => {
+  if (metadata.cancelledBy && (!late || metadata.lateCancelledAt)) return;
 
   const result = await updateTransactionMetadata(transactionId, {
-    lateCancelledAt: new Date().toISOString(),
-    cancelledBy: existing.cancelRequestedBy === 'customer' ? 'client' : 'coach',
+    cancelledBy,
+    ...(late && !metadata.lateCancelledAt ? { lateCancelledAt: new Date().toISOString() } : {}),
   });
   if (!result.ok) throw result.error;
+};
+
+/**
+ * A client cancelled inside 48 hours: they are charged and the coach is still paid.
+ *
+ * Release-4 transactions get `transition/late-cancel`, which puts them in their own state (the
+ * payout then follows by itself, with no review prompts). A release-3 transaction has no such
+ * transition: Sharetribe answers 409, indistinguishable from "already made", so the transaction is
+ * re-read to tell the two apart. For release-3 nothing changes in Sharetribe and the metadata
+ * written afterwards is all that marks it (the UI reads it from there).
+ */
+const handleLateCancellation = async (transactionId, metadata) => {
+  const result = await applyTransition(transactionId, 'transition/late-cancel');
+  if (!result.ok && !result.alreadyApplied) throw result.error;
+
+  if (result.alreadyApplied) {
+    const current = await getTransactionBasics(transactionId);
+    // Moved on some other way (e.g. a refund) - leave it entirely alone.
+    if (
+      !LATE_CANCEL_TRANSITIONS.includes(current.lastTransition) &&
+      current.lastTransition !== 'transition/operator-accept' &&
+      current.lastTransition !== 'transition/complete'
+    ) {
+      return;
+    }
+  }
+  await recordCancellation(transactionId, metadata, { cancelledBy: 'client', late: true });
 };
 
 const handleBookingWebhook = async ({ trigger, data, grantId }) => {
@@ -152,18 +180,28 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
       throw new Error(`Cannot decide refund for booking ${bookingId}: no booking start time`);
     }
 
-    if (!isFreeCancellation({ bookingStart, cancelledAt: new Date() })) {
-      // Inside 48 hours: deliberately no transition. The transaction completes on its own and the
-      // client is charged, which is the policy. But Sharetribe knows nothing of the cancellation, so
-      // write it onto the transaction: the order page, inbox and Console read it from there.
-      await recordLateCancellation(mapping.sharetribe_transaction_id);
+    const transactionId = mapping.sharetribe_transaction_id;
+    const { metadata } = await getTransactionBasics(transactionId);
+
+    // Who cancelled. The client's cancel button leaves `cancelRequestedBy: customer` before it asks
+    // Nylas (cancelBookingEndpoint.js); a cancellation without that note can only have come from
+    // the coach's own calendar. Decided Nov 5, 2026: a coach cancellation always refunds the client,
+    // at any time; only the client's own cancellation inside 48 hours is charged.
+    const byClient = metadata.cancelRequestedBy === 'customer';
+    const late = byClient && !isFreeCancellation({ bookingStart, cancelledAt: new Date() });
+
+    if (late) {
+      await handleLateCancellation(transactionId, metadata);
       return { handled: true, action: 'charged-late-cancellation' };
     }
 
-    const result = await applyTransition(mapping.sharetribe_transaction_id, 'transition/cancel');
-    if (result.alreadyApplied) return { handled: true, action: 'already-cancelled' };
-    if (!result.ok) throw result.error;
-    return { handled: true, action: 'refunded' };
+    const result = await applyTransition(transactionId, 'transition/cancel');
+    if (!result.ok && !result.alreadyApplied) throw result.error;
+    await recordCancellation(transactionId, metadata, {
+      cancelledBy: byClient ? 'client' : 'provider',
+      late: false,
+    });
+    return { handled: true, action: result.alreadyApplied ? 'already-cancelled' : 'refunded' };
   }
 
   if (trigger === 'booking.rescheduled') {
