@@ -20,6 +20,13 @@ import { Message, OwnMessage } from '../Message/Message';
 
 import { stateDataShape } from '../TransactionPage.stateData';
 
+import {
+  getLateCancellation,
+  LATE_CANCELLATION_FEED_ITEM,
+  LATE_CANCELLED,
+  LATE_CANCELLED_BY_COACH,
+} from '../../../transactions/lateCancellation';
+
 import css from './ActivityFeed.module.css';
 
 const { Money } = sdkTypes;
@@ -250,9 +257,24 @@ export const ActivityFeed = props => {
   );
   const todayString = intl.formatMessage({ id: 'TransactionPage.ActivityFeed.today' });
 
+  // Revie: a late cancellation is not a Sharetribe transition (the transaction deliberately stays
+  // `accepted`), so it is added to the feed as a stand-in one, dated from the transaction metadata.
+  const lateCancellation = getLateCancellation(transaction);
+  const feedTransitions =
+    lateCancellation && [LATE_CANCELLED, LATE_CANCELLED_BY_COACH].includes(stateData.processState)
+      ? [
+          ...relevantTransitions,
+          {
+            transition: LATE_CANCELLATION_FEED_ITEM,
+            createdAt: lateCancellation.at,
+            by: TX_TRANSITION_ACTOR_OPERATOR,
+          },
+        ]
+      : relevantTransitions;
+
   // combine messages and transaction transitions
   const hideOldTransitions = hasOlderMessages || fetchMessagesInProgress;
-  const items = organizedItems(messages, relevantTransitions, hideOldTransitions);
+  const items = organizedItems(messages, feedTransitions, hideOldTransitions);
 
   const messageListItem = message => {
     const formattedDate = formatDateWithProximity(message.attributes.createdAt, intl, todayString, {
@@ -301,7 +323,10 @@ export const ActivityFeed = props => {
 
     if (currentUser?.id && customer?.id && provider?.id && listing?.id) {
       const transitionName = transition.transition;
-      const nextState = process.getStateAfterTransition(transition.transition);
+      const isLateCancellationItem = transitionName === LATE_CANCELLATION_FEED_ITEM;
+      const nextState = isLateCancellationItem
+        ? stateData.processState
+        : process.getStateAfterTransition(transition.transition);
       const isCustomerReview = process.isCustomerReview(transitionName);
       const isProviderRieview = process.isProviderReview(transitionName);
       const reviewEntity = isCustomerReview

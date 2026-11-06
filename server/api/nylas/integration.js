@@ -78,6 +78,35 @@ const applyTransition = async (transactionId, transition, params = {}) => {
 };
 
 /**
+ * Merge keys into a transaction's `metadata` (the operator-written, party-readable bag that shows in
+ * Console and is returned to both parties by the Marketplace API). Existing keys not named here are
+ * kept; a key set to null is removed.
+ *
+ * @param {string} transactionId
+ * @param {object} metadata
+ * @returns {Promise<{ok: boolean, error?: Error}>}
+ */
+const updateTransactionMetadata = async (transactionId, metadata) => {
+  const sdk = getIntegrationSdk();
+  if (!sdk)
+    return { ok: false, error: new Error('Integration API credentials are not configured') };
+  try {
+    await sdk.transactions.updateMetadata({ id: transactionId, metadata });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e };
+  }
+};
+
+/** A transaction's current `metadata`, read as the operator. Empty object when there is none. */
+const getTransactionMetadata = async transactionId => {
+  const sdk = getIntegrationSdk();
+  if (!sdk) throw new Error('Integration API credentials are not configured');
+  const response = await sdk.transactions.show({ id: transactionId });
+  return response.data.data.attributes?.metadata || {};
+};
+
+/**
  * Load a transaction with its listing, booking and customer, as the operator.
  *
  * The payment-failure recovery runs from the browser's call and from a timer with no user at all,
@@ -150,6 +179,8 @@ module.exports = {
   isConfigured,
   getIntegrationSdk,
   applyTransition,
+  updateTransactionMetadata,
+  getTransactionMetadata,
   loadTransactionAsOperator,
   findPaidUnconfirmedTransactions,
 };

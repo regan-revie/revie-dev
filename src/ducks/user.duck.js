@@ -10,6 +10,7 @@ import {
   getStatesNeedingCustomerAttention,
 } from '../transactions/transaction';
 
+import { isLateCancelled } from '../transactions/lateCancellation';
 import { authInfo } from './auth.duck';
 import { updateStripeConnectAccount } from './stripeConnectAccount.duck';
 
@@ -137,8 +138,12 @@ const fetchCurrentUserNotificationsPayloadCreator = (_, { extra: sdk, rejectWith
     sdk.transactions.query(paramsForOrders),
   ])
     .then(([sales, orders]) => {
-      const saleNotificationsCount = sales.data.data.length;
-      const orderNotificationsCount = orders.data.data.length;
+      // Revie: a late-cancelled session sits in `accepted`/`delivered` as far as Sharetribe is
+      // concerned, so the state filter above still returns it (a "leave a review" for the client).
+      // It is a cancelled session, nothing is waiting on anyone, so it does not count.
+      const notCancelledLate = tx => !isLateCancelled(tx);
+      const saleNotificationsCount = sales.data.data.filter(notCancelledLate).length;
+      const orderNotificationsCount = orders.data.data.filter(notCancelledLate).length;
       return { saleNotificationsCount, orderNotificationsCount };
     })
     .catch(e => rejectWithValue(storableError(e)));

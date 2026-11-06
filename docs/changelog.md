@@ -19,6 +19,29 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-05 (late-cancellation visibility)
+
+**Branch / PR:** `late-cancel-visibility`, one PR, not merged. No process change, nothing pushed to Sharetribe.
+
+**Investigated (test transaction `6aed1131…`, cancelled by the client at 23:49:33 UTC, session 7 Nov 00:00 UTC):** Render shows the webhook arriving, signed correctly, and ending `booking.cancelled -> charged-late-cancellation`. **The calendar event is gone**: the coach's calendar has no events in that slot (read-only check against Nylas EU). Sharetribe still says `accepted` and will auto-complete about 9 Nov 01:00 UTC (booking end + 2 days), paying the coach, and send both sides the review emails.
+
+**What changed (code only)**
+1. The `booking.cancelled` webhook writes `lateCancelledAt` and `cancelledBy` (`client` / `coach`) onto the Sharetribe transaction's metadata (visible in Console). Written once; a redelivered webhook does not move the time; a failed write makes the webhook fail so Nylas delivers it again. The client's cancel button leaves `cancelRequestedBy: 'customer'` first (removed again if Nylas refuses).
+2. A late-cancelled session now shows as cancelled: order-page heading ("Session cancelled." / coach: "{client} cancelled late. You'll still be paid.") plus a line saying the charge stands; inbox status ("Cancelled, charged" / "Cancelled late, you'll be paid"), not "Booked" and not "Leave a review"; the activity feed gets a cancellation entry and the later automatic completion reads as a charge/payout; the review button and link are gone on the page; the topbar count no longer counts it.
+3. After the client cancels, the order page re-reads the transaction at 3, 8 and 20 seconds so the heading catches up with the webhook without a reload.
+4. New repo-owned translation keys only (`late-cancelled`, `late-cancelled-by-coach`); Console shadows none of them.
+
+**Not fixed, needs a process version (plan below, not built):** Sharetribe's own review emails on `transition/complete`, and the `Accepted`/`Delivered` state in Console.
+
+**What's next**
+- Regan decides on the release-4 plan (a `late-cancel` operator transition into its own state, with a time-triggered payout and no review notifications, and the cancellation emails that do not exist today). Existing transactions stay on release-3, so the code above remains the safety net for them.
+- Product decision: a **coach** who cancels inside 48 hours from their calendar also leaves the client charged, because the webhook cannot tell a coach-cancel from a client-cancel except by our note. The UI now says so honestly ("cancelled by you" / "{coach} cancelled"), but the policy itself is unchosen.
+
+**Blocked / needs a decision**
+- Release-4 go-ahead (above).
+
+---
+
 ## HANDOFF — 2026-11-05 (create-booking customer check, sweeper cutoff, order-page retry)
 
 **Branch / PR:** `create-booking-fix`, one PR, not merged. Keeps the PR #15 logging.

@@ -13,7 +13,12 @@
  */
 
 const db = require('./db');
-const { applyTransition, isConfigured: integrationConfigured } = require('./integration');
+const {
+  applyTransition,
+  updateTransactionMetadata,
+  getTransactionMetadata,
+  isConfigured: integrationConfigured,
+} = require('./integration');
 const { isFreeCancellation, TRANSACTION_FIELD } = require('./scheduler');
 const { cancelIfDeclined } = require('./bookingRecovery');
 
@@ -74,6 +79,26 @@ const extractBookingId = data => data?.booking_id ?? data?.bookingId ?? data?.id
  *
  * @returns {Promise<{handled: boolean, reason?: string, action?: string}>}
  */
+/**
+ * Mark a transaction as late-cancelled in its metadata: `lateCancelledAt` (ISO time) and
+ * `cancelledBy` ('client' when the client used our cancel button, which leaves a
+ * `cancelRequestedBy` marker first; otherwise 'coach', as only the coach can cancel from their own
+ * calendar).
+ *
+ * Throws on failure so the webhook answers 500 and Nylas redelivers it. Safe to repeat: the first
+ * write wins, so a redelivery never moves the timestamp.
+ */
+const recordLateCancellation = async transactionId => {
+  const existing = await getTransactionMetadata(transactionId);
+  if (existing.lateCancelledAt) return;
+
+  const result = await updateTransactionMetadata(transactionId, {
+    lateCancelledAt: new Date().toISOString(),
+    cancelledBy: existing.cancelRequestedBy === 'customer' ? 'client' : 'coach',
+  });
+  if (!result.ok) throw result.error;
+};
+
 const handleBookingWebhook = async ({ trigger, data, grantId }) => {
   const bookingId = extractBookingId(data);
   if (!bookingId) return { handled: false, reason: 'no-booking-id' };
@@ -129,7 +154,9 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
 
     if (!isFreeCancellation({ bookingStart, cancelledAt: new Date() })) {
       // Inside 48 hours: deliberately no transition. The transaction completes on its own and the
-      // client is charged, which is the policy.
+      // client is charged, which is the policy. But Sharetribe knows nothing of the cancellation, so
+      // write it onto the transaction: the order page, inbox and Console read it from there.
+      await recordLateCancellation(mapping.sharetribe_transaction_id);
       return { handled: true, action: 'charged-late-cancellation' };
     }
 
