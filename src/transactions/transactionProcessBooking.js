@@ -48,6 +48,11 @@ export const transitions = {
   // Admin can also cancel the transition.
   CANCEL: 'transition/cancel',
 
+  // Revie, release-4: a client cancelling inside 48 hours is charged and the coach still paid.
+  // The server runs LATE_CANCEL when the cancellation arrives; the payout follows by itself.
+  LATE_CANCEL: 'transition/late-cancel',
+  COMPLETE_LATE_CANCELLED: 'transition/complete-late-cancelled',
+
   // The backend will mark the transaction completed.
   COMPLETE: 'transition/complete',
   OPERATOR_COMPLETE: 'transition/operator-complete',
@@ -83,6 +88,8 @@ export const states = {
   ACCEPTED: 'accepted',
   EXPIRED: 'expired',
   CANCELED: 'canceled',
+  LATE_CANCELLED: 'late-cancelled',
+  LATE_CANCELLED_COMPLETED: 'late-cancelled-completed',
   DELIVERED: 'delivered',
   REVIEWED: 'reviewed',
   REVIEWED_BY_CUSTOMER: 'reviewed-by-customer',
@@ -144,12 +151,19 @@ export const graph = {
     [states.ACCEPTED]: {
       on: {
         [transitions.CANCEL]: states.CANCELED,
+        [transitions.LATE_CANCEL]: states.LATE_CANCELLED,
         [transitions.COMPLETE]: states.DELIVERED,
         [transitions.OPERATOR_COMPLETE]: states.DELIVERED,
       },
     },
 
     [states.CANCELED]: {},
+    [states.LATE_CANCELLED]: {
+      on: {
+        [transitions.COMPLETE_LATE_CANCELLED]: states.LATE_CANCELLED_COMPLETED,
+      },
+    },
+    [states.LATE_CANCELLED_COMPLETED]: { type: 'final' },
     [states.DELIVERED]: {
       on: {
         [transitions.EXPIRE_REVIEW_PERIOD]: states.REVIEWED,
@@ -182,8 +196,10 @@ export const isRelevantPastTransition = transition => {
     transitions.ACCEPT,
     transitions.OPERATOR_ACCEPT,
     transitions.CANCEL,
+    transitions.LATE_CANCEL,
     transitions.COMPLETE,
     transitions.OPERATOR_COMPLETE,
+    transitions.COMPLETE_LATE_CANCELLED,
     transitions.CONFIRM_PAYMENT,
     transitions.DECLINE,
     transitions.OPERATOR_DECLINE,

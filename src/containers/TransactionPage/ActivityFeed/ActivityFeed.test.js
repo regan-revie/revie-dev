@@ -265,6 +265,26 @@ describe('ActivityFeed for a late-cancelled session', () => {
     ).toBeInTheDocument();
   });
 
+  it('lists a real release-4 late-cancel transition once, without adding a stand-in', () => {
+    const props = feedProps('late-cancelled', {
+      lateCancelledAt: '2026-11-05T23:49:33.000Z',
+      cancelledBy: 'client',
+    });
+    props.transaction.attributes.transitions.push(
+      createTxTransition({
+        createdAt: new Date(Date.UTC(2026, 10, 5, 23, 49, 33)),
+        by: 'operator',
+        transition: bookingTransitions.LATE_CANCEL,
+      })
+    );
+    render(<ActivityFeed {...props} />);
+    const items = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(items.length).toBe(2);
+    expect(
+      within(items[1]).getByText('TransactionPage.ActivityFeed.default-booking.late-cancelled')
+    ).toBeInTheDocument();
+  });
+
   it('adds nothing for an ordinary booking', () => {
     render(<ActivityFeed {...feedProps('accepted', {})} />);
     expect(within(screen.getByRole('list')).getAllByRole('listitem').length).toBe(1);

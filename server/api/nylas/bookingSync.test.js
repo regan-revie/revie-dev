@@ -7,7 +7,10 @@ jest.mock('./db', () => ({
 jest.mock('./integration', () => ({
   isConfigured: jest.fn(() => true),
   applyTransition: jest.fn(async () => ({ ok: true, transaction: {} })),
-  getTransactionMetadata: jest.fn(async () => ({})),
+  getTransactionBasics: jest.fn(async () => ({
+    metadata: {},
+    lastTransition: 'transition/operator-accept',
+  })),
   updateTransactionMetadata: jest.fn(async () => ({ ok: true })),
 }));
 
@@ -18,7 +21,7 @@ jest.mock('./bookingRecovery', () => ({
 const db = require('./db');
 const {
   applyTransition,
-  getTransactionMetadata,
+  getTransactionBasics,
   updateTransactionMetadata,
 } = require('./integration');
 const { cancelIfDeclined } = require('./bookingRecovery');
@@ -37,7 +40,10 @@ beforeEach(() => {
   db.isAvailable.mockReturnValue(true);
   require('./integration').isConfigured.mockReturnValue(true);
   applyTransition.mockResolvedValue({ ok: true, transaction: {} });
-  getTransactionMetadata.mockResolvedValue({});
+  getTransactionBasics.mockResolvedValue({
+    metadata: {},
+    lastTransition: 'transition/operator-accept',
+  });
   updateTransactionMetadata.mockResolvedValue({ ok: true });
   cancelIfDeclined.mockResolvedValue(false);
 });
@@ -170,83 +176,108 @@ describe('booking.created', () => {
 describe('booking.cancelled', () => {
   const cancelled = { trigger: 'booking.cancelled', grantId: 'g1', data: { booking_id: BOOKING } };
   const startingIn = hours => new Date(Date.now() + hours * 3600000);
-
-  it('refunds a cancellation more than 48 hours out', async () => {
+  const mapping = hours =>
     db.findByBookingId.mockResolvedValue({
       sharetribe_transaction_id: TX,
-      booking_start: startingIn(72),
+      booking_start: startingIn(hours),
     });
-    const result = await handleBookingWebhook(cancelled);
-    expect(applyTransition).toHaveBeenCalledWith(TX, 'transition/cancel');
-    expect(result).toEqual({ handled: true, action: 'refunded' });
+  const tx = (metadata, lastTransition = 'transition/operator-accept') =>
+    getTransactionBasics.mockResolvedValue({ metadata, lastTransition });
+  const clientNote = { cancelRequestedBy: 'customer' };
+
+  describe('by the coach (no client note)', () => {
+    it('refunds the client more than 48 hours out and records the coach as the canceller', async () => {
+      mapping(72);
+      const result = await handleBookingWebhook(cancelled);
+      expect(applyTransition).toHaveBeenCalledWith(TX, 'transition/cancel');
+      expect(updateTransactionMetadata).toHaveBeenCalledWith(TX, { cancelledBy: 'provider' });
+      expect(result).toEqual({ handled: true, action: 'refunded' });
+    });
+
+    it('refunds the client just as fully inside 48 hours - a coach cancellation is never charged', async () => {
+      mapping(2);
+      const result = await handleBookingWebhook(cancelled);
+      expect(applyTransition).toHaveBeenCalledWith(TX, 'transition/cancel');
+      expect(applyTransition).not.toHaveBeenCalledWith(TX, 'transition/late-cancel');
+      expect(updateTransactionMetadata).toHaveBeenCalledWith(TX, { cancelledBy: 'provider' });
+      expect(result.action).toBe('refunded');
+    });
   });
 
-  it('charges a cancellation inside 48 hours by doing nothing at all', async () => {
-    // The transaction completes by itself at booking-end + 2 days, so the client keeps their charge
-    // and the coach is paid. Calling any transition here would undo that.
-    db.findByBookingId.mockResolvedValue({
-      sharetribe_transaction_id: TX,
-      booking_start: startingIn(12),
+  describe('by the client', () => {
+    it('refunds a cancellation more than 48 hours out and notes the client', async () => {
+      mapping(72);
+      tx(clientNote);
+      const result = await handleBookingWebhook(cancelled);
+      expect(applyTransition).toHaveBeenCalledWith(TX, 'transition/cancel');
+      expect(updateTransactionMetadata).toHaveBeenCalledWith(TX, { cancelledBy: 'client' });
+      expect(result).toEqual({ handled: true, action: 'refunded' });
     });
-    const result = await handleBookingWebhook(cancelled);
-    expect(applyTransition).not.toHaveBeenCalled();
-    expect(result).toEqual({ handled: true, action: 'charged-late-cancellation' });
-  });
 
-  describe('recording a late cancellation on the transaction', () => {
-    const late = () =>
-      db.findByBookingId.mockResolvedValue({
-        sharetribe_transaction_id: TX,
-        booking_start: startingIn(12),
-      });
-
-    it('writes lateCancelledAt and attributes it to the client when they used our cancel button', async () => {
-      late();
-      getTransactionMetadata.mockResolvedValue({ cancelRequestedBy: 'customer' });
-      await handleBookingWebhook(cancelled);
+    it('runs transition/late-cancel inside 48 hours and never the refunding cancel', async () => {
+      mapping(12);
+      tx(clientNote);
+      const result = await handleBookingWebhook(cancelled);
+      expect(applyTransition).toHaveBeenCalledTimes(1);
+      expect(applyTransition).toHaveBeenCalledWith(TX, 'transition/late-cancel');
       expect(updateTransactionMetadata).toHaveBeenCalledWith(TX, {
-        lateCancelledAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
         cancelledBy: 'client',
+        lateCancelledAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
       });
+      expect(result).toEqual({ handled: true, action: 'charged-late-cancellation' });
     });
 
-    it('attributes it to the coach when nobody left a requester note (cancelled in their calendar)', async () => {
-      late();
+    it('on a release-3 transaction (409, still accepted) changes nothing in Sharetribe but records it in metadata', async () => {
+      mapping(12);
+      tx(clientNote, 'transition/operator-accept');
+      applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
       await handleBookingWebhook(cancelled);
+      expect(applyTransition).toHaveBeenCalledTimes(1);
       expect(updateTransactionMetadata).toHaveBeenCalledWith(
         TX,
-        expect.objectContaining({ cancelledBy: 'coach' })
+        expect.objectContaining({
+          cancelledBy: 'client',
+          lateCancelledAt: expect.any(String),
+        })
       );
     });
 
     it('does not move the timestamp when the webhook is delivered again', async () => {
-      late();
-      getTransactionMetadata.mockResolvedValue({ lateCancelledAt: '2026-11-05T23:49:33.000Z' });
+      mapping(12);
+      tx(
+        { ...clientNote, cancelledBy: 'client', lateCancelledAt: '2026-11-05T23:49:33.000Z' },
+        'transition/late-cancel'
+      );
+      applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+      await handleBookingWebhook(cancelled);
+      expect(updateTransactionMetadata).not.toHaveBeenCalled();
+    });
+
+    it('leaves a transaction alone that something else has already moved on', async () => {
+      mapping(12);
+      tx(clientNote, 'transition/cancel');
+      applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
       await handleBookingWebhook(cancelled);
       expect(updateTransactionMetadata).not.toHaveBeenCalled();
     });
 
     it('fails the webhook if the metadata cannot be written, so Nylas delivers it again', async () => {
-      late();
+      mapping(12);
+      tx(clientNote);
       updateTransactionMetadata.mockResolvedValue({ ok: false, error: new Error('boom') });
       await expect(handleBookingWebhook(cancelled)).rejects.toThrow('boom');
     });
 
-    it('writes nothing for a free cancellation', async () => {
-      db.findByBookingId.mockResolvedValue({
-        sharetribe_transaction_id: TX,
-        booking_start: startingIn(72),
-      });
-      await handleBookingWebhook(cancelled);
-      expect(updateTransactionMetadata).not.toHaveBeenCalled();
+    it('fails the webhook when late-cancel itself fails for a real reason', async () => {
+      mapping(12);
+      tx(clientNote);
+      applyTransition.mockResolvedValue({ ok: false, error: new Error('stripe down') });
+      await expect(handleBookingWebhook(cancelled)).rejects.toThrow('stripe down');
     });
   });
 
   it('always marks the booking cancelled, whichever side of the window', async () => {
-    db.findByBookingId.mockResolvedValue({
-      sharetribe_transaction_id: TX,
-      booking_start: startingIn(12),
-    });
+    mapping(12);
     await handleBookingWebhook(cancelled);
     expect(db.setStatus).toHaveBeenCalledWith(BOOKING, 'cancelled');
   });

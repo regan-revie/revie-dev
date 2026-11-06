@@ -56,14 +56,14 @@ describe('POST /api/nylas/cancel-booking', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('still cancels when the note cannot be written', async () => {
+  it('refuses to cancel when the note cannot be written, so a late cancel is never refunded as a coach one', async () => {
     updateTransactionMetadata.mockResolvedValue({ ok: false, error: new Error('down') });
     const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const res = makeRes();
     await handler({ body: { transactionId: 'tx-1' } }, res);
 
-    expect(cancelBooking).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(cancelBooking).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(502);
     spy.mockRestore();
   });
 

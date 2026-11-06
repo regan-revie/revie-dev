@@ -1,4 +1,4 @@
-import { getLateCancellation, isLateCancelled, lateCancelledState } from './lateCancellation';
+import { getLateCancellation, isLateCancelled } from './lateCancellation';
 
 const tx = metadata => ({ attributes: { metadata } });
 
@@ -11,10 +11,12 @@ describe('getLateCancellation()', () => {
     expect(result.at.toISOString()).toBe('2026-11-05T23:49:33.000Z');
   });
 
-  it('treats anything but "client" as the coach, since only the coach can cancel from a calendar', () => {
-    expect(getLateCancellation(tx({ lateCancelledAt: '2026-11-05T23:49:33.000Z' })).by).toBe(
-      'coach'
-    );
+  it('reports a provider cancellation as such', () => {
+    expect(
+      getLateCancellation(
+        tx({ lateCancelledAt: '2026-11-05T23:49:33.000Z', cancelledBy: 'provider' })
+      ).by
+    ).toBe('provider');
   });
 
   it('is null for ordinary transactions, missing metadata and unreadable dates', () => {
@@ -23,16 +25,5 @@ describe('getLateCancellation()', () => {
     expect(getLateCancellation({})).toBeNull();
     expect(getLateCancellation(null)).toBeNull();
     expect(isLateCancelled(tx({ lateCancelledAt: 'not a date' }))).toBe(false);
-  });
-});
-
-describe('lateCancelledState()', () => {
-  it('picks the state by who cancelled', () => {
-    expect(
-      lateCancelledState(tx({ lateCancelledAt: '2026-11-05T23:49:33.000Z', cancelledBy: 'client' }))
-    ).toBe('late-cancelled');
-    expect(
-      lateCancelledState(tx({ lateCancelledAt: '2026-11-05T23:49:33.000Z', cancelledBy: 'coach' }))
-    ).toBe('late-cancelled-by-coach');
   });
 });

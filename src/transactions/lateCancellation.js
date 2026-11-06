@@ -1,31 +1,28 @@
 /**
- * Late cancellations: a client cancelled a calendar session less than 48 hours before it started.
+ * Late cancellations: a client cancelled a calendar session less than 48 hours before it started,
+ * so they are charged and the coach is still paid.
  *
- * Sharetribe does not know. Policy is to charge, so the server deliberately makes no transition and
- * the transaction stays `accepted` (and later auto-completes, paying the coach). What it does is
- * write `lateCancelledAt` and `cancelledBy` into the transaction's metadata
- * (server/api/nylas/bookingSync.js), which both parties receive from the Marketplace API. The UI
- * reads them here and shows a cancelled session instead of a booked or completed one.
+ * On process release-4 and later the server runs `transition/late-cancel`, so the transaction is
+ * really in the `late-cancelled` state and no special handling is needed. Transactions that
+ * started on release-3 have no such transition; for those the server only writes `lateCancelledAt`
+ * and `cancelledBy` into the transaction metadata (server/api/nylas/bookingSync.js) and the
+ * transaction stays `accepted`, then auto-completes. This module recognises that case so the UI can
+ * show it as the late-cancelled session it is.
  */
 
-/** Pseudo-states used only to pick translation keys and UI behaviour; never sent to Sharetribe. */
+/** The state a late-cancelled session is shown as (a real state on release-4, derived on release-3). */
 export const LATE_CANCELLED = 'late-cancelled';
-export const LATE_CANCELLED_BY_COACH = 'late-cancelled-by-coach';
 
-/** Stands in for the cancellation in the activity feed, which lists transitions. */
+/** Stands in for the cancellation in the activity feed of a release-3 transaction. */
 export const LATE_CANCELLATION_FEED_ITEM = 'revie/late-cancelled';
 
-/** { at: Date, by: 'client' | 'coach' } when this transaction was late-cancelled, else null. */
+/** { at: Date, by: 'client' | 'provider' } from the transaction metadata, or null. */
 export const getLateCancellation = transaction => {
   const metadata = transaction?.attributes?.metadata;
   if (!metadata?.lateCancelledAt) return null;
   const at = new Date(metadata.lateCancelledAt);
   if (Number.isNaN(at.getTime())) return null;
-  return { at, by: metadata.cancelledBy === 'client' ? 'client' : 'coach' };
+  return { at, by: metadata.cancelledBy === 'provider' ? 'provider' : 'client' };
 };
 
 export const isLateCancelled = transaction => !!getLateCancellation(transaction);
-
-/** The pseudo-state a late-cancelled transaction is shown as. */
-export const lateCancelledState = transaction =>
-  getLateCancellation(transaction)?.by === 'coach' ? LATE_CANCELLED_BY_COACH : LATE_CANCELLED;

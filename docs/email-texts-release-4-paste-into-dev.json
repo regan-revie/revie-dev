@@ -1,0 +1,11 @@
+{
+  "BookingLateCancelledToCustomer.Subject": "Your session is cancelled.",
+  "BookingLateCancelledToCustomer.Title": "Session cancelled.",
+  "BookingLateCancelledToCustomer.Content": "It was less than 48 hours away, so you've still been charged. Your {listingTitle} session with {providerDisplayName} is off the calendar. Questions? Write to hello@heyrevie.com.",
+  "BookingLateCancelledToCustomer.Cta": "See your sessions",
+  "BookingLateCancelledToProvider.Subject": "{customerDisplayName} cancelled late. You'll still be paid.",
+  "BookingLateCancelledToProvider.Title": "{customerDisplayName} cancelled late.",
+  "BookingLateCancelledToProvider.Content": "You'll still be paid for {listingTitle}. The payment is released two days after the session time, as usual. Questions? Write to hello@heyrevie.com.",
+  "BookingLateCancelledToProvider.Cta": "See your sessions",
+  "BookingCanceledToProvider.ContentNeutral": "{listingTitle} with {customerDisplayName} is cancelled, and it's off your calendar."
+}
