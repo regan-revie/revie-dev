@@ -57,10 +57,20 @@ describe('inbox state data for a late-cancelled session', () => {
     });
   });
 
-  it('uses its own state when the coach is the one who cancelled', () => {
-    expect(lateDataFor(states.ACCEPTED, 'provider', 'coach').processState).toBe(
-      'late-cancelled-by-coach'
-    );
+  it('shows the real release-4 states the same way, with nothing to do in either', () => {
+    [states.LATE_CANCELLED, states.LATE_CANCELLED_COMPLETED].forEach(state => {
+      ['customer', 'provider'].forEach(role => {
+        const data = getStateDataForBookingProcess(
+          { transactionRole: role, transaction: { attributes: { metadata: {} } } },
+          { processName: 'default-booking', processState: state, states }
+        );
+        expect(data).toEqual({
+          processName: 'default-booking',
+          processState: 'late-cancelled',
+          isFinal: true,
+        });
+      });
+    });
   });
 
   it('leaves an ordinary booking alone', () => {

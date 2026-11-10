@@ -19,6 +19,31 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-05 (release-4: late cancellations get their own state)
+
+**Branch / PR:** `late-cancel-release-4`, one PR, not merged.
+
+**Process (pushed to Dev and Test only; Live untouched):** `default-booking` version 4, alias `release-4`, on `revie1-dev` and `revie1-test` (Console list shows 0 transactions on it in both when pushed). New: `transition/late-cancel` (operator, `accepted → late-cancelled`, no refund action, no `cancel-booking`), `transition/complete-late-cancelled` (time-triggered at booking end + 2 days, `stripe-create-payout`, into `late-cancelled-completed`), no review transition or notification on that path, late-cancellation emails to both sides, and the usual "money paid" email at the payout.
+
+**Dev listing:** the Test Session listing (`6aa17447…`) moved release-3 → **release-4** (status before: `default-booking/release-3`; after: `default-booking/release-4`; configuration, lengths and `calendarBookingEnabled` unchanged). Dev transaction `6aed1131…` (release-3, still accepted) now carries `lateCancelledAt` / `cancelledBy: client` in its metadata so the new UI shows on it.
+
+**Policy implemented (decisions of Nov 5):** the client's cancel button first writes `cancelRequestedBy: customer` (and now refuses to cancel if it cannot, so a late cancel can never be refunded as a coach one). The `booking.cancelled` webhook: no note = coach → `transition/cancel`, full refund at any time, `cancelledBy: provider`; note + over 48 h → refund, `cancelledBy: client`; note + inside 48 h → `transition/late-cancel`. A release-3 transaction answers 409 to `late-cancel` (same as "already made"), so the webhook re-reads the last transition and, for release-3, only writes the metadata; the UI still shows it as a late cancellation. The "coach-cancelled late" UI states from PR #17 are gone (a coach cancellation is a plain refund now).
+
+**Judgement call to check:** `BookingCanceledToProvider` used to say "{client} cancelled…"; `transition/cancel` now also runs for coach cancellations, so the coach email moved to a neutral new key `BookingCanceledToProvider.ContentNeutral` ("{listing} with {client} is cancelled, and it's off your calendar."). Release-3 transactions keep the old template.
+
+**Tests:** server and client suites pass (webhook decision table, cancel-note-required, release-3 fallback, real-state UI, activity feed).
+
+**Regan, to do**
+1. Merge, then check Render's `BOOKING_PROCESS_ALIAS` is `default-booking/release-4` (the Blueprint carries it; set it by hand on `revie-dev` if the Blueprint is not re-synced). Until then a *newly enabled* listing would be stamped release-3 (the Test Session listing is already on release-4).
+2. Paste `docs/email-texts-release-4-paste-into-dev.json` into Dev's Console Email texts (the late-cancel keys have in-template defaults, so emails work before the paste; the paste makes them editable).
+3. Run scenarios 7 and 8 in `docs/test-script-booking-recovery.md`.
+
+**What's next:** Postmark reschedule and reminder emails; at cutover, push release-4 to Live and set the alias on the production service (logged in `docs/go-live-plan.md`).
+
+**Blocked / needs a decision:** none.
+
+---
+
 ## HANDOFF — 2026-11-05 (late-cancellation visibility)
 
 **Branch / PR:** `late-cancel-visibility`, one PR, not merged. No process change, nothing pushed to Sharetribe.

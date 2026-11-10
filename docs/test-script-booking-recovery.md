@@ -140,7 +140,48 @@ A safe way to make every booking fail, for one listing only.
 
 Also book a second session and look at the **coach's "You've got a session"** email from the booking: it should now have a sentence naming the client and the time.
 
-**Not covered here:** a cancellation **inside 48 hours** sends no Sharetribe email by design (no transition runs). The Postmark email for that comes later.
+**Not covered here:** a cancellation **inside 48 hours** by the client (scenario 7, release-4) and a cancellation by the coach (scenario 8).
+
+---
+
+## Scenario 7: a late cancellation by the client (added Nov 5, release-4)
+
+**Before you start:** release-4 is on Dev and Test, the Dev Test Session listing is on it (`node scripts/dev-listing-test-helper.js status --listing <id>` shows `default-booking/release-4`), the nine keys in `docs/email-texts-release-4-paste-into-dev.json` are in Dev's Email texts, and the new code is deployed to Render. Use a client and a coach whose inboxes you can open, on **revie-dev.onrender.com**. Book a session that starts **less than 48 hours** from now (the booking notice must allow it; lower the listing's notice for the test if needed).
+
+**Do:**
+1. As the client, book it and wait until the order page says "You're booked."
+2. On the order page, cancel it and confirm (the confirmation says you will still be charged).
+3. Wait about 10 seconds, then look at both order pages and both inboxes.
+
+| Where | What you should see |
+|---|---|
+| **Client order page** | Heading "Session cancelled." with "It was less than 48 hours away, so you've still been charged for it." No review button. |
+| **Coach sale page** | Heading "{client} cancelled late. You'll still be paid." |
+| **Inbox** | Both sides: "Cancelled, charged" (client) / "Cancelled late, you'll be paid" (coach). Not "Booked", not "Leave a review"; the topbar dot does not light. |
+| **Client inbox (email)** | **One** email, "Your session is cancelled.", saying they are still charged. |
+| **Coach inbox (email)** | **One** email, "{client} cancelled late. You'll still be paid." |
+| **Console** | The transaction is in state **late-cancelled** (last transition `transition/late-cancel`), metadata `lateCancelledAt` and `cancelledBy: client`. |
+| **Stripe** | The charge stays; **no refund**. |
+| **Calendar** | The event is gone from the coach's calendar. |
+| **Later (booking end + 2 days)** | The transaction moves to `late-cancelled-completed`, the coach gets the "You have been paid" email, and **neither side gets a review email**. The payout transition is time-triggered only, so this part cannot be rushed from the app; Console shows it scheduled. |
+
+**Older transactions (release-3):** a late cancel on one of those leaves it `accepted` with the same metadata, and the pages above still read correctly; the review emails are the one thing that still go out.
+
+---
+
+## Scenario 8: the coach cancels from their calendar, at any time (added Nov 5)
+
+**Before you start:** as scenario 7. Book two sessions as the client: one **more than 48 hours** ahead, one **less than 48 hours** ahead.
+
+**Do:** for each, delete the event from the coach's Google Calendar (not from Revie). Wait about 10 seconds.
+
+| Where | What you should see |
+|---|---|
+| **Console** | State **cancelled** (last transition `transition/cancel`), metadata `cancelledBy: provider`, and **no** `lateCancelledAt`, for both sessions. |
+| **Stripe** | A **full refund** for both, including the one inside 48 hours. |
+| **Client** | The cancellation email with the refund, "Your session is cancelled." Order page heading "Session cancelled." |
+| **Coach** | "{listing} with {client} is cancelled, and it's off your calendar." (It does not say the client cancelled.) |
+| **Order page** | No "charged" wording anywhere. |
 
 ---
 

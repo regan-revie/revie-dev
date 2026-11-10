@@ -92,10 +92,20 @@ describe('a late-cancelled session on the transaction page', () => {
     ]);
   });
 
-  it('uses the coach-cancelled state when the coach cancelled', () => {
-    expect(dataFor(states.ACCEPTED, 'provider', 'coach').processState).toBe(
-      'late-cancelled-by-coach'
-    );
+  it('shows the real release-4 states as the same late-cancelled session', () => {
+    [states.LATE_CANCELLED, states.LATE_CANCELLED_COMPLETED].forEach(state => {
+      const data = getStateDataForBookingProcess(
+        {
+          transaction: { attributes: { metadata: {} } },
+          transactionRole: 'provider',
+          nextTransitions: [],
+        },
+        { ...processInfo, processState: state }
+      );
+      expect(data.processState).toBe('late-cancelled');
+      expect(data.showExtraInfo).toBe(true);
+      expect(data.showActionButtons).toBeUndefined();
+    });
   });
 
   it('is not triggered for an ordinary delivered booking', () => {
