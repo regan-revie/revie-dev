@@ -140,16 +140,18 @@ describe('filterSlotsByOpenHours()', () => {
     expect(filterSlotsByOpenHours([tooEarlyAfterDst], nineToFiveWeekdays, LONDON)).toHaveLength(0);
   });
 
-  it('leaves slots alone when no hours are declared', () => {
-    // A coach who has not set hours should still be bookable, not invisible.
-    const slots = [at('2026-09-19T03:00:00Z')];
-    expect(filterSlotsByOpenHours(slots, undefined, LA)).toHaveLength(1);
-    expect(
-      filterSlotsByOpenHours(slots, { days: [], start: '09:00', end: '17:00' }, LA)
-    ).toHaveLength(1);
-    expect(
-      filterSlotsByOpenHours(slots, { days: [1], start: 'nonsense', end: '17:00' }, LA)
-    ).toHaveLength(1);
+  it('falls back to Mon-Fri 9:00-17:00 when no usable hours are declared, never to "always"', () => {
+    // Nobody is ever offered 3am. A Saturday 03:00 slot and a Monday 17:00Z (10:00 LA) slot:
+    const saturday3am = at('2026-09-19T10:00:00Z'); // Sat 03:00 LA
+    const monday10am = at('2026-09-14T17:00:00Z'); // Mon 10:00 LA
+    [
+      undefined,
+      { days: [], start: '09:00', end: '17:00' },
+      { days: [1], start: 'nonsense', end: '17:00' },
+      { days: [1], start: '17:00', end: '09:00' },
+    ].forEach(hours => {
+      expect(filterSlotsByOpenHours([saturday3am, monday10am], hours, LA)).toEqual([monday10am]);
+    });
   });
 
   it('reads the weekday and time from the coach timezone, not UTC', () => {

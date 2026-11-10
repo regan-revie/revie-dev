@@ -153,6 +153,13 @@ export const nylasRescheduleBooking = ({ transactionId, start, end }) => {
   return post('/api/nylas/reschedule-booking', { transactionId, start, end });
 };
 
+// Make the logged-in coach's published session listings bookable now (configurations, hours,
+// calendar, process alias). The server also does this by itself every minute; this is for the moment
+// a coach saves their working hours. See server/api/nylas/syncMe.js.
+export const nylasSyncMe = () => {
+  return post('/api/nylas/sync-me', {});
+};
+
 // The session time to actually display: our own database once a reschedule has moved it,
 // Sharetribe's original booking record otherwise. See bookingStatusEndpoint.js.
 export const nylasBookingStatus = ({ transactionId }) => {

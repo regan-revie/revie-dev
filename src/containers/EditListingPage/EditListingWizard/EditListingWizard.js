@@ -84,7 +84,7 @@ const STRIPE_ONBOARDING_RETURN_URL_FAILURE = 'failure';
  * @param {Object} listingTypeConfig - The listing type configuration
  * @returns {Array<string>} - The allowed tabs for the given process and listing type configuration
  */
-const tabsForListingType = (processName, listingTypeConfig) => {
+export const tabsForListingType = (processName, listingTypeConfig) => {
   const locationMaybe = displayLocation(listingTypeConfig) ? [LOCATION] : [];
   const pricingMaybe = displayPrice(listingTypeConfig) ? [PRICING] : [];
   const deliveryMaybe =
@@ -92,6 +92,10 @@ const tabsForListingType = (processName, listingTypeConfig) => {
       ? [DELIVERY]
       : [];
   const styleOrPhotosTab = requireListingImage(listingTypeConfig) ? [PHOTOS] : [STYLE];
+  // Revie: a fixed-length session is booked through the coach's connected calendar and their working
+  // hours (Account settings > Calendar), not through an availability plan set per listing, so that
+  // step is not offered. The server writes the plan the listing still needs.
+  const availabilityMaybe = listingTypeConfig?.unitType === 'fixed' ? [] : [AVAILABILITY];
 
   // You can reorder these panels.
   // Note 1: You need to change save button translations for new listing flow
@@ -102,7 +106,13 @@ const tabsForListingType = (processName, listingTypeConfig) => {
   // Note 4: Ensure that the last panel contains the messaging for not-yet-verified files so
   //         that it is clear to the user why the 'publish' button is disabled during verification
   const tabs = {
-    ['default-booking']: [DETAILS, ...locationMaybe, PRICING, AVAILABILITY, ...styleOrPhotosTab],
+    ['default-booking']: [
+      DETAILS,
+      ...locationMaybe,
+      PRICING,
+      ...availabilityMaybe,
+      ...styleOrPhotosTab,
+    ],
     ['default-purchase']: [DETAILS, PRICING_AND_STOCK, ...deliveryMaybe, ...styleOrPhotosTab],
     ['default-negotiation']: [DETAILS, ...locationMaybe, ...pricingMaybe, ...styleOrPhotosTab],
     ['default-inquiry']: [DETAILS, ...locationMaybe, ...pricingMaybe, ...styleOrPhotosTab],

@@ -30,13 +30,14 @@ const connected = userWith({
   },
 });
 
-const renderPage = (currentUser, search = '', goTo = undefined) =>
+const renderPage = (currentUser, search = '', goTo = undefined, onSaveHours = jest.fn()) =>
   render(
     <CalendarSettingsPageComponent
       currentUser={currentUser}
       scrollingDisabled={false}
       location={{ search }}
       goTo={goTo}
+      onSaveHours={onSaveHours}
     />
   );
 
@@ -113,5 +114,14 @@ describe('CalendarSettingsPage', () => {
   it('shows no message on an ordinary visit', () => {
     renderPage(notConnected);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('shows the working hours section whether or not a calendar is connected', () => {
+    const { unmount } = renderPage(notConnected);
+    expect(screen.getByText('CalendarSettingsPage.hoursHeading')).toBeInTheDocument();
+    unmount();
+
+    renderPage(connected);
+    expect(screen.getByText('CalendarSettingsPage.hoursHeading')).toBeInTheDocument();
   });
 });

@@ -17,6 +17,7 @@
 
 const { API_BASE_URL } = require('./config');
 const { nylasRequest } = require('./client');
+const { normalizeSchedule, DEFAULT_HOURS } = require('./hours');
 
 /**
  * How long a Scheduler session stays valid. Short on purpose: a session is the capability to see
@@ -155,16 +156,14 @@ const toMinutes = hhmm => {
  * @param {{days: number[], start: string, end: string}} [openHours] days are 1-7, Monday first
  * @param {string} timeZone the coach's IANA zone
  */
-const filterSlotsByOpenHours = (slots, openHours, timeZone) => {
-  const start = openHours && toMinutes(openHours.start);
-  const end = openHours && toMinutes(openHours.end);
-  const days = openHours && openHours.days;
-
-  // No usable hours means no opinion, rather than silently blocking everything: a coach who has not
-  // declared hours should still be bookable, not invisible.
-  if (start == null || end == null || !Array.isArray(days) || days.length === 0) {
-    return slots || [];
-  }
+const filterSlotsByOpenHours = (slots, openHoursRaw, timeZone) => {
+  // No usable hours means Mon-Fri 9:00-17:00, never "always": a coach who has not declared hours is
+  // still bookable, but nobody is ever offered 3am. ensureBookable.js writes real hours onto every
+  // listing it sets up; this is the safety net for one it has not reached.
+  const openHours = normalizeSchedule(openHoursRaw) || DEFAULT_HOURS;
+  const start = toMinutes(openHours.start);
+  const end = toMinutes(openHours.end);
+  const days = openHours.days;
 
   return (slots || []).filter(slot => {
     const { weekday, minutes } = slotInCoachWeek(slot.start_time * 1000, timeZone);

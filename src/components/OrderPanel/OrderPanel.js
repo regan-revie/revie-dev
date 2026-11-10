@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useHistory } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import loadable from '@loadable/component';
 import classNames from 'classnames';
 
@@ -25,6 +26,7 @@ import {
 import { formatMoney } from '../../util/currency';
 import { createSlug, parse, stringify } from '../../util/urlHelpers';
 import { userDisplayNameAsString } from '../../util/data';
+import { getCalendarConnection } from '../../util/calendarConnection';
 import {
   OFFER,
   REQUEST,
@@ -37,7 +39,7 @@ import {
   resolveLatestProcessName,
 } from '../../transactions/transaction';
 
-import { ModalInMobile, PrimaryButton, AvatarSmall, H1, H2 } from '../../components';
+import { ModalInMobile, NamedLink, PrimaryButton, AvatarSmall, H1, H2 } from '../../components';
 import PriceVariantPicker from './PriceVariantPicker/PriceVariantPicker';
 import SubmitFinePrint from './SubmitFinePrint/SubmitFinePrint';
 
@@ -48,11 +50,6 @@ const BookingTimeForm = loadable(() =>
 );
 const BookingDatesForm = loadable(() =>
   import(/* webpackChunkName: "BookingDatesForm" */ './BookingDatesForm/BookingDatesForm')
-);
-const BookingFixedDurationForm = loadable(() =>
-  import(
-    /* webpackChunkName: "BookingFixedDurationForm" */ './BookingFixedDurationForm/BookingFixedDurationForm'
-  )
 );
 const NylasBookingForm = loadable(() =>
   import(/* webpackChunkName: "NylasBookingForm" */ './NylasBookingForm/NylasBookingForm')
@@ -100,12 +97,6 @@ const priceData = (price, currency, intl) => {
     };
   }
   return {};
-};
-
-const getCheapestPriceVariant = (priceVariants = []) => {
-  return priceVariants.reduce((cheapest, current) => {
-    return current.priceInSubunits < cheapest.priceInSubunits ? current : cheapest;
-  }, priceVariants[0]);
 };
 
 const formatMoneyIfSupportedCurrency = (price, intl) => {
@@ -204,6 +195,36 @@ const PriceMissing = () => {
     </p>
   );
 };
+
+// Revie: a session is booked through its coach's calendar, never through Sharetribe's own
+// availability plan. Until the server has set the listing up (it does so by itself once the coach
+// has connected a calendar, see server/api/nylas/reconcile.js) there is nothing to book.
+const NotTakingBookings = ({ isOwnListing }) => {
+  const currentUser = useSelector(state => state.user?.currentUser);
+  const { connected } = getCalendarConnection(currentUser);
+
+  if (!isOwnListing) {
+    return (
+      <p className={css.error}>
+        <FormattedMessage id="OrderPanel.notTakingBookings" />
+      </p>
+    );
+  }
+  // The coach looking at their own listing is told what to do, not that they are not ready.
+  return connected ? (
+    <p className={css.error}>
+      <FormattedMessage id="OrderPanel.ownListingSettingUp" />
+    </p>
+  ) : (
+    <p className={css.error}>
+      <FormattedMessage id="OrderPanel.ownListingConnectCalendar" />{' '}
+      <NamedLink name="CalendarSettingsPage">
+        <FormattedMessage id="OrderPanel.ownListingConnectCalendarLink" />
+      </NamedLink>
+    </p>
+  );
+};
+
 const InvalidCurrency = () => {
   return (
     <p className={css.error}>
@@ -349,13 +370,11 @@ const OrderPanel = props => {
   const calendarBookingEnabled = !!publicData?.calendarBookingEnabled;
   const showNylasBookingForm =
     mounted && shouldHaveFixedBookingDuration && !isClosed && timeZone && calendarBookingEnabled;
-  const showBookingFixedDurationForm =
-    mounted &&
-    shouldHaveFixedBookingDuration &&
-    !isClosed &&
-    timeZone &&
-    priceVariants?.length > 0 &&
-    !calendarBookingEnabled;
+  // Revie: a fixed-length session that is not (yet) set up for calendar booking shows a message, not
+  // the stock form that reads Sharetribe's availability plan. The message needs no timezone, since a
+  // listing the server has not reached has no plan yet.
+  const showNotTakingBookings =
+    mounted && shouldHaveFixedBookingDuration && !isClosed && !calendarBookingEnabled;
 
   const shouldHaveBookingTime = isBooking && [LINE_ITEM_HOUR].includes(lineItemUnitType);
   const showBookingTimeForm = mounted && shouldHaveBookingTime && !isClosed && timeZone;
@@ -414,12 +433,6 @@ const OrderPanel = props => {
         priceVariantFieldComponent: PriceVariantPicker,
         preselectedPriceVariant,
         isPublishedListing: isPublishedListing(listing),
-      }
-    : !isPriceVariationsInUse && showBookingFixedDurationForm
-    ? {
-        isPriceVariationsInUse: false,
-        priceVariants: [getCheapestPriceVariant(priceVariants)],
-        priceVariantFieldComponent: PriceVariantPicker,
       }
     : {};
 
@@ -514,22 +527,8 @@ const OrderPanel = props => {
             {...priceVariantsMaybe}
             {...sharedProps}
           />
-        ) : showBookingFixedDurationForm ? (
-          <BookingFixedDurationForm
-            seatsEnabled={seatsEnabled}
-            className={css.bookingForm}
-            formId="OrderPanelBookingFixedDurationForm"
-            dayCountAvailableForBooking={dayCountAvailableForBooking}
-            monthlyTimeSlots={monthlyTimeSlots}
-            timeSlotsForDate={timeSlotsForDate}
-            onFetchTimeSlots={onFetchTimeSlots}
-            startDatePlaceholder={intl.formatDate(TODAY, dateFormattingOptions)}
-            startTimeInterval={startTimeInterval}
-            timeZone={timeZone}
-            finePrintComponent={SubmitFinePrint}
-            {...priceVariantsMaybe}
-            {...sharedProps}
-          />
+        ) : showNotTakingBookings ? (
+          <NotTakingBookings isOwnListing={isOwnListing} />
         ) : showBookingTimeForm ? (
           <BookingTimeForm
             seatsEnabled={seatsEnabled}

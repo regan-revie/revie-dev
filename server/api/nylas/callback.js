@@ -13,6 +13,7 @@ const { getSdk, getTrustedSdk, createCookieTokenStore } = require('../../api-uti
 const { buildMarketplaceRedirectUrl } = require('../../api-util/url');
 const { exchangeCodeForGrant } = require('./client');
 const { handleGrantChange } = require('./grantChange');
+const { ensureOwnListings } = require('./ensureCoach');
 const { STATE_COOKIE, RETURN_PATH_COOKIE, callbackUri } = require('./connect');
 
 const ROOT_URL = process.env.REACT_APP_MARKETPLACE_ROOT_URL;
@@ -116,18 +117,43 @@ module.exports = (req, res) => {
     .then(grant => {
       // Reconnecting the same account keeps the same grant id and needs nothing. A different one
       // leaves the coach's listings pointing at the old calendar; handleGrantChange never throws.
-      if (previousGrantId && previousGrantId !== grant.grantId) {
-        return handleGrantChange({
-          sdk,
-          userId,
-          previousGrantId,
-          newGrantId: grant.grantId,
-          newGrantEmail: grant.email,
-          coachName: profile.displayName,
-          siteUrl: ROOT_URL,
-        }).catch(e => console.error(`[nylas] Grant change handling failed: ${e.message}`));
-      }
-      return null;
+      const changed =
+        previousGrantId && previousGrantId !== grant.grantId
+          ? handleGrantChange({
+              sdk,
+              userId,
+              previousGrantId,
+              newGrantId: grant.grantId,
+              newGrantEmail: grant.email,
+              coachName: profile.displayName,
+              siteUrl: ROOT_URL,
+            })
+          : Promise.resolve(null);
+
+      // Then make sure every session listing is set up on the calendar just connected. It uses the
+      // grant we have just stored (the profile read above is from before). A failure here only
+      // means the reconcile loop does it a minute later, so it never fails the connect.
+      return changed
+        .catch(e => console.error(`[nylas] Grant change handling failed: ${e.message}`))
+        .then(() =>
+          ensureOwnListings({
+            sdk,
+            userId,
+            profile: {
+              displayName: profile.displayName,
+              privateData: {
+                ...(profile.privateData || {}),
+                nylasGrantId: grant.grantId,
+                nylasGrantProvider: grant.provider,
+                nylasGrantEmail: grant.email,
+              },
+            },
+            siteUrl: ROOT_URL,
+          })
+        )
+        .catch(e =>
+          console.error(`[nylas] Setting up listings after connect failed: ${e.message}`)
+        );
     })
     .then(() => redirectBack(res, returnPathRaw, 'connected'))
     .catch(e => {
