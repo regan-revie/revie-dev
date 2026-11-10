@@ -231,6 +231,41 @@ const setStatus = async (nylasBookingId, status) => {
   return rows[0] || null;
 };
 
+/**
+ * Run `fn` only if nobody else holds the named lock, using a Postgres session advisory lock.
+ *
+ * Used to stop the reconcile loop, the Calendar page's sync and the Nylas callback from syncing the
+ * same coach at once (two would each create Nylas configurations for the same listing). The lock is
+ * held by one pooled connection for the duration of `fn` and released with it; if the process dies
+ * Postgres releases it when the connection drops. With no database (local development) there is
+ * nothing to coordinate with, so `fn` simply runs.
+ *
+ * @returns {Promise<{locked: boolean, value?: any}>} `locked: false` means someone else has it
+ */
+const withAdvisoryLock = async (key, fn) => {
+  const p = getPool();
+  if (!p) return { locked: true, value: await fn() };
+
+  const client = await p.connect();
+  let discard = false;
+  try {
+    const { rows } = await client.query('SELECT pg_try_advisory_lock(hashtext($1)) AS got', [key]);
+    if (!rows[0].got) return { locked: false };
+    try {
+      return { locked: true, value: await fn() };
+    } finally {
+      try {
+        await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key]);
+      } catch (e) {
+        // A connection that could not unlock must not go back in the pool still holding the lock.
+        discard = true;
+      }
+    }
+  } finally {
+    client.release(discard);
+  }
+};
+
 /** Close the pool. Used by tests; production keeps it open for the process lifetime. */
 const close = async () => {
   if (pool) {
@@ -246,6 +281,7 @@ module.exports = {
   findByBookingId,
   findByTransactionId,
   findUpcomingByGrantId,
+  withAdvisoryLock,
   setStatus,
   claimBookingAttempt,
   getBookingAttempt,

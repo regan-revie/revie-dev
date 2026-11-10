@@ -7,61 +7,19 @@
  *
  * Body: { listingId, eventTypeKey, calendarId?, minBookingNoticeMinutes? }
  *
- * Does four things, the last two of which are easy to miss:
- *  1. Pushes a Nylas Scheduler configuration for each session length the listing sells.
- *  2. Records the configuration ids and notice period on the listing, where the availability
- *     endpoint reads them.
- *  3. Writes the transaction process alias (BOOKING_PROCESS_ALIAS) onto the listing in that same
- *     update. Console cannot pin a listing type to a process version, and a transaction uses its
- *     listing's own alias, so this is what puts calendar listings on the process where the
- *     calendar - not the coach - confirms a booking. Refused up front if the setting is missing.
- *  4. Writes a permissive Sharetribe availability plan carrying the calendar's timezone - see
- *     below for why both halves of that matter.
+ * Now a thin wrapper: the work (configurations per session length, calendar, hours, notice, process
+ * alias, availability plan) is ensureBookable.js, which the server also runs automatically for every
+ * coach (reconcile.js), so this is only needed to choose a calendar or notice period explicitly.
+ * It always forces a sync and always writes the configured process alias. Refused up front if
+ * BOOKING_PROCESS_ALIAS is missing.
  */
 
 const { createCookieTokenStore, getSdk, handleError, serialize } = require('../../api-util/sdk');
-const {
-  listCalendars,
-  defaultCalendarFor,
-  getEventType,
-  SCHEDULING_DEFAULTS,
-} = require('./scheduler');
+const { getEventType } = require('./scheduler');
 const { isConfigured } = require('./config');
-const {
-  resolveBookingProcessAlias,
-  grantProvider,
-  syncListingConfigurations,
-} = require('./listingSync');
-
-const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-/**
- * A deliberately wide-open Sharetribe availability plan.
- *
- * Two separate problems are solved by this, and each would be a silent failure on its own:
- *
- *  - `:action/create-pending-booking` validates the requested time against Sharetribe's own
- *    availability plan. Nylas is the real authority on when a coach is free, so Sharetribe must not
- *    second-guess it: an empty plan would reject every booking Nylas had just offered, surfacing as
- *    a confusing "not available" at checkout.
- *  - `OrderPanel` derives `timeZone` from `availabilityPlan.timezone` and renders **no booking form
- *    at all** without it. So the plan also carries the coach's real calendar timezone, taken from
- *    Nylas - which is the same value that makes the `timezone` listing field redundant.
- */
-const permissiveAvailabilityPlan = timezone => ({
-  type: 'availability-plan/time',
-  timezone,
-  entries: WEEKDAYS.map(dayOfWeek => ({
-    dayOfWeek,
-    startTime: '00:00',
-    // End of day is '00:00', not '24:00'. The Marketplace API rejects '24:00' outright with "End
-    // time must be in hh:mm format", and '23:59' with "End time must be a multiple of 5 minutes".
-    // '24:00' is only the template's *internal* representation - see EditListingAvailabilityPanel.js,
-    // which converts it to '00:00' on the way to the API and back again on the way out.
-    endTime: '00:00',
-    seats: 1,
-  })),
-});
+const { resolveBookingProcessAlias } = require('./listingSync');
+const { ensureListingBookable } = require('./ensureBookable');
+const { WEEKDAYS, permissiveAvailabilityPlan } = require('./availabilityPlan');
 
 module.exports = async (req, res) => {
   if (!isConfigured()) {
@@ -97,55 +55,41 @@ module.exports = async (req, res) => {
     // codebase, so every state-changing endpoint has to establish who is calling before acting.
     const userResponse = await sdk.currentUser.show();
     const profile = userResponse.data.data.attributes.profile || {};
-    const grantId = (profile.privateData || {}).nylasGrantId;
-
-    if (!grantId) {
-      res
-        .status(409)
-        .json({ error: 'Connect a calendar before enabling booking', code: 'no-grant' });
-      return;
-    }
 
     // ownListings rather than listings: this refuses a listing the caller does not own, so a coach
     // cannot enable booking on somebody else's listing and point it at their own calendar.
     const listingResponse = await sdk.ownListings.show({ id: listingId });
     const listing = listingResponse.data.data;
 
-    const calendars = await listCalendars(grantId);
-    const chosen = calendarId
-      ? calendars.find(c => c.id === calendarId && !c.read_only)
-      : defaultCalendarFor(calendars);
+    const result = await ensureListingBookable({
+      listing,
+      profile,
+      updateListing: ({ publicData, availabilityPlan }) =>
+        sdk.ownListings.update({ id: listingId, publicData, availabilityPlan }),
+      siteUrl: process.env.REACT_APP_MARKETPLACE_ROOT_URL,
+      overrides: { eventTypeKey, calendarId, minBookingNoticeMinutes, useEnvAlias: true },
+      force: true,
+    });
 
-    if (!chosen) {
+    if (result.status === 'no-grant') {
+      res
+        .status(409)
+        .json({ error: 'Connect a calendar before enabling booking', code: 'no-grant' });
+      return;
+    }
+    if (result.status === 'no-calendar') {
       res.status(409).json({
-        error: calendarId ? 'That calendar cannot be written to' : 'No writable calendar found',
+        error: result.explicit
+          ? 'That calendar cannot be written to'
+          : 'No writable calendar found',
         code: 'no-calendar',
       });
       return;
     }
-
-    const notice = Number.isFinite(Number(minBookingNoticeMinutes))
-      ? Number(minBookingNoticeMinutes)
-      : SCHEDULING_DEFAULTS.minBookingNoticeMinutes;
-
-    const { publicData, configurationIds } = await syncListingConfigurations({
-      listing,
-      grantId,
-      provider: await grantProvider(grantId),
-      coachName: profile.displayName,
-      coachEmail: (profile.privateData || {}).nylasGrantEmail || chosen.id,
-      calendarId: chosen.id,
-      eventTypeKey,
-      minBookingNoticeMinutes: notice,
-      siteUrl: process.env.REACT_APP_MARKETPLACE_ROOT_URL,
-      processAlias: processAlias.alias,
-    });
-
-    const updated = await sdk.ownListings.update({
-      id: listingId,
-      publicData,
-      availabilityPlan: permissiveAvailabilityPlan(chosen.timezone),
-    });
+    if (result.status !== 'synced') {
+      res.status(409).json({ error: 'Could not enable calendar booking', code: result.status });
+      return;
+    }
 
     res
       .status(200)
@@ -155,11 +99,11 @@ module.exports = async (req, res) => {
           status: 200,
           statusText: 'OK',
           data: {
-            configurationIds,
-            calendarId: chosen.id,
-            timezone: chosen.timezone,
-            minBookingNoticeMinutes: notice,
-            listingId: updated.data.data.id,
+            configurationIds: result.configurationIds,
+            calendarId: result.calendarId,
+            timezone: result.timeZone,
+            minBookingNoticeMinutes: result.minBookingNoticeMinutes,
+            listingId: result.updated.data.data.id,
           },
         })
       );

@@ -7,6 +7,7 @@
  */
 
 const { runBookingSweep } = require('./bookingSweeper');
+const { runReconcile } = require('../api/nylas/reconcile');
 const log = require('../log');
 
 const SWEEP_EVERY_MS = 60 * 1000;
@@ -35,9 +36,33 @@ const start = () => {
     }
   };
 
+  // The reconcile loop (server/api/nylas/reconcile.js): puts every coach's session listings on their
+  // calendar, and keeps them there. Its own flag, so a slow booking sweep never delays it or the
+  // other way round.
+  let reconciling = false;
+  const reconcileTick = async () => {
+    if (reconciling) return;
+    reconciling = true;
+    try {
+      const result = await runReconcile();
+      const changed = Object.entries(result.statuses || {}).filter(
+        ([status]) => !['unchanged', 'ineligible'].includes(status)
+      );
+      if (changed.length > 0) {
+        console.log('[jobs] reconcile', JSON.stringify(result)); // eslint-disable-line no-console
+      }
+    } catch (e) {
+      log.error(e, 'nylas-reconcile-failed', {});
+    } finally {
+      reconciling = false;
+    }
+  };
+
   // unref(): these timers must never be the reason the process stays alive.
   setTimeout(tick, FIRST_SWEEP_AFTER_MS).unref();
   setInterval(tick, SWEEP_EVERY_MS).unref();
+  setTimeout(reconcileTick, FIRST_SWEEP_AFTER_MS + 15 * 1000).unref();
+  setInterval(reconcileTick, SWEEP_EVERY_MS).unref();
 };
 
 module.exports = { start };
