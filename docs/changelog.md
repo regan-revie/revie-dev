@@ -19,6 +19,22 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-10 (coach calendar connect: Calendar tab in account settings)
+
+**Branch / PR:** `coach-calendar-connect`, one PR, not merged.
+
+**What changed:** coaches now have a normal way to connect their Google Calendar, which is also the flow to film for Google's OAuth verification. New page **Account settings → Calendar** (`/account/calendar`, `src/containers/CalendarSettingsPage/`), visible only to users whose user type has the provider role. Not connected: the explanation and a primary "Connect Google Calendar" button that goes to `/api/nylas/connect?provider=google&returnPath=/account/calendar`. Connected: "Google Calendar connected", "Connected as {email}" and a "Reconnect" link to the same URL. The Nylas callback now returns to this page by default (it used to land on `/`), and the page shows the result (`?calendarConnect=connected|declined|failed`). Nothing in the server flow changed apart from that default.
+
+**Findings (before building):** nothing in the UI linked to `/api/nylas/connect` (or `/api/nylas/enable-listing`) before this. The connection is stored by the callback on the coach's user: `privateData.nylasGrantId/Provider/Email` (readable only by that user and the Integration API) and the public flag `publicData.calendarConnected`/`calendarProvider`. The Google *login* flow requests `plus.login`, `userinfo.profile`, `userinfo.email` and nothing else; calendar scopes come only from the Nylas Google connector.
+
+**Not verified:** the full round trip with a real Google account (needs a logged-in coach on Render; the page was only viewed logged out locally), that Reconnect reuses the same grant id in Nylas, and that "connected" still means a working grant (the Google OAuth app is in Testing, so refresh tokens expire after 7 days; the flag is not cleared when that happens).
+
+**What's next:** the coach-side "enable booking on this listing" UI (`/api/nylas/enable-listing` still has no caller), and showing a coach when their grant has expired.
+
+**Blocked / needs a decision:** whether to drop `plus.login` from the Google login scopes (Google+ is retired; it is stock template code and not a calendar scope, but it will show on the verification scope list).
+
+---
+
 ## HANDOFF — 2026-11-05 (release-4: late cancellations get their own state)
 
 **Branch / PR:** `late-cancel-release-4`, one PR, not merged.

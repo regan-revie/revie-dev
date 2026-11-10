@@ -17,8 +17,9 @@ const { STATE_COOKIE, RETURN_PATH_COOKIE, callbackUri } = require('./connect');
 const ROOT_URL = process.env.REACT_APP_MARKETPLACE_ROOT_URL;
 const USING_SSL = process.env.REACT_APP_SHARETRIBE_USING_SSL === 'true';
 
-// Where the coach lands when the flow did not start from a known page.
-const DEFAULT_RETURN_PATH = '/';
+// Where the coach lands when the flow did not start from a known page: the Calendar tab in account
+// settings, which shows the result (?calendarConnect=connected|declined|failed).
+const DEFAULT_RETURN_PATH = '/account/calendar';
 
 const isValidState = (state, storedState) => {
   if (typeof state !== 'string' || typeof storedState !== 'string') return false;
