@@ -208,6 +208,20 @@ const findByTransactionId = async sharetribeTransactionId => {
   return rows;
 };
 
+/**
+ * Sessions still to happen on a grant: booked (or rescheduled) and starting in the future. Used when
+ * a coach connects a different calendar, to say which sessions stay on the old one.
+ */
+const findUpcomingByGrantId = async nylasGrantId => {
+  const { rows } = await query(
+    `SELECT sharetribe_transaction_id, booking_start FROM nylas_bookings
+      WHERE nylas_grant_id = $1 AND status IN ('created', 'rescheduled') AND booking_start > now()
+      ORDER BY booking_start`,
+    [nylasGrantId]
+  );
+  return rows;
+};
+
 const setStatus = async (nylasBookingId, status) => {
   const { rows } = await query(
     `UPDATE nylas_bookings SET status = $2, updated_at = now()
@@ -231,6 +245,7 @@ module.exports = {
   recordBooking,
   findByBookingId,
   findByTransactionId,
+  findUpcomingByGrantId,
   setStatus,
   claimBookingAttempt,
   getBookingAttempt,

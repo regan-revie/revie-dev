@@ -92,8 +92,13 @@ exports.authenticateGoogle = (req, res, next) => {
   const paramsAsString = JSON.stringify(params);
 
   passport.authenticate('google', {
+    // Sign-in only: who the person is, never their calendar (that is a separate Google OAuth client,
+    // connected through Nylas). Revie dropped the template's `plus.login`, a retired Google+ scope
+    // that would otherwise appear on Google's verification scope list. `openid` stays explicit
+    // because verifyCallback reads the `id_token` Google returns, and an ID token is what that
+    // scope requests.
     scope: [
-      'https://www.googleapis.com/auth/plus.login',
+      'openid',
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/userinfo.email',
     ],

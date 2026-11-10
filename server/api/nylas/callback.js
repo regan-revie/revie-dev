@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const { getSdk, getTrustedSdk, createCookieTokenStore } = require('../../api-util/sdk');
 const { buildMarketplaceRedirectUrl } = require('../../api-util/url');
 const { exchangeCodeForGrant } = require('./client');
+const { handleGrantChange } = require('./grantChange');
 const { STATE_COOKIE, RETURN_PATH_COOKIE, callbackUri } = require('./connect');
 
 const ROOT_URL = process.env.REACT_APP_MARKETPLACE_ROOT_URL;
@@ -77,29 +78,57 @@ module.exports = (req, res) => {
   const sdk = getSdk(req, res, tokenStore);
 
   // Re-check the session: the state cookie proves the flow started here, not who is finishing it.
+  let profile = {};
+  let previousGrantId = null;
+  let userId = null;
+
   sdk.currentUser
     .show()
-    .then(() => exchangeCodeForGrant({ code, redirectUri: callbackUri() }))
+    .then(response => {
+      // What the coach had before, so a different grant can be spotted (see grantChange.js).
+      userId = response.data.data.id.uuid;
+      profile = response.data.data.attributes.profile || {};
+      previousGrantId = (profile.privateData || {}).nylasGrantId || null;
+      return exchangeCodeForGrant({ code, redirectUri: callbackUri() });
+    })
     .then(grant =>
-      getTrustedSdk(req, res, tokenStore).then(trustedSdk =>
-        trustedSdk.currentUser.updateProfile({
-          // privateData is readable only by this user and by the Integration API, so the grant id
-          // never reaches another marketplace user. The Nylas API key, which is what actually
-          // grants access to the calendar, stays on the server regardless.
-          privateData: {
-            nylasGrantId: grant.grantId,
-            nylasGrantProvider: grant.provider,
-            nylasGrantEmail: grant.email,
-          },
-          // A public flag so listing and profile UI can show connection state without exposing
-          // the grant id itself.
-          publicData: {
-            calendarConnected: true,
-            calendarProvider: grant.provider,
-          },
-        })
-      )
+      getTrustedSdk(req, res, tokenStore)
+        .then(trustedSdk =>
+          trustedSdk.currentUser.updateProfile({
+            // privateData is readable only by this user and by the Integration API, so the grant id
+            // never reaches another marketplace user. The Nylas API key, which is what actually
+            // grants access to the calendar, stays on the server regardless.
+            privateData: {
+              nylasGrantId: grant.grantId,
+              nylasGrantProvider: grant.provider,
+              nylasGrantEmail: grant.email,
+            },
+            // A public flag so listing and profile UI can show connection state without exposing
+            // the grant id itself.
+            publicData: {
+              calendarConnected: true,
+              calendarProvider: grant.provider,
+            },
+          })
+        )
+        .then(() => grant)
     )
+    .then(grant => {
+      // Reconnecting the same account keeps the same grant id and needs nothing. A different one
+      // leaves the coach's listings pointing at the old calendar; handleGrantChange never throws.
+      if (previousGrantId && previousGrantId !== grant.grantId) {
+        return handleGrantChange({
+          sdk,
+          userId,
+          previousGrantId,
+          newGrantId: grant.grantId,
+          newGrantEmail: grant.email,
+          coachName: profile.displayName,
+          siteUrl: ROOT_URL,
+        }).catch(e => console.error(`[nylas] Grant change handling failed: ${e.message}`));
+      }
+      return null;
+    })
     .then(() => redirectBack(res, returnPathRaw, 'connected'))
     .catch(e => {
       // The authorization code is single use, so there is nothing to retry here - the coach has to
