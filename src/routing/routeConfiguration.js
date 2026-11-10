@@ -15,6 +15,7 @@ const pageDataLoadingAPI = getPageDataLoadingAPI();
 const AuthenticationPage = loadable(() => import(/* webpackChunkName: "AuthenticationPage" */ '../containers/AuthenticationPage/AuthenticationPage'));
 const CheckoutPage = loadable(() => import(/* webpackChunkName: "CheckoutPage" */ '../containers/CheckoutPage/CheckoutPage'));
 const CMSPage = loadable(() => import(/* webpackChunkName: "CMSPage" */ '../containers/CMSPage/CMSPage'));
+const CalendarSettingsPage = loadable(() => import(/* webpackChunkName: "CalendarSettingsPage" */ '../containers/CalendarSettingsPage/CalendarSettingsPage'));
 const ContactDetailsPage = loadable(() => import(/* webpackChunkName: "ContactDetailsPage" */ '../containers/ContactDetailsPage/ContactDetailsPage'));
 const EditListingPage = loadable(() => import(/* webpackChunkName: "EditListingPage" */ '../containers/EditListingPage/EditListingPage'));
 const EmailVerificationPage = loadable(() => import(/* webpackChunkName: "EmailVerificationPage" */ '../containers/EmailVerificationPage/EmailVerificationPage'));
@@ -45,6 +46,7 @@ const StyleguidePage = loadable(() => import(/* webpackChunkName: "StyleguidePag
 
 export const ACCOUNT_SETTINGS_PAGES = [
   'ContactDetailsPage',
+  'CalendarSettingsPage',
   'PasswordChangePage',
   'StripePayoutPage',
   'PaymentMethodsPage',
@@ -338,6 +340,14 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       authPage: 'LoginPage',
       component: ContactDetailsPage,
       loadData: pageDataLoadingAPI.ContactDetailsPage.loadData,
+    },
+    {
+      // Revie: coaches connect their calendar here (Nylas); see containers/CalendarSettingsPage.
+      path: '/account/calendar',
+      name: 'CalendarSettingsPage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: CalendarSettingsPage,
     },
     {
       path: '/account/change-password',

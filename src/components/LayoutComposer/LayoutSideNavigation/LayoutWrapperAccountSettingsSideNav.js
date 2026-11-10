@@ -4,7 +4,11 @@
  */
 import React, { useEffect, useState } from 'react';
 
+import { useSelector } from 'react-redux';
+
+import { useConfiguration } from '../../../context/configurationContext';
 import { FormattedMessage } from '../../../util/reactIntl';
+import { getCurrentUserTypeRoles } from '../../../util/userHelpers';
 
 import { TabNav } from '../../../components';
 
@@ -71,6 +75,12 @@ const LayoutWrapperAccountSettingsSideNav = props => {
   const [scrollLeft, setScrollLeft] = useGlobalState('scrollLeft');
   const { accountSettingsNavProps, ariaLabel } = props;
 
+  // Revie: the Calendar tab is for coaches only. Read here, rather than threaded through every
+  // account page's nav props, so the five stock pages stay untouched.
+  const config = useConfiguration();
+  const currentUser = useSelector(state => state.user?.currentUser);
+  const showCalendar = !!currentUser && !!getCurrentUserTypeRoles(config, currentUser).provider;
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -99,6 +109,19 @@ const LayoutWrapperAccountSettingsSideNav = props => {
           id: 'StripePayoutPageTab',
           linkProps: {
             name: 'StripePayoutPage',
+          },
+        },
+      ]
+    : [];
+
+  const calendarMaybe = showCalendar
+    ? [
+        {
+          text: <FormattedMessage id="LayoutWrapperAccountSettingsSideNav.calendarTabTitle" />,
+          selected: currentPage === 'CalendarSettingsPage',
+          id: 'CalendarSettingsPageTab',
+          linkProps: {
+            name: 'CalendarSettingsPage',
           },
         },
       ]
@@ -136,6 +159,7 @@ const LayoutWrapperAccountSettingsSideNav = props => {
         name: 'PasswordChangePage',
       },
     },
+    ...calendarMaybe,
     ...payoutDetailsMaybe,
     ...paymentMethodsMaybe,
     {
