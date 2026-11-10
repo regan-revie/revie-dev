@@ -53,3 +53,86 @@
 .resultError {
   color: var(--colorFail);
 }
+
+/* Working hours */
+.hours {
+  margin-top: 40px;
+}
+
+.fieldset {
+  border: none;
+  margin: 0 0 16px 0;
+  padding: 0;
+}
+
+.label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: var(--fontWeightMedium);
+  color: var(--colorGrey700);
+}
+
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* A day is a pill: lavender with a maroon label when on (approved pairing), outlined when off. The
+   native checkbox stays in the page for keyboards and screen readers but is not drawn. */
+.day {
+  position: relative;
+  padding: 8px 16px;
+  border: 1px solid var(--colorGrey300);
+  border-radius: var(--borderRadiusPill);
+  color: var(--revieMaroon);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dayOn {
+  border-color: var(--revieLavender);
+  background-color: var(--revieLavender);
+}
+
+.dayInput {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+}
+
+.day:focus-within {
+  outline: 3px solid var(--revieMaroon);
+  outline-offset: 2px;
+}
+
+.timeRow {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.field {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  margin-bottom: 16px;
+}
+
+.timeRow .field {
+  margin-bottom: 0;
+}
+
+.select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--colorGrey300);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorWhite);
+  color: var(--revieMaroon);
+}
+
+.saveButton {
+  margin-top: 8px;
+}

@@ -19,6 +19,40 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-10 (coach booking setup: automatic, with working hours)
+
+**PRs, both not merged:** #20 (server, stacked on #19) and this one (client, stacked on #20). Merge in order: #19, #20, then this.
+
+**What it does:** a coach who has connected their calendar no longer needs any manual step for clients to be able to book their sessions. Every minute the server checks every published session listing and, for coaches with a calendar, sets each one up: a Nylas configuration per session length (price variant), the calendar, working hours, notice, and the release-4 process (new listings are stamped release-1 by the listing type). The same happens straight away when a coach connects a calendar or saves their hours. On the coach side: **Account settings → Calendar** now has **Working hours** (days, start, end, timezone; default Mon-Fri 9:00-17:00). A session whose coach has not been set up shows "This coach isn't taking bookings yet." instead of the old booking form; the coach sees a link to connect their calendar. The listing wizard no longer asks for availability on sessions.
+
+**Changed from the plan:** (1) hours are stored with ISO weekday numbers (1 = Monday), the shape the availability filter already used, not day names; (2) the loop skips a coach with no calendar after one query (their author record comes with the listings), so it costs nothing for coaches who have not connected; (3) listings enabled before this (the Test Session) are *adopted*, not re-synced: only a signature key is written, checked by a dry run against the real listing; (4) a listing that already works keeps its process alias; only new listings get `BOOKING_PROCESS_ALIAS`; (5) the stock `BookingFixedDurationForm` is no longer rendered by `OrderPanel` at all (a fixed-length session without calendar booking shows the message), and the AVAILABILITY wizard step is hidden for every `fixed` listing type, not by listing type id.
+
+**Fresh-coach test on revie-dev, step by step (plain language)**
+
+Before you start: both PRs merged and deployed; Render's `BOOKING_PROCESS_ALIAS` reads `default-booking/release-4`; you have a brand-new Google account for the coach (add it as a test user in your Google Cloud OAuth consent screen) and a second Google account for the client; the Nylas Essentials plan allows 10 connected accounts, so check you have room.
+
+1. In a private window, sign up on revie-dev as a **coach** with the new Google account.
+2. Go to **Account settings → Calendar**. Check you see "Connect Google Calendar" and, below it, **Working hours** already set to Mon-Fri, 09:00 to 17:00, in your own timezone. Change nothing yet, or change it and press **Save hours** (you should see "Saved...").
+3. Create a **Signature Session** with **two price variants** (for example 30 and 60 minutes), add a photo, and publish it. Check the wizard did **not** ask for availability, and that the listing is **Published** (not draft).
+4. Open the listing as the **client** (second browser, second account). It should say **"This coach isn't taking bookings yet."** and no booking form. Open it as the coach: it should say "Connect your calendar to start taking bookings" with a link.
+5. As the coach, press **Connect Google Calendar** and approve. You should land back on the Calendar page with "Your Google Calendar is connected."
+6. Wait up to one minute, then reload the listing. As the coach the message goes away; as the client you now get the booking form, with **both lengths** offered and slots **only Monday to Friday, 09:00 to 17:00** (in the coach's timezone).
+7. In **Sharetribe Console**, open that listing's public data. You should see `calendarBookingEnabled: true`, two ids in `nylasConfigurationIds`, `nylasOpenHours`, `transactionProcessAlias: default-booking/release-4` and `nylasSyncSignature`. **The listing must still be Published**: this is the check that a server update does not unpublish it. In the Nylas dashboard the coach's account should show two configurations.
+8. As the client, book a slot with a Stripe test card. The transaction should end up **Accepted** on release-4, with an event (and a Meet link) on the coach's Google Calendar.
+9. As the coach, change the hours to **Tue-Thu, 10:00 to 14:00** and save. Within a minute the client should be offered only those slots. The booking from step 8 is untouched.
+10. As the coach, edit the listing and add a **90-minute** variant. Within about a minute the client can pick 90 minutes too, and Console shows three ids.
+11. Check **Render's logs** for lines starting `[jobs] reconcile` and **Sentry** for no `nylas-ensure-bookable-failed`.
+12. Open the existing **Test Session** listing: it should be exactly as before (still bookable, hours unchanged).
+13. Optional: as the coach, connect a **different** Google account. You should get a Sentry event tagged `nylas-grant-changed`, and the listings point at the new calendar.
+
+If step 6 is still the message after two minutes: check the Render logs for `[nylas] Reconcile is paused` (alias missing) or a Sentry `nylas-ensure-bookable-failed` event.
+
+**Not verified:** anything against live Nylas and Sharetribe beyond a read-only dry run on the Test Session (a full sync of a new listing, that an operator update leaves a published listing published, the advisory lock on real Postgres, the new Calendar page logged in, and the listing page message). They are steps 3 to 7 above.
+
+**What's next:** nothing marks a listing paused when a coach's Google grant stops working (the app is in Testing mode, so refresh tokens expire after 7 days); no hours check when a booking is created (by decision); one schedule per coach, not per listing.
+
+---
+
 ## HANDOFF — 2026-11-10 (coach calendar connect: Calendar tab in account settings)
 
 **Branch / PR:** `coach-calendar-connect`, one PR, not merged.

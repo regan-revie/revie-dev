@@ -2,7 +2,13 @@ import React from 'react';
 import '@testing-library/jest-dom';
 
 import { types as sdkTypes } from '../../util/sdkLoader';
-import { createListing, createStock, createUser, fakeIntl } from '../../util/testData';
+import {
+  createCurrentUser,
+  createListing,
+  createStock,
+  createUser,
+  fakeIntl,
+} from '../../util/testData';
 import {
   renderWithProviders as render,
   testingLibrary,
@@ -388,8 +394,8 @@ describe('OrderPanel', () => {
     });
   });
 
-  it('Booking: fixed', async () => {
-    const listing = createListing('listing-fixed', {
+  const fixedListing = (publicDataExtra = {}) => {
+    return createListing('listing-fixed', {
       title: 'the listing',
       description: 'Lorem ipsum',
       price: new Money(1000, 'USD'),
@@ -423,34 +429,76 @@ describe('OrderPanel', () => {
           },
         ],
         startTimeInterval: 'quarterHour',
+        ...publicDataExtra,
       },
     });
+  };
 
-    const props = {
-      ...commonProps,
-      timeSlotsForDate,
-      listing,
+  const renderFixed = (props, options = {}) =>
+    render(
+      <OrderPanel
+        {...commonProps}
+        timeSlotsForDate={timeSlotsForDate}
+        validListingTypes={validListingTypes}
+        {...props}
+      />,
+      { config, routeConfiguration, ...options }
+    );
+
+  const connectedUser = {
+    user: {
+      currentUser: createCurrentUser('coach1', {
+        profile: { publicData: { calendarConnected: true }, privateData: { nylasGrantId: 'g' } },
+      }),
+    },
+  };
+
+  it('Booking: fixed, not set up for calendar booking: says the coach is not taking bookings, not the stock form', async () => {
+    const { getByText, queryByText } = renderFixed({
+      listing: fixedListing(),
       isOwnListing: false,
-      validListingTypes,
-    };
-    const { getByText, queryAllByText, queryByText } = render(<OrderPanel {...props} />, {
-      config,
-      routeConfiguration,
     });
 
     await waitFor(() => {
-      expect(queryAllByText('title!')).toHaveLength(2);
-      expect(queryAllByText('OrderPanel.price')).toHaveLength(1);
-      expect(queryAllByText('OrderPanel.priceInMobileCTA')).toHaveLength(1);
-      expect(queryAllByText('OrderPanel.perUnit')).toHaveLength(1);
-      expect(queryAllByText('OrderPanel.author')).toHaveLength(2);
-      expect(getByText('BookingFixedDurationForm.bookingStartTitle')).toBeInTheDocument();
-      expect(getByText('FieldDateAndTimeInput.startTime')).toBeInTheDocument();
-      expect(queryByText('FieldDateAndTimeInput.endTime')).not.toBeInTheDocument();
-      expect(getByText('BookingFixedDurationForm.requestToBook')).toBeInTheDocument();
-      expect(getByText('OrderPanel.youWontBeChargedInfo')).toBeInTheDocument();
-      expect(getByText('OrderPanel.ctaButtonMessageBooking')).toBeInTheDocument();
+      expect(getByText('OrderPanel.notTakingBookings')).toBeInTheDocument();
     });
+    expect(queryByText('BookingFixedDurationForm.bookingStartTitle')).not.toBeInTheDocument();
+    expect(queryByText('BookingFixedDurationForm.requestToBook')).not.toBeInTheDocument();
+  });
+
+  it('Booking: fixed, no availability plan yet (a listing the server has not reached): still the message, not an empty panel', async () => {
+    const listing = fixedListing();
+    listing.attributes.availabilityPlan = null;
+    const { getByText } = renderFixed({ listing, isOwnListing: false });
+    await waitFor(() => {
+      expect(getByText('OrderPanel.notTakingBookings')).toBeInTheDocument();
+    });
+  });
+
+  it('Booking: fixed, own listing, no calendar connected: a link to connect one', async () => {
+    const { getByText, getByRole } = renderFixed({ listing: fixedListing(), isOwnListing: true });
+
+    await waitFor(() => {
+      expect(getByText('OrderPanel.ownListingConnectCalendar')).toBeInTheDocument();
+    });
+    expect(getByRole('link', { name: 'OrderPanel.ownListingConnectCalendarLink' })).toHaveAttribute(
+      'href',
+      '/account/calendar'
+    );
+  });
+
+  it('Booking: fixed, own listing, calendar connected: says it is being set up', async () => {
+    const { getByText, queryByRole } = renderFixed(
+      { listing: fixedListing(), isOwnListing: true },
+      { initialState: connectedUser }
+    );
+
+    await waitFor(() => {
+      expect(getByText('OrderPanel.ownListingSettingUp')).toBeInTheDocument();
+    });
+    expect(
+      queryByRole('link', { name: 'OrderPanel.ownListingConnectCalendarLink' })
+    ).not.toBeInTheDocument();
   });
 
   it('Purchase: item ', async () => {
