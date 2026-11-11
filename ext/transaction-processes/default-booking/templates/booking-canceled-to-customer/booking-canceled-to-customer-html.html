@@ -13,8 +13,23 @@
           <table align="center" role="presentation" cellSpacing="0" cellPadding="0" border="0" width="100%" style="max-width:600px;margin:0 auto">
             <tr style="width:100%">
               <td>
+                {{#eq "provider" metadata.cancelledBy}}
+                <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingCanceledToCustomer.TitleByProvider" "Your session was cancelled"}}</h1>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{#if metadata.refundAmount}}{{t "BookingCanceledToCustomer.ContentByProvider" "{providerDisplayName} cancelled your {listingTitle} session. You'll get a full refund of {amount,number,::.00} {currency}; it can take 5 to 10 days to reach your card." providerDisplayName=provider.display-name listingTitle=listing.title amount=metadata.refundAmount currency=metadata.refundCurrency}}{{else}}{{t "BookingCanceledToCustomer.ContentByProviderNoAmount" "{providerDisplayName} cancelled your {listingTitle} session. You'll get a full refund; it can take 5 to 10 days to reach your card." providerDisplayName=provider.display-name listingTitle=listing.title}}{{/if}}</p>
+                <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                  <tbody>
+                    <tr>
+                      <td><a href="{{marketplace.url}}/l/{{url-encode listing.id}}" target="_blank" style="color:#FFF;background-color:{{asset "design/branding.json" "marketplaceColors.notificationPrimaryButton" "#6938EF"}};border-radius:4px;font-size:15px;text-decoration:none;text-align:center;display:inline-block;min-width:210px;padding:0px 0px;line-height:100%;max-width:100%"><span style="color:#FFF;background-color:{{asset "design/branding.json" "marketplaceColors.notificationPrimaryButton" "#6938EF"}};border-radius:4px;font-size:15px;text-decoration:none;text-align:center;display:inline-block;min-width:210px;padding:16px 32px;max-width:100%;line-height:120%;text-transform:none">{{t "BookingCanceledToCustomer.CtaByProvider" "Find another time"}}</span></a>
+                        <div>
+                          <p style="font-size:14px;line-height:1.5;margin:16px 0;color:#484848">{{t "TransactionEmails.AccessibleLinkText" "Can't click the button? Here's a link for your convenience:"}} <a target="_blank" style="color:{{asset "design/branding.json" "marketplaceColors.notificationPrimaryButton" "#6938EF"}};text-decoration:none" href="{{marketplace.url}}/l/{{url-encode listing.id}}">{{marketplace.url}}/l/{{url-encode listing.id}}</a></p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                {{else}}
                 <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingCanceledToCustomer.Title" "Session cancelled."}}</h1>
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingCanceledToCustomer.Content" "Your {listingTitle} session with {providerDisplayName} is cancelled. Your refund of {amount,number,::.00} {currency} is on its way and can take 5 to 10 days to reach your card." listingTitle=listing.title providerDisplayName=provider.display-name amount=payin-total.amount currency=payin-total.currency}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{#if metadata.refundAmount}}{{t "BookingCanceledToCustomer.Content" "Your {listingTitle} session with {providerDisplayName} is cancelled. Your refund of {amount,number,::.00} {currency} is on its way and can take 5 to 10 days to reach your card." listingTitle=listing.title providerDisplayName=provider.display-name amount=metadata.refundAmount currency=metadata.refundCurrency}}{{else}}{{t "BookingCanceledToCustomer.ContentNoAmount" "Your {listingTitle} session with {providerDisplayName} is cancelled. Your refund is on its way and can take 5 to 10 days to reach your card." listingTitle=listing.title providerDisplayName=provider.display-name}}{{/if}}</p>
                 <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
                     <tr>
@@ -26,6 +41,7 @@
                     </tr>
                   </tbody>
                 </table>
+                {{/eq}}
                 {{/with}}
                 <div>
                   <hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#E1E1E1;margin:20px 0" />
