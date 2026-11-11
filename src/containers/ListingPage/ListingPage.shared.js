@@ -212,8 +212,13 @@ export const getDerivedRenderData = ({
   const ensuredAuthor = ensureUser(currentAuthor);
   const authorNeedsPayoutDetails =
     ['booking', 'purchase'].includes(processType) || (isNegotiation && unitType === OFFER);
+  // Revie: a fixed-length session shows the coach one setup card in the sidebar (OrderPanel's
+  // SessionSetupCard: connect a calendar, add payout details), so the stock banner is not also shown.
+  const isSessionListing = isBooking && unitType === 'fixed';
   const noPayoutDetailsSetWithOwnListing =
-    isOwnListing && (authorNeedsPayoutDetails && !currentUser?.attributes?.stripeConnected);
+    isOwnListing &&
+    !isSessionListing &&
+    (authorNeedsPayoutDetails && !currentUser?.attributes?.stripeConnected);
 
   const payoutDetailsWarning = noPayoutDetailsSetWithOwnListing ? (
     <span className={payoutDetailsWarningClassName}>

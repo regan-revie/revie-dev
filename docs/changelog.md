@@ -19,6 +19,26 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-11 (session wizard tab fix, coach setup card)
+
+**Branch / PR:** `session-wizard-and-setup-card`, one PR against `main`, not merged.
+
+**Bug 1, cause:** the wizard's check for "fixed-length session" read `listingTypeConfig.unitType`. The hosted listing type does have `unitType: "fixed"` at the top level (Dev: `signature-session`, process `default-booking/release-1`), but the app restructures hosted listing types on load (`restructureListingTypes` in `configHelpers.js`) and moves it to `transactionType.unitType`. So on the deployed site the check was always false and the Availability tab stayed; the Next button is disabled there because the tab is incomplete until a default schedule is set. #21's test passed because it used a hand-written config in the wrong shape. Publishing itself is not gated on an availability plan anywhere in the wizard (the tab list decides what is required), so with the tab gone a session goes Details → Pricing → Photos and publishes without one; whether the Marketplace API accepts a booking listing with no plan is only checked end to end (step 3 below). The fix reads `transactionType.unitType`; the new test runs the real hosted shape through `mergeConfig`, and fails against the old check (checked).
+
+**Bug 2, what changed:** on the coach's own session listing the red "Connect your calendar..." sidebar text and the dark "Please add your payout details" banner are replaced by one setup card in the sidebar: "Clients can't book this session yet" / "Finish these and it goes live automatically." with two steps, "Connect your calendar" (to `/account/calendar`) and "Add payout details" (to the stock payout page), each a secondary button until done and a tick with no button once done. Maroon text, body size, no error red. When both are done the card does not render; a plain "we're setting up this session" line shows meanwhile if the server has not finished. Clients and visitors see "This coach isn't taking bookings yet." in plain body text. The stock payout banner is hidden on fixed-length session pages only. Card states are also in the styleguide (Components → SessionSetupCard).
+
+**Decision for you:** the card says it goes live automatically, but the server makes a listing bookable as soon as a calendar is connected, regardless of payout details. A coach with a calendar and no payout details therefore shows clients a booking form whose checkout fails at Stripe. Fix would be one condition in `ensureBookable` (require `stripeConnected`); I did not build it.
+
+**Retest, step by step**
+1. After deploy, as a new coach, start a new Signature Session. The steps should be Details, Pricing, Photos only, with no Availability tab and no "set a default schedule" gate.
+2. Publish it. It must publish without an availability plan (watch for an API error on the last step; if there is one, tell me the message).
+3. Open the published listing as the coach with no calendar and no payouts: one card, two buttons, no red text and no dark banner. Connect the calendar and come back: that step has a tick and no button. Add payout details: both done, the card goes, and within a minute the booking form appears.
+4. Open the same listing as a client: "This coach isn't taking bookings yet." in normal text until step 3 finishes.
+
+**Not verified:** the card and the wizard on the real site while logged in (the card states were viewed in the styleguide in a browser; the wizard and listing page are covered by tests only), and publishing without a plan against the live API.
+
+---
+
 ## HANDOFF — 2026-11-11 (coach deletes the event from Google Calendar: refund)
 
 **Branch / PR:** `coach-calendar-delete-refund`, one PR against `main`, not merged.

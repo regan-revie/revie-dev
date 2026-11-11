@@ -42,6 +42,7 @@ import {
 import { ModalInMobile, NamedLink, PrimaryButton, AvatarSmall, H1, H2 } from '../../components';
 import PriceVariantPicker from './PriceVariantPicker/PriceVariantPicker';
 import SubmitFinePrint from './SubmitFinePrint/SubmitFinePrint';
+import SessionSetupCard from './SessionSetupCard/SessionSetupCard';
 
 import css from './OrderPanel.module.css';
 
@@ -198,32 +199,13 @@ const PriceMissing = () => {
 
 // Revie: a session is booked through its coach's calendar, never through Sharetribe's own
 // availability plan. Until the server has set the listing up (it does so by itself once the coach
-// has connected a calendar, see server/api/nylas/reconcile.js) there is nothing to book.
-const NotTakingBookings = ({ isOwnListing }) => {
-  const currentUser = useSelector(state => state.user?.currentUser);
-  const { connected } = getCalendarConnection(currentUser);
-
-  if (!isOwnListing) {
-    return (
-      <p className={css.error}>
-        <FormattedMessage id="OrderPanel.notTakingBookings" />
-      </p>
-    );
-  }
-  // The coach looking at their own listing is told what to do, not that they are not ready.
-  return connected ? (
-    <p className={css.error}>
-      <FormattedMessage id="OrderPanel.ownListingSettingUp" />
-    </p>
-  ) : (
-    <p className={css.error}>
-      <FormattedMessage id="OrderPanel.ownListingConnectCalendar" />{' '}
-      <NamedLink name="CalendarSettingsPage">
-        <FormattedMessage id="OrderPanel.ownListingConnectCalendarLink" />
-      </NamedLink>
-    </p>
-  );
-};
+// has connected a calendar, see server/api/nylas/reconcile.js) there is nothing to book. This is
+// not an error, so it is plain body text, not the red the template uses for problems.
+const BookingNotice = ({ messageId }) => (
+  <p className={css.notice}>
+    <FormattedMessage id={messageId} />
+  </p>
+);
 
 const InvalidCurrency = () => {
   return (
@@ -370,11 +352,23 @@ const OrderPanel = props => {
   const calendarBookingEnabled = !!publicData?.calendarBookingEnabled;
   const showNylasBookingForm =
     mounted && shouldHaveFixedBookingDuration && !isClosed && timeZone && calendarBookingEnabled;
-  // Revie: a fixed-length session that is not (yet) set up for calendar booking shows a message, not
-  // the stock form that reads Sharetribe's availability plan. The message needs no timezone, since a
-  // listing the server has not reached has no plan yet.
-  const showNotTakingBookings =
-    mounted && shouldHaveFixedBookingDuration && !isClosed && !calendarBookingEnabled;
+  // Revie: a fixed-length session is booked only through the coach's calendar. Its author sees what
+  // is still to do (connect a calendar, add payout details) until both are done; everyone else sees
+  // that the coach is not taking bookings yet. None of this needs a timezone, since a listing the
+  // server has not reached has no availability plan yet.
+  const currentUser = useSelector(state => state.user?.currentUser);
+  const calendarConnected = getCalendarConnection(currentUser).connected;
+  const payoutDetailsSet = !!currentUser?.attributes?.stripeConnected;
+  const isOpenSession = mounted && shouldHaveFixedBookingDuration && !isClosed;
+  const showSessionSetupCard =
+    isOpenSession && isOwnListing && !(calendarConnected && payoutDetailsSet);
+  const showSettingUpNotice =
+    isOpenSession &&
+    isOwnListing &&
+    calendarConnected &&
+    payoutDetailsSet &&
+    !calendarBookingEnabled;
+  const showNotTakingBookings = isOpenSession && !isOwnListing && !calendarBookingEnabled;
 
   const shouldHaveBookingTime = isBooking && [LINE_ITEM_HOUR].includes(lineItemUnitType);
   const showBookingTimeForm = mounted && shouldHaveBookingTime && !isClosed && timeZone;
@@ -518,6 +512,11 @@ const OrderPanel = props => {
           <InvalidCurrency />
         ) : showInvalidPriceVariantsMessage ? (
           <InvalidPriceVariants />
+        ) : showSessionSetupCard ? (
+          <SessionSetupCard
+            calendarConnected={calendarConnected}
+            payoutDetailsSet={payoutDetailsSet}
+          />
         ) : showNylasBookingForm ? (
           <NylasBookingForm
             className={css.bookingForm}
@@ -528,7 +527,9 @@ const OrderPanel = props => {
             {...sharedProps}
           />
         ) : showNotTakingBookings ? (
-          <NotTakingBookings isOwnListing={isOwnListing} />
+          <BookingNotice messageId="OrderPanel.notTakingBookings" />
+        ) : showSettingUpNotice ? (
+          <BookingNotice messageId="OrderPanel.ownListingSettingUp" />
         ) : showBookingTimeForm ? (
           <BookingTimeForm
             seatsEnabled={seatsEnabled}
