@@ -1,3 +1,4 @@
+jest.mock('../../log', () => ({ error: jest.fn() }));
 jest.mock('./scheduler', () => ({
   listCalendars: jest.fn(),
   defaultCalendarFor: jest.fn(),
@@ -12,7 +13,8 @@ jest.mock('./listingSync', () => ({
 
 const { listCalendars, defaultCalendarFor, getEventType } = require('./scheduler');
 const { grantProvider, syncListingConfigurations } = require('./listingSync');
-const { ensureListingBookable } = require('./ensureBookable');
+const log = require('../../log');
+const { ensureListingBookable, signatureOf } = require('./ensureBookable');
 
 const ENV = { BOOKING_PROCESS_ALIAS: 'default-booking/release-4' };
 const profile = (privateData = { nylasGrantId: 'g1', nylasGrantEmail: 'coach@example.com' }) => ({
@@ -40,6 +42,7 @@ const run = (listing, extra = {}) => {
   const promise = ensureListingBookable({
     listing,
     profile: profile(),
+    stripeConnected: true,
     updateListing,
     siteUrl: 'https://revie-dev.onrender.com',
     env: ENV,
@@ -281,5 +284,140 @@ describe('who and what it leaves alone', () => {
     const settled = newListing(written.publicData, { availabilityPlan: written.availabilityPlan });
     const forced = await run(settled, { force: true });
     expect(forced.result.status).toBe('synced');
+  });
+});
+
+// A session is bookable only with a connected calendar AND payout details.
+describe('payout details', () => {
+  const withPayouts = stripeConnected => ({ stripeConnected });
+
+  it('calendar only (no payouts): a new listing is left not bookable and nothing is written or called', async () => {
+    const { result, updateListing } = await run(newListing(), withPayouts(false));
+    expect(result.status).toBe('no-payouts');
+    expect(listCalendars).not.toHaveBeenCalled();
+    expect(syncListingConfigurations).not.toHaveBeenCalled();
+    expect(updateListing).not.toHaveBeenCalled();
+  });
+
+  it('payouts only (no calendar): not bookable either', async () => {
+    const { result, updateListing } = await run(newListing(), {
+      ...withPayouts(true),
+      profile: profile({}),
+    });
+    expect(result.status).toBe('no-grant');
+    expect(updateListing).not.toHaveBeenCalled();
+  });
+
+  it('both: bookable', async () => {
+    const { result, updateListing } = await run(newListing(), withPayouts(true));
+    expect(result.status).toBe('synced');
+    expect(updateListing.mock.calls[0][0].publicData.calendarBookingEnabled).toBe(true);
+  });
+
+  it('payouts added later: the next run enables a listing that was left not bookable', async () => {
+    const first = await run(newListing(), withPayouts(false));
+    expect(first.result.status).toBe('no-payouts');
+
+    // The coach adds payout details; the listing is exactly as it was.
+    const second = await run(newListing(), withPayouts(true));
+    expect(second.result.status).toBe('synced');
+    expect(second.updateListing.mock.calls[0][0].publicData).toMatchObject({
+      calendarBookingEnabled: true,
+      nylasConfigurationIds: expect.any(Object),
+    });
+  });
+
+  it('payouts added later: also re-enables a listing that was switched off, with its setup intact', async () => {
+    const first = await run(newListing(), withPayouts(true));
+    const written = first.updateListing.mock.calls[0][0].publicData;
+    // Booking switched off by the payouts check; everything else kept.
+    const switchedOff = newListing(
+      { ...written, calendarBookingEnabled: false },
+      { availabilityPlan: first.updateListing.mock.calls[0][0].availabilityPlan }
+    );
+    jest.clearAllMocks();
+    const back = await run(switchedOff, withPayouts(true));
+    expect(back.result.status).toBe('synced');
+    expect(back.updateListing.mock.calls[0][0].publicData.calendarBookingEnabled).toBe(true);
+  });
+
+  it('payouts removed: an enabled listing is switched off (only that), and reported once', async () => {
+    const first = await run(newListing(), withPayouts(true));
+    const written = first.updateListing.mock.calls[0][0];
+    const enabled = newListing(written.publicData, { availabilityPlan: written.availabilityPlan });
+    jest.clearAllMocks();
+
+    const off = await run(enabled, withPayouts(false));
+    expect(off.result.status).toBe('disabled-no-payouts');
+    expect(off.updateListing).toHaveBeenCalledTimes(1);
+    expect(off.updateListing.mock.calls[0][0]).toEqual({
+      id: { uuid: 'l1' },
+      publicData: { calendarBookingEnabled: false },
+    });
+    expect(listCalendars).not.toHaveBeenCalled();
+    expect(log.error).toHaveBeenCalledTimes(1);
+    expect(log.error).toHaveBeenCalledWith(expect.any(Error), 'nylas-booking-disabled-no-payouts', {
+      listingId: 'l1',
+    });
+
+    // The next tick finds a listing that is already off: nothing written, nothing reported again.
+    const disabled = newListing({ ...written.publicData, calendarBookingEnabled: false });
+    jest.clearAllMocks();
+    const again = await run(disabled, withPayouts(false));
+    expect(again.result.status).toBe('no-payouts');
+    expect(again.updateListing).not.toHaveBeenCalled();
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it('payout status unknown (not readable): a working listing is left exactly as it is', async () => {
+    const first = await run(newListing(), withPayouts(true));
+    const written = first.updateListing.mock.calls[0][0];
+    const enabled = newListing(written.publicData, { availabilityPlan: written.availabilityPlan });
+    jest.clearAllMocks();
+
+    const unknown = await run(enabled, { stripeConnected: undefined });
+    expect(unknown.result.status).toBe('payouts-unknown');
+    expect(unknown.updateListing).not.toHaveBeenCalled();
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it('an enabled listing from before payouts were part of the signature is re-stamped, not re-synced, when the coach has payouts', async () => {
+    // The Test Session: enabled, complete, carrying the old signature (without payout status).
+    const legacySignature = signatureOf({
+      v: 1,
+      grantId: 'g1',
+      eventTypeKey: 'signature-session',
+      lengths: [60],
+      title: 'Find your focus',
+      coachName: 'Coach',
+      notice: 1440,
+      alias: 'default-booking/release-4',
+      hours: { days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' },
+      timeZone: null,
+      calendarId: null,
+    });
+    const listing = newListing(
+      {
+        calendarBookingEnabled: true,
+        transactionProcessAlias: 'default-booking/release-4',
+        nylasConfigurationIds: { 60: 'cfg-60' },
+        nylasCalendarId: 'cal-1',
+        nylasMinBookingNoticeMinutes: 1440,
+        nylasOpenHours: { days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' },
+        nylasSyncSignature: legacySignature,
+      },
+      { availabilityPlan: { timezone: 'America/Los_Angeles' } }
+    );
+
+    const { result, updateListing } = await run(listing, withPayouts(true));
+
+    expect(result.status).toBe('adopted');
+    expect(updateListing.mock.calls[0][0]).toEqual({
+      id: { uuid: 'l1' },
+      publicData: { nylasSyncSignature: expect.any(String) },
+    });
+    expect(updateListing.mock.calls[0][0].publicData.nylasSyncSignature).not.toBe(legacySignature);
+    expect(listCalendars).not.toHaveBeenCalled();
+    expect(syncListingConfigurations).not.toHaveBeenCalled();
   });
 });

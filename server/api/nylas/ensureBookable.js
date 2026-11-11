@@ -20,11 +20,19 @@
  * existed whose stored state already matches is "adopted": the signature is stamped and nothing
  * else changes, so deploying this never alters a listing that is working.
  *
+ * A session is bookable only when the coach has BOTH a connected calendar and payout details
+ * (`stripeConnected`): without payouts a client could pick a time and pay, and checkout would fail
+ * at Stripe. So without payouts a new listing is left not bookable, and one that is already enabled
+ * has booking switched off (reported to Sentry once, when it happens). Payout status is part of the
+ * signature, so when a coach adds payout details the next reconcile tick enables their listings.
+ *
  * Never touches a coach with no connected calendar, and never invents a transaction process for a
  * listing that already has one working.
  */
 
 const crypto = require('crypto');
+
+const log = require('../../log');
 
 const {
   listCalendars,
@@ -55,6 +63,8 @@ const signatureOf = inputs =>
  * @param {object} params
  * @param {object} params.listing a Sharetribe listing resource (from either API)
  * @param {object} params.profile the coach's profile: `displayName` and `privateData`
+ * @param {boolean} [params.stripeConnected] whether the coach has payout details. `undefined` means
+ *   "not known": the listing is left exactly as it is rather than guessed about.
  * @param {Function} params.updateListing `({id, publicData, availabilityPlan}) => Promise`, bound to
  *   whichever SDK the caller has (the coach's own, or the Integration API)
  * @param {string} params.siteUrl public site URL for the links in calendar invites
@@ -62,12 +72,13 @@ const signatureOf = inputs =>
  * @param {object} [params.overrides] `eventTypeKey`, `calendarId`, `minBookingNoticeMinutes`,
  *   `useEnvAlias`: what an explicit enable may choose that the loop never does
  * @param {boolean} [params.force] skip the signature check and always sync
- * @returns {Promise<{status: string}>} one of: ineligible, no-grant, no-process-alias, no-calendar,
- *   unchanged, adopted, synced
+ * @returns {Promise<{status: string}>} one of: ineligible, no-grant, no-payouts, payouts-unknown,
+ *   disabled-no-payouts, no-process-alias, no-calendar, unchanged, adopted, synced
  */
 const ensureListingBookable = async ({
   listing,
   profile,
+  stripeConnected,
   updateListing,
   siteUrl,
   env = process.env,
@@ -85,6 +96,26 @@ const ensureListingBookable = async ({
   if (!grantId) return { status: 'no-grant' };
 
   const enabled = !!publicData.calendarBookingEnabled;
+
+  // Payout details come before anything else is looked at or written. Not known (the caller could not
+  // read it) leaves the listing alone, so a missing attribute can never switch off a working listing.
+  if (stripeConnected === undefined || stripeConnected === null) {
+    return { status: 'payouts-unknown' };
+  }
+  if (!stripeConnected) {
+    if (!enabled) return { status: 'no-payouts' };
+
+    // Already bookable and the coach has lost their payout details: switch booking off rather than
+    // leave a checkout that fails. Everything else on the listing is kept, so switching it back on
+    // when payouts return is an ordinary sync. Reported once: after this the listing is not enabled.
+    await updateListing({ id: listing.id, publicData: { calendarBookingEnabled: false } });
+    log.error(
+      new Error('Calendar booking switched off: the coach no longer has payout details'),
+      'nylas-booking-disabled-no-payouts',
+      { listingId: listing.id.uuid || listing.id }
+    );
+    return { status: 'disabled-no-payouts' };
+  }
 
   // An already-enabled listing keeps the process it is on. A new one gets the configured alias, and
   // is refused rather than defaulted if there is none: falling back to release-1 would put the
@@ -113,7 +144,7 @@ const ensureListingBookable = async ({
   const openHours = { days: hours.days, start: hours.start, end: hours.end };
   const lengths = offeredLengths(publicData);
 
-  const signature = signatureOf({
+  const signedInputs = {
     v: SYNC_VERSION,
     grantId,
     eventTypeKey,
@@ -127,7 +158,11 @@ const ensureListingBookable = async ({
     // availability plan, and reading that back into the signature would make every sync change it.
     timeZone: (normalizeBookingHours(privateData.bookingHours) || {}).timeZone || null,
     calendarId: overrides.calendarId || null,
-  });
+  };
+  // Payout status is part of the signature, added last so that dropping it gives the signature
+  // written before it existed (see `legacySignature` below).
+  const signature = signatureOf({ ...signedInputs, stripeConnected: true });
+  const legacySignature = signatureOf(signedInputs);
 
   if (!force && enabled && publicData.nylasSyncSignature === signature) {
     return { status: 'unchanged' };
@@ -136,9 +171,11 @@ const ensureListingBookable = async ({
   // Enabled before signatures existed, and what is stored already is what a sync would write:
   // record the signature and change nothing else.
   const ids = configurationIdsOf(publicData);
+  // The same goes for a listing carrying the signature from before payout status was part of it: the
+  // inputs are unchanged, so it is re-stamped and nothing else is touched.
   const alreadyComplete =
     enabled &&
-    !publicData.nylasSyncSignature &&
+    (!publicData.nylasSyncSignature || publicData.nylasSyncSignature === legacySignature) &&
     !overrides.calendarId &&
     publicData.nylasCalendarId &&
     existingTimeZone &&

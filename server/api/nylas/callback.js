@@ -82,12 +82,14 @@ module.exports = (req, res) => {
   let profile = {};
   let previousGrantId = null;
   let userId = null;
+  let stripeConnected;
 
   sdk.currentUser
     .show()
     .then(response => {
       // What the coach had before, so a different grant can be spotted (see grantChange.js).
       userId = response.data.data.id.uuid;
+      stripeConnected = response.data.data.attributes.stripeConnected;
       profile = response.data.data.attributes.profile || {};
       previousGrantId = (profile.privateData || {}).nylasGrantId || null;
       return exchangeCodeForGrant({ code, redirectUri: callbackUri() });

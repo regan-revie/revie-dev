@@ -33,6 +33,7 @@ module.exports = async (req, res) => {
       sdk,
       userId: user.id.uuid,
       profile: user.attributes.profile || {},
+      stripeConnected: user.attributes.stripeConnected,
       siteUrl: process.env.REACT_APP_MARKETPLACE_ROOT_URL,
     });
 

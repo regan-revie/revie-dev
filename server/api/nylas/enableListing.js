@@ -55,6 +55,7 @@ module.exports = async (req, res) => {
     // codebase, so every state-changing endpoint has to establish who is calling before acting.
     const userResponse = await sdk.currentUser.show();
     const profile = userResponse.data.data.attributes.profile || {};
+    const stripeConnected = userResponse.data.data.attributes.stripeConnected;
 
     // ownListings rather than listings: this refuses a listing the caller does not own, so a coach
     // cannot enable booking on somebody else's listing and point it at their own calendar.
@@ -64,6 +65,7 @@ module.exports = async (req, res) => {
     const result = await ensureListingBookable({
       listing,
       profile,
+      stripeConnected,
       updateListing: ({ publicData, availabilityPlan }) =>
         sdk.ownListings.update({ id: listingId, publicData, availabilityPlan }),
       siteUrl: process.env.REACT_APP_MARKETPLACE_ROOT_URL,
@@ -75,6 +77,13 @@ module.exports = async (req, res) => {
       res
         .status(409)
         .json({ error: 'Connect a calendar before enabling booking', code: 'no-grant' });
+      return;
+    }
+    if (result.status === 'no-payouts' || result.status === 'disabled-no-payouts') {
+      res.status(409).json({
+        error: 'Add payout details before enabling booking',
+        code: 'no-payouts',
+      });
       return;
     }
     if (result.status === 'no-calendar') {
