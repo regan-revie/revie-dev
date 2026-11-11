@@ -9,6 +9,7 @@
 const { runBookingSweep } = require('./bookingSweeper');
 const { runReconcile } = require('../api/nylas/reconcile');
 const { resolveMissingEventIds } = require('../api/nylas/eventIdBackfill');
+const { processDueEventCancellations } = require('../api/nylas/calendarEventSync');
 const log = require('../log');
 
 const SWEEP_EVERY_MS = 60 * 1000;
@@ -29,6 +30,11 @@ const start = () => {
       const result = await runBookingSweep();
       if (result.checked > 0) {
         console.log('[jobs] booking sweep', JSON.stringify(result)); // eslint-disable-line no-console
+      }
+      // Calendar deletions whose five-minute wait is over (server/api/nylas/calendarEventSync.js).
+      const deletions = await processDueEventCancellations();
+      if (deletions.checked > 0) {
+        console.log('[jobs] calendar deletions', JSON.stringify(deletions)); // eslint-disable-line no-console
       }
       // Bookings with no calendar event recorded yet, so the coach deleting one is recognised.
       const backfill = await resolveMissingEventIds();

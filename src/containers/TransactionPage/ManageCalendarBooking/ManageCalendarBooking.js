@@ -213,7 +213,13 @@ const ManageCalendarBooking = ({
           </p>
           <div className={css.actions}>
             <PrimaryButton inProgress={actionInProgress} onClick={handleCancel}>
-              <FormattedMessage id="ManageCalendarBooking.confirmCancelButton" />
+              <FormattedMessage
+                id={
+                  status.freeCancellationNow === false
+                    ? 'ManageCalendarBooking.confirmCancelButtonCharged'
+                    : 'ManageCalendarBooking.confirmCancelButton'
+                }
+              />
             </PrimaryButton>
             <SecondaryButton disabled={actionInProgress} onClick={() => setMode('idle')}>
               <FormattedMessage id="ManageCalendarBooking.keepBookingButton" />

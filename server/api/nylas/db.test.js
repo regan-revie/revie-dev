@@ -181,3 +181,71 @@ describe('calendar event ids', () => {
     expect(all).toMatch(/nylas_booking_events_event_idx/);
   });
 });
+
+describe('calendar deletion waits', () => {
+  it('starts a wait with a due time five minutes on, and reports whether it started one', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ nylas_booking_id: 'b1' }] });
+    const started = await loadDb(URL).scheduleEventCancellation({
+      nylasBookingId: 'b1',
+      nylasEventId: 'e1',
+      nylasGrantId: 'g1',
+      calendarId: 'cal-1',
+      delayMinutes: 5,
+    });
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/INSERT INTO nylas_event_cancellations/);
+    expect(sql).toMatch(/now\(\) \+ \(\$5 \|\| ' minutes'\)::interval/);
+    // A wait that is already pending is left alone (its time is not pushed back); only a finished
+    // one is started again.
+    expect(sql).toMatch(/WHERE nylas_event_cancellations\.status <> 'pending'/);
+    expect(params).toEqual(['b1', 'e1', 'g1', 'cal-1', '5']);
+    expect(started).toBe(true);
+  });
+
+  it('says a wait was already running when nothing was written', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    expect(
+      await loadDb(URL).scheduleEventCancellation({
+        nylasBookingId: 'b1',
+        nylasEventId: 'e1',
+        nylasGrantId: 'g1',
+        delayMinutes: 5,
+      })
+    ).toBe(false);
+  });
+
+  it('ends a wait as restored only while it is still pending', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ nylas_booking_id: 'b1' }] });
+    const row = await loadDb(URL).markEventRestored('b1');
+    expect(mockQuery.mock.calls[0][0]).toMatch(/status = 'restored'[\s\S]*status = 'pending'/);
+    expect(row).toEqual({ nylas_booking_id: 'b1' });
+  });
+
+  it('claims only waits that are due and not locked, skipping any another worker holds', async () => {
+    await loadDb(URL).claimDueEventCancellations(10, 120);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/status = 'pending' AND due_at <= now\(\) AND locked_until <= now\(\)/);
+    expect(sql).toMatch(/FOR UPDATE SKIP LOCKED/);
+    expect(params).toEqual([10, '120']);
+  });
+
+  it('retries a failed one later without ending it, and finishes one with a status', async () => {
+    const db = loadDb(URL);
+    await db.retryEventCancellation('b1', 300);
+    expect(mockQuery.mock.calls[0][0]).toMatch(
+      /locked_until = now\(\) \+ \(\$2 \|\| ' seconds'\)::interval/
+    );
+    expect(mockQuery.mock.calls[0][0]).toMatch(/status = 'pending'/);
+    expect(mockQuery.mock.calls[0][1]).toEqual(['b1', '300']);
+
+    await db.finishEventCancellation('b1', 'done');
+    expect(mockQuery.mock.calls[1][1]).toEqual(['b1', 'done']);
+  });
+
+  it('creates its table with the rest of the schema', async () => {
+    await loadDb(URL).initSchema();
+    expect(mockQuery.mock.calls.map(c => c[0]).join('\n')).toMatch(
+      /CREATE TABLE IF NOT EXISTS nylas_event_cancellations/
+    );
+  });
+});
