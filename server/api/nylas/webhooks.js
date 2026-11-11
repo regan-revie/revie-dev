@@ -16,6 +16,7 @@
 
 const { verifySignature, SIGNATURE_HEADER } = require('./signature');
 const { handleBookingWebhook } = require('./bookingSync');
+const { handleCalendarEvent } = require('./calendarEventSync');
 const { WEBHOOK_SECRET, canVerifyWebhooks } = require('./config');
 
 // Scheduler booking triggers we expect to act on. Anything else is acknowledged and ignored, so an
@@ -25,7 +26,13 @@ const HANDLED_TRIGGERS = [
   'booking.pending',
   'booking.rescheduled',
   'booking.cancelled',
+  // The coach deleting a session's event from their own calendar (calendarEventSync.js). These
+  // arrive for every event on every connected calendar, almost none of them ours.
+  'event.updated',
+  'event.deleted',
 ];
+
+const isCalendarEvent = trigger => typeof trigger === 'string' && trigger.startsWith('event.');
 
 /**
  * Answer Nylas's ownership challenge by echoing the challenge value verbatim.
@@ -127,14 +134,26 @@ const receive = (req, res) => {
     data.booking_info?.additional_fields || data.customFields || data.custom_fields
   );
 
-  console.log(
-    `[nylas] ${trigger} booking=${bookingId || 'unknown'} customFields=${hasCustomFields}`
-  );
+  const calendarEvent = isCalendarEvent(trigger);
+  // Calendar notifications are mostly not ours, so only the ones that turn out to be are logged
+  // (below); the access line above already records that one arrived.
+  if (!calendarEvent) {
+    console.log(
+      `[nylas] ${trigger} booking=${bookingId || 'unknown'} customFields=${hasCustomFields}`
+    );
+  }
+
+  const grantIdFromBody = body.data?.grant_id ?? data.grant_id;
 
   // Returned so tests can await completion; Express ignores a handler's return value.
-  return handleBookingWebhook({ trigger, data, grantId: body.data?.grant_id ?? data.grant_id })
+  return (calendarEvent
+    ? handleCalendarEvent({ trigger, data, grantId: grantIdFromBody })
+    : handleBookingWebhook({ trigger, data, grantId: grantIdFromBody })
+  )
     .then(result => {
-      console.log(`[nylas] ${trigger} -> ${result.action || result.reason}`);
+      if (!calendarEvent || result.handled) {
+        console.log(`[nylas] ${trigger} -> ${result.action || result.reason}`);
+      }
       res.status(200).json({ received: true, ...result });
     })
     .catch(e => {

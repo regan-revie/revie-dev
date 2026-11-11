@@ -78,6 +78,20 @@ const waitForWebhookBooking = async transactionId => {
  * @param {'browser'|'sweeper'} [params.source] only for the logs
  * @returns {Promise<{outcome: 'booked'|'declined'|'already-resolved'|'busy'|'not-calendar'|'unavailable'|'error', detail?: string}>}
  */
+/** Store the calendar event id of a booking just made. Never throws. */
+const rememberEvent = async ({ bookingId, eventId, grantId }) => {
+  if (!bookingId || !eventId || !grantId) return;
+  try {
+    await db.recordBookingEvent({
+      nylasBookingId: bookingId,
+      nylasEventId: eventId,
+      nylasGrantId: grantId,
+    });
+  } catch (e) {
+    console.error(`[nylas] Could not store the calendar event id: ${e.message}`);
+  }
+};
+
 const ensureBooking = async ({ transactionId, source = 'unknown' }) => {
   if (!db.isAvailable() || !integration.isConfigured()) return { outcome: 'unavailable' };
 
@@ -160,6 +174,15 @@ const ensureBooking = async ({ transactionId, source = 'unknown' }) => {
         });
         // eslint-disable-next-line no-await-in-loop
         await db.finishBookingAttempt(transactionId, 'booked');
+        // Remember which calendar event this is, so the coach deleting it can be recognised later.
+        // Best effort: the booking exists and is paid for either way, and the backfill finds a
+        // missing one.
+        // eslint-disable-next-line no-await-in-loop
+        await rememberEvent({
+          bookingId: created?.booking_id || created?.id,
+          eventId: created?.event_id,
+          grantId: provider?.attributes?.profile?.privateData?.nylasGrantId,
+        });
         // eslint-disable-next-line no-await-in-loop
         await describeBookedEvent({
           grantId: provider?.attributes?.profile?.privateData?.nylasGrantId,

@@ -290,10 +290,18 @@ describe('booking.cancelled', () => {
     });
   });
 
-  it('throws rather than guessing when there is no start time', async () => {
+  it('throws rather than guessing when a client cancelled and there is no start time', async () => {
     // Without it there is no way to tell a free cancellation from a chargeable one.
     db.findByBookingId.mockResolvedValue({ sharetribe_transaction_id: TX, booking_start: null });
+    tx(clientNote);
     await expect(handleBookingWebhook(cancelled)).rejects.toThrow(/no booking start time/);
+  });
+
+  it('refunds a coach cancellation even with no start time on record: it never needs one', async () => {
+    db.findByBookingId.mockResolvedValue({ sharetribe_transaction_id: TX, booking_start: null });
+    const result = await handleBookingWebhook(cancelled);
+    expect(applyTransition).toHaveBeenCalledWith(TX, 'transition/cancel');
+    expect(result.action).toBe('refunded');
   });
 });
 

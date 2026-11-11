@@ -19,6 +19,30 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-11 (coach deletes the event from Google Calendar: refund)
+
+**Branch / PR:** `coach-calendar-delete-refund`, one PR against `main`, not merged.
+
+**Cause:** the Nylas webhook destination on revie-dev is subscribed to `booking.created`, `booking.pending`, `booking.rescheduled` and `booking.cancelled` only. `booking.cancelled` is for cancellations made *through* the Scheduler. A coach deleting the event in Google Calendar is a plain calendar change, which Nylas reports as `event.updated` (status `cancelled`) or `event.deleted`, so Nylas never called us. Render's logs confirm it: in the last 30 hours the only webhook request was one `booking.created`; nothing for the deletion.
+
+**What changed:** `calendarEventSync.js` handles `event.updated` / `event.deleted`. It matches an event to a booking only by the stored grant id + event id (new table `nylas_booking_events`), ignores everything else straight away, and sends a match through the same cancel path as `booking.cancelled` (a coach cancellation: full refund, Sharetribe's cancellation emails, `cancelledBy: provider`; if the client had used our cancel button first, it is treated as theirs). Safe to repeat: a second notification, or `booking.cancelled` arriving too, refunds nothing further. The event id is stored when a booking is made (it is in the creation response, not in the `booking.created` webhook) and refreshed on reschedule; `eventIdBackfill.js` fills it in for bookings that have none.
+
+**Needs you (I did not touch the Nylas dashboard):** add two triggers to the existing webhook destination, then retest.
+1. Open the Nylas dashboard, switch to the **EU application** (the one used by revie-dev), go to **Notifications**, open the webhook destination whose URL is `https://revie-dev.onrender.com/api/nylas/webhooks`, press **Edit**.
+2. Under the event triggers tick **`event.updated`** and **`event.deleted`** (keep the four `booking.*` ones ticked). Save. The signing secret does not change, so nothing needs updating in 1Password or Render. (If the dashboard does not list them, the same change can be made through the API; ask and I will give you the call.)
+
+**Retest, step by step**
+1. Merge, wait for the Render deploy, and do step 2 above.
+2. Wait two minutes. The server finds the calendar event of each existing upcoming test booking by itself (Render logs show `[jobs] event id backfill {...}`; `resolved` should equal `checked`). A booking that was already cancelled by hand before this is not fixed retroactively; refund that one in Stripe/Console if you still want it.
+3. As a client, book a session (or use an existing upcoming one).
+4. As the coach, delete the event from Google Calendar.
+5. Within about a minute: the order page and inbox read cancelled, Stripe shows a full refund, the client and the coach each get the Sharetribe cancellation email, and the transaction in Console is `cancelled` with `cancelledBy: provider`. Render shows `[nylas] event.updated -> refunded`.
+6. Delete an event that is not a Revie session (any ordinary calendar entry): nothing happens and nothing is logged beyond the access line.
+
+**Not verified:** against live Nylas. I confirmed from Nylas's own mock payloads that `event.updated` carries `id`, `grant_id`, `calendar_id` and `status`, that a deleted Google event is kept as `status: cancelled` (seen on this coach's calendar), and that the booking object returned by Nylas has an `event_id`. Not confirmed: the exact notification Nylas sends for a Google deletion (the Nylas help page that says Google gets `event.updated` could not be opened; both triggers are handled for that reason), and that reading a booking back with a session works for the backfill. If the backfill cannot resolve a booking, only bookings made after this deploys are covered; the log line says so.
+
+---
+
 ## HANDOFF — 2026-11-10 (coach booking setup: automatic, with working hours)
 
 **PRs, both not merged:** #20 (server, stacked on #19) and this one (client, stacked on #20). Merge in order: #19, #20, then this.

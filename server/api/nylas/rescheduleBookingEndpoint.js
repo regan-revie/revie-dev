@@ -76,12 +76,22 @@ module.exports = async (req, res) => {
       return;
     }
 
-    await rescheduleBooking({
+    const moved = await rescheduleBooking({
       configurationId,
       bookingId: active.nylas_booking_id,
       start: startDate,
       end: endDate,
     });
+
+    // Keep the calendar event id current in case moving the session gave it a new one, so the coach
+    // deleting it afterwards is still recognised. Best effort; a reschedule never fails for this.
+    if (moved && moved.event_id) {
+      db.recordBookingEvent({
+        nylasBookingId: active.nylas_booking_id,
+        nylasEventId: moved.event_id,
+        nylasGrantId: active.nylas_grant_id,
+      }).catch(e => console.error(`[nylas] Could not refresh the calendar event id: ${e.message}`));
+    }
 
     res.status(200).json({ ok: true });
   } catch (e) {

@@ -139,3 +139,45 @@ describe('lookups', () => {
     expect(mockQuery.mock.calls[0][0]).toMatch(/WHERE sharetribe_transaction_id = \$1/);
   });
 });
+
+describe('calendar event ids', () => {
+  it('records an event against a booking, replacing an older one', async () => {
+    const db = loadDb(URL);
+    await db.recordBookingEvent({ nylasBookingId: 'b1', nylasEventId: 'e1', nylasGrantId: 'g1' });
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/INSERT INTO nylas_booking_events/);
+    expect(sql).toMatch(/ON CONFLICT \(nylas_booking_id\) DO UPDATE/);
+    expect(params).toEqual(['b1', 'e1', 'g1']);
+  });
+
+  it('finds a booking by grant id and event id together, and nothing else', async () => {
+    mockQuery.mockResolvedValue({ rows: [{ nylas_booking_id: 'b1' }] });
+    const row = await loadDb(URL).findBookingByEvent('g1', 'e1');
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/nylas_grant_id = \$1 AND e\.nylas_event_id = \$2/);
+    expect(params).toEqual(['g1', 'e1']);
+    expect(row).toEqual({ nylas_booking_id: 'b1' });
+  });
+
+  it('returns null for an event that is not a booking', async () => {
+    mockQuery.mockResolvedValue({ rows: [] });
+    expect(await loadDb(URL).findBookingByEvent('g1', 'someone-elses-meeting')).toBeNull();
+  });
+
+  it('lists only active upcoming bookings that have no event recorded', async () => {
+    await loadDb(URL).findBookingsMissingEvent(5);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/LEFT JOIN nylas_booking_events/);
+    expect(sql).toMatch(/e\.nylas_booking_id IS NULL/);
+    expect(sql).toMatch(/status IN \('created', 'rescheduled'\)/);
+    expect(sql).toMatch(/booking_start > now\(\)/);
+    expect(params).toEqual([5]);
+  });
+
+  it('creates its table and lookup index with the rest of the schema', async () => {
+    await loadDb(URL).initSchema();
+    const all = mockQuery.mock.calls.map(c => c[0]).join('\n');
+    expect(all).toMatch(/CREATE TABLE IF NOT EXISTS nylas_booking_events/);
+    expect(all).toMatch(/nylas_booking_events_event_idx/);
+  });
+});
