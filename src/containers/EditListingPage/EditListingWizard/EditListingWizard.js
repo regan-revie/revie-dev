@@ -95,7 +95,10 @@ export const tabsForListingType = (processName, listingTypeConfig) => {
   // Revie: a fixed-length session is booked through the coach's connected calendar and their working
   // hours (Account settings > Calendar), not through an availability plan set per listing, so that
   // step is not offered. The server writes the plan the listing still needs.
-  const availabilityMaybe = listingTypeConfig?.unitType === 'fixed' ? [] : [AVAILABILITY];
+  // `unitType` lives under `transactionType` once the hosted listing type has been restructured
+  // (configHelpers.js restructureListingTypes), not at the top level where the hosted asset has it.
+  const availabilityMaybe =
+    listingTypeConfig?.transactionType?.unitType === 'fixed' ? [] : [AVAILABILITY];
 
   // You can reorder these panels.
   // Note 1: You need to change save button translations for new listing flow

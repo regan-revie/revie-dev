@@ -89,6 +89,8 @@ const runReconcile = async ({ now = Date.now() } = {}) => {
     const { locked, results } = await ensureCoachListings({
       userId,
       profile: author.attributes.profile,
+      // Not the profile: payout status is an attribute of the user itself.
+      stripeConnected: author.attributes.stripeConnected,
       listings: due,
       updateListing,
       siteUrl,

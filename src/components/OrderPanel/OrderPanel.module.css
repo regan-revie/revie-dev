@@ -271,6 +271,15 @@
     padding: 0;
   }
 }
+.notice {
+  margin: 0;
+  padding: 0 24px;
+
+  @media (--viewportMedium) {
+    padding: 0;
+  }
+}
+
 .errorSidebar {
   color: var(--colorFail);
   padding: 0 24px;

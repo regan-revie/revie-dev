@@ -22,12 +22,20 @@ const updaterFor = update => ({ id, publicData, availabilityPlan }) =>
  * @param {object} params
  * @param {string} params.userId
  * @param {object} params.profile `{displayName, privateData}`
+ * @param {boolean} [params.stripeConnected] whether the coach has payout details
  * @param {object[]} params.listings the coach's listings (any state mix; only callers decide which)
  * @param {Function} params.updateListing `({id, publicData, availabilityPlan}) => Promise`
  * @param {string} params.siteUrl
  * @returns {Promise<{locked: boolean, results: {listingId: string, status: string, error?: Error}[]}>}
  */
-const ensureCoachListings = async ({ userId, profile, listings, updateListing, siteUrl }) => {
+const ensureCoachListings = async ({
+  userId,
+  profile,
+  stripeConnected,
+  listings,
+  updateListing,
+  siteUrl,
+}) => {
   const outcome = await db.withAdvisoryLock(`nylas-ensure-coach:${userId}`, async () => {
     const results = [];
     for (const listing of listings) {
@@ -37,6 +45,7 @@ const ensureCoachListings = async ({ userId, profile, listings, updateListing, s
         const { status } = await ensureListingBookable({
           listing,
           profile,
+          stripeConnected,
           updateListing,
           siteUrl,
         });
@@ -60,13 +69,15 @@ const ensureCoachListings = async ({ userId, profile, listings, updateListing, s
  * @param {string} params.userId
  * @param {object} params.profile `{displayName, privateData}` - pass the *new* private data when the
  *   caller has just changed it (the callback has just stored a grant)
+ * @param {boolean} [params.stripeConnected] the user's `stripeConnected` attribute
  * @param {string} params.siteUrl
  */
-const ensureOwnListings = async ({ sdk, userId, profile, siteUrl }) => {
+const ensureOwnListings = async ({ sdk, userId, profile, stripeConnected, siteUrl }) => {
   const response = await sdk.ownListings.query({ states: 'published', perPage: 100 });
   return ensureCoachListings({
     userId,
     profile,
+    stripeConnected,
     listings: response.data.data,
     updateListing: updaterFor(args => sdk.ownListings.update(args)),
     siteUrl,

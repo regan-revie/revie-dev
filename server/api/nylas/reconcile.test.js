@@ -79,6 +79,14 @@ describe('runReconcile()', () => {
     expect(summary).toMatchObject({ coaches: 2, listings: 3, statuses: { unchanged: 3 } });
   });
 
+  it("passes the coach's payout status (a user attribute, not part of the profile) along", async () => {
+    const user = author('u1', { nylasGrantId: 'g1' });
+    user.attributes.stripeConnected = true;
+    getIntegrationSdk.mockReturnValue(makeSdk([page([listing('l1', 'u1')], [user])]));
+    await loadReconcile()();
+    expect(ensureCoachListings.mock.calls[0][0].stripeConnected).toBe(true);
+  });
+
   it('asks only for published listings, with their authors', async () => {
     const sdk = makeSdk([page([], [])]);
     getIntegrationSdk.mockReturnValue(sdk);

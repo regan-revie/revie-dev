@@ -19,6 +19,28 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-11 (session wizard tab fix, coach setup card)
+
+**Branch / PR:** `session-wizard-and-setup-card`, one PR against `main`, not merged.
+
+**Bug 1, cause:** the wizard's check for "fixed-length session" read `listingTypeConfig.unitType`. The hosted listing type does have `unitType: "fixed"` at the top level (Dev: `signature-session`, process `default-booking/release-1`), but the app restructures hosted listing types on load (`restructureListingTypes` in `configHelpers.js`) and moves it to `transactionType.unitType`. So on the deployed site the check was always false and the Availability tab stayed; the Next button is disabled there because the tab is incomplete until a default schedule is set. #21's test passed because it used a hand-written config in the wrong shape. Publishing itself is not gated on an availability plan anywhere in the wizard (the tab list decides what is required), so with the tab gone a session goes Details → Pricing → Photos and publishes without one; whether the Marketplace API accepts a booking listing with no plan is only checked end to end (step 3 below). The fix reads `transactionType.unitType`; the new test runs the real hosted shape through `mergeConfig`, and fails against the old check (checked).
+
+**Bug 2, what changed:** on the coach's own session listing the red "Connect your calendar..." sidebar text and the dark "Please add your payout details" banner are replaced by one setup card in the sidebar: "Clients can't book this session yet" / "Finish these and it goes live automatically." with two steps, "Connect your calendar" (to `/account/calendar`) and "Add payout details" (to the stock payout page), each a secondary button until done and a tick with no button once done. Maroon text, body size, no error red. When both are done the card does not render; a plain "we're setting up this session" line shows meanwhile if the server has not finished. Clients and visitors see "This coach isn't taking bookings yet." in plain body text. The stock payout banner is hidden on fixed-length session pages only. Card states are also in the styleguide (Components → SessionSetupCard).
+
+**Payouts are now required for a session to go live (added to this PR at your request):** `ensureBookable` only enables calendar booking when the coach has a connected calendar **and** `stripeConnected`. Calendar only or payouts only: not bookable (clients see "This coach isn't taking bookings yet", the coach sees the setup card). Payout status is part of the sync signature, so adding payout details enables the listing on the next loop, within a minute. If an enabled listing's coach loses `stripeConnected`, booking is switched off on it and reported to Sentry once (`nylas-booking-disabled-no-payouts`). If the status cannot be read, the listing is left alone. Existing listings whose coaches already have payouts do not change (dry run on both Dev listings: only a signature key is rewritten). Tests: calendar only, payouts only, both, payouts added later (next loop), payouts removed (off, reported once, back on when re-added), unknown status, and the old-signature listing, plus the whole loop end to end.
+
+**Retest, step by step**
+1. After deploy, as a new coach, start a new Signature Session. The steps should be Details, Pricing, Photos only, with no Availability tab and no "set a default schedule" gate.
+2. Publish it. It must publish without an availability plan (watch for an API error on the last step; if there is one, tell me the message).
+3. Open the published listing as the coach with no calendar and no payouts: one card, two buttons, no red text and no dark banner.
+4. Connect the calendar and come back: that step has a tick and no button, and the payout step still has its button. The listing must **still not** be bookable: open it as the client (second browser) and it says "This coach isn't taking bookings yet." in normal text. In Console, `calendarBookingEnabled` should not be true.
+5. **Add payout details last** (account settings, Payments). Then wait: **within a minute** the coach's card disappears (after a refresh), the client's page shows the booking form, and Console shows `calendarBookingEnabled: true` with the configuration ids. Watch Render's logs for `[jobs] reconcile` with `synced: 1`.
+6. Optional: remove the payout details in Stripe (or, simpler, ask me to) and within a minute the client's page goes back to "isn't taking bookings yet" and Sentry shows one `nylas-booking-disabled-no-payouts` event.
+
+**Not verified:** the card and the wizard on the real site while logged in (the card states were viewed in the styleguide in a browser; the wizard and listing page are covered by tests only), and publishing without a plan against the live API.
+
+---
+
 ## HANDOFF — 2026-11-11 (coach deletes the event from Google Calendar: refund)
 
 **Branch / PR:** `coach-calendar-delete-refund`, one PR against `main`, not merged.

@@ -81,6 +81,7 @@ import * as TopbarSimplified from './components/TopbarSimplified/TopbarSimplifie
 import * as SectionFooter from './containers/PageBuilder/SectionBuilder/SectionFooter/SectionFooter.example';
 import * as InboxBooking from './containers/InboxPage/InboxPage.booking.example';
 import * as OrderPanel from './components/OrderPanel/OrderPanel.example';
+import * as SessionSetupCard from './components/OrderPanel/SessionSetupCard/SessionSetupCard.example';
 import * as NylasBookingForm from './components/OrderPanel/NylasBookingForm/NylasBookingForm.example';
 import * as ManageCalendarBooking from './containers/TransactionPage/ManageCalendarBooking/ManageCalendarBooking.example';
 import * as OutsideClickHandler from './components/OutsideClickHandler/OutsideClickHandler.example';
@@ -233,6 +234,7 @@ export {
   NamedLink,
   OrderBreakdown,
   OrderPanel,
+  SessionSetupCard,
   InboxBooking,
   TopbarSimplified,
   SectionFooter,

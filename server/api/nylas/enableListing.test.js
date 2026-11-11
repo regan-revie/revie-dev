@@ -47,6 +47,7 @@ describe('enable-listing handler', () => {
             data: {
               data: {
                 attributes: {
+                  stripeConnected: true,
                   profile: {
                     displayName: 'Ada',
                     privateData: { nylasGrantId: 'g', nylasGrantEmail: 'ada@example.com' },

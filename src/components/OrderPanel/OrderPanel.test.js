@@ -475,30 +475,106 @@ describe('OrderPanel', () => {
     });
   });
 
-  it('Booking: fixed, own listing, no calendar connected: a link to connect one', async () => {
-    const { getByText, getByRole } = renderFixed({ listing: fixedListing(), isOwnListing: true });
-
-    await waitFor(() => {
-      expect(getByText('OrderPanel.ownListingConnectCalendar')).toBeInTheDocument();
-    });
-    expect(getByRole('link', { name: 'OrderPanel.ownListingConnectCalendarLink' })).toHaveAttribute(
-      'href',
-      '/account/calendar'
-    );
+  // The coach's own session listing, by what they have done so far. `stripeConnected` is the user
+  // attribute Sharetribe sets once payout details exist.
+  const coach = ({ calendar, payouts }) => ({
+    user: {
+      currentUser: createCurrentUser('coach1', {
+        stripeConnected: !!payouts,
+        profile: calendar
+          ? { publicData: { calendarConnected: true }, privateData: { nylasGrantId: 'g' } }
+          : {},
+      }),
+    },
   });
 
-  it('Booking: fixed, own listing, calendar connected: says it is being set up', async () => {
-    const { getByText, queryByRole } = renderFixed(
+  const stepButton = name => screen.queryByRole('button', { name });
+  const CALENDAR = 'OrderPanel.setupConnectCalendar';
+  const PAYOUTS = 'OrderPanel.setupAddPayoutDetails';
+
+  it('Booking: fixed, own listing, neither step done: one card with two buttons', async () => {
+    renderFixed(
       { listing: fixedListing(), isOwnListing: true },
-      { initialState: connectedUser }
+      { initialState: coach({ calendar: false, payouts: false }) }
     );
 
     await waitFor(() => {
-      expect(getByText('OrderPanel.ownListingSettingUp')).toBeInTheDocument();
+      expect(screen.getByText('OrderPanel.setupCardHeading')).toBeInTheDocument();
     });
-    expect(
-      queryByRole('link', { name: 'OrderPanel.ownListingConnectCalendarLink' })
-    ).not.toBeInTheDocument();
+    expect(screen.getByText('OrderPanel.setupCardIntro')).toBeInTheDocument();
+    expect(stepButton(CALENDAR)).toBeInTheDocument();
+    expect(stepButton(PAYOUTS)).toBeInTheDocument();
+    // No ticks, and none of the old red messages.
+    expect(screen.queryByText('OrderPanel.setupStepDone')).not.toBeInTheDocument();
+    expect(screen.queryByText('OrderPanel.notTakingBookings')).not.toBeInTheDocument();
+    expect(screen.queryByText('OrderPanel.ownListingSettingUp')).not.toBeInTheDocument();
+  });
+
+  it('Booking: fixed, own listing, calendar done: that step is ticked with no button, payouts still has one', async () => {
+    renderFixed(
+      { listing: fixedListing(), isOwnListing: true },
+      { initialState: coach({ calendar: true, payouts: false }) }
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('OrderPanel.setupCardHeading')).toBeInTheDocument();
+    });
+    expect(stepButton(CALENDAR)).not.toBeInTheDocument();
+    expect(screen.getByText(CALENDAR)).toBeInTheDocument();
+    expect(screen.getAllByText('OrderPanel.setupStepDone')).toHaveLength(1);
+    expect(stepButton(PAYOUTS)).toBeInTheDocument();
+  });
+
+  it('Booking: fixed, own listing, payouts done: that step is ticked with no button, calendar still has one', async () => {
+    renderFixed(
+      { listing: fixedListing(), isOwnListing: true },
+      { initialState: coach({ calendar: false, payouts: true }) }
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('OrderPanel.setupCardHeading')).toBeInTheDocument();
+    });
+    expect(stepButton(PAYOUTS)).not.toBeInTheDocument();
+    expect(screen.getByText(PAYOUTS)).toBeInTheDocument();
+    expect(stepButton(CALENDAR)).toBeInTheDocument();
+  });
+
+  it('Booking: fixed, own listing, both done: no card (only a quiet note while the server finishes setting it up)', async () => {
+    renderFixed(
+      { listing: fixedListing(), isOwnListing: true },
+      { initialState: coach({ calendar: true, payouts: true }) }
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('OrderPanel.ownListingSettingUp')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+    expect(stepButton(CALENDAR)).not.toBeInTheDocument();
+    expect(stepButton(PAYOUTS)).not.toBeInTheDocument();
+  });
+
+  it('Booking: fixed, own listing, both done and already set up for calendar booking: no card at all', async () => {
+    renderFixed(
+      { listing: fixedListing({ calendarBookingEnabled: true }), isOwnListing: true },
+      { initialState: coach({ calendar: true, payouts: true }) }
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('title!').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+    expect(screen.queryByText('OrderPanel.ownListingSettingUp')).not.toBeInTheDocument();
+  });
+
+  it('Booking: fixed, a client or visitor: the plain "isn\'t taking bookings yet" line, never the card', async () => {
+    renderFixed({ listing: fixedListing(), isOwnListing: false });
+
+    const line = await screen.findByText('OrderPanel.notTakingBookings');
+    expect(line).toBeInTheDocument();
+    expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+    expect(stepButton(CALENDAR)).not.toBeInTheDocument();
+    // Body text, not the red error style.
+    expect(line.className).not.toMatch(/error/i);
   });
 
   it('Purchase: item ', async () => {
