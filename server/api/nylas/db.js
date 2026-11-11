@@ -85,6 +85,22 @@ const initSchema = async () => {
       updated_at                timestamptz NOT NULL DEFAULT now()
     )
   `);
+  // The Nylas calendar event each booking created. Nylas returns it only when the booking is made
+  // (`event_id`), never in the booking.created webhook, and it is what a calendar notification (the
+  // coach deleting the event) names. A separate table, so it can be written before or after the
+  // webhook records the booking itself, in either order.
+  await query(`
+    CREATE TABLE IF NOT EXISTS nylas_booking_events (
+      nylas_booking_id text PRIMARY KEY,
+      nylas_event_id   text NOT NULL,
+      nylas_grant_id   text NOT NULL,
+      updated_at       timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await query(
+    `CREATE INDEX IF NOT EXISTS nylas_booking_events_event_idx
+       ON nylas_booking_events (nylas_grant_id, nylas_event_id)`
+  );
   return true;
 };
 
@@ -208,6 +224,50 @@ const findByTransactionId = async sharetribeTransactionId => {
   return rows;
 };
 
+/** Remember which calendar event a booking created. Safe to repeat. */
+const recordBookingEvent = async ({ nylasBookingId, nylasEventId, nylasGrantId }) => {
+  const { rows } = await query(
+    `INSERT INTO nylas_booking_events (nylas_booking_id, nylas_event_id, nylas_grant_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (nylas_booking_id) DO UPDATE
+       SET nylas_event_id = EXCLUDED.nylas_event_id,
+           nylas_grant_id = EXCLUDED.nylas_grant_id,
+           updated_at     = now()
+     RETURNING *`,
+    [nylasBookingId, nylasEventId, nylasGrantId]
+  );
+  return rows[0];
+};
+
+/**
+ * The booking a calendar event belongs to, matched on the grant and event ids we stored when the
+ * booking was made. Null for any event that is not a Revie booking, which is almost all of them.
+ */
+const findBookingByEvent = async (nylasGrantId, nylasEventId) => {
+  const { rows } = await query(
+    `SELECT b.* FROM nylas_booking_events e
+       JOIN nylas_bookings b ON b.nylas_booking_id = e.nylas_booking_id
+      WHERE e.nylas_grant_id = $1 AND e.nylas_event_id = $2`,
+    [nylasGrantId, nylasEventId]
+  );
+  return rows[0] || null;
+};
+
+/** Active, upcoming bookings with no stored event id (made before this existed, or its call failed). */
+const findBookingsMissingEvent = async (limit = 10) => {
+  const { rows } = await query(
+    `SELECT b.* FROM nylas_bookings b
+       LEFT JOIN nylas_booking_events e ON e.nylas_booking_id = b.nylas_booking_id
+      WHERE e.nylas_booking_id IS NULL
+        AND b.status IN ('created', 'rescheduled')
+        AND (b.booking_start IS NULL OR b.booking_start > now())
+      ORDER BY b.created_at DESC
+      LIMIT $1`,
+    [limit]
+  );
+  return rows;
+};
+
 /**
  * Sessions still to happen on a grant: booked (or rescheduled) and starting in the future. Used when
  * a coach connects a different calendar, to say which sessions stay on the old one.
@@ -281,6 +341,9 @@ module.exports = {
   findByBookingId,
   findByTransactionId,
   findUpcomingByGrantId,
+  recordBookingEvent,
+  findBookingByEvent,
+  findBookingsMissingEvent,
   withAdvisoryLock,
   setStatus,
   claimBookingAttempt,

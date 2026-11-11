@@ -296,7 +296,26 @@ const rescheduleBooking = async ({ configurationId, bookingId, start, end }) => 
   return payload.data;
 };
 
+/**
+ * Read a Nylas booking back (it carries the `event_id` of its calendar event). Same session
+ * mechanics as the calls above: a private configuration answers only to a session.
+ */
+const getBooking = async ({ configurationId, bookingId }) => {
+  const session = await createSession(configurationId);
+  const response = await fetch(`${API_BASE_URL}/v3/scheduling/bookings/${bookingId}`, {
+    headers: { Authorization: `Bearer ${session}`, Accept: 'application/json' },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const err = new Error(`Nylas booking lookup failed with status ${response.status}`);
+    err.status = response.status;
+    throw err;
+  }
+  return payload.data;
+};
+
 module.exports = {
+  getBooking,
   createSession,
   filterSlotsByOpenHours,
   slotInCoachWeek,

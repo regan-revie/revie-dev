@@ -6,6 +6,7 @@ jest.mock('./db', () => ({
   finishBookingAttempt: jest.fn(async () => ({})),
   findByTransactionId: jest.fn(async () => []),
   setStatus: jest.fn(async () => ({})),
+  recordBookingEvent: jest.fn(async () => ({})),
 }));
 jest.mock('./integration', () => ({
   isConfigured: jest.fn(() => true),
@@ -83,6 +84,39 @@ describe('isTransient()', () => {
 });
 
 describe('ensureBooking()', () => {
+  it('remembers which calendar event the booking created, so the coach deleting it is recognised', async () => {
+    integration.loadTransactionAsOperator.mockResolvedValue(
+      resources({
+        provider: { attributes: { profile: { privateData: { nylasGrantId: 'grant-9' } } } },
+      })
+    );
+    createBooking.mockResolvedValue({ booking_id: 'bk-1', event_id: 'ev-1' });
+
+    await ensureBooking({ transactionId: TX, source: 'browser' });
+
+    expect(db.recordBookingEvent).toHaveBeenCalledWith({
+      nylasBookingId: 'bk-1',
+      nylasEventId: 'ev-1',
+      nylasGrantId: 'grant-9',
+    });
+  });
+
+  it('does not fail a booking that is made and paid for because the event id could not be stored', async () => {
+    integration.loadTransactionAsOperator.mockResolvedValue(
+      resources({
+        provider: { attributes: { profile: { privateData: { nylasGrantId: 'grant-9' } } } },
+      })
+    );
+    createBooking.mockResolvedValue({ booking_id: 'bk-1', event_id: 'ev-1' });
+    db.recordBookingEvent.mockRejectedValueOnce(new Error('db down'));
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await ensureBooking({ transactionId: TX, source: 'browser' });
+
+    expect(result.outcome).toBe('booked');
+    spy.mockRestore();
+  });
+
   it('creates the booking on the first attempt and does not decline', async () => {
     const result = await ensureBooking({ transactionId: TX, source: 'browser' });
     expect(result.outcome).toBe('booked');

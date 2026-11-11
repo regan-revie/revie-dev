@@ -127,6 +127,56 @@ const handleLateCancellation = async (transactionId, metadata) => {
   await recordCancellation(transactionId, metadata, { cancelledBy: 'client', late: true });
 };
 
+/**
+ * A booking is cancelled, from whichever side, and the money has to follow. Shared by the Scheduler's
+ * `booking.cancelled` and by calendarEventSync.js (the coach deleting the event on their own
+ * calendar), so both ways in do exactly the same thing.
+ *
+ * Idempotent: Sharetribe refuses a second transition out of `accepted`, so a notification that
+ * arrives twice, or by both routes, refunds once and the second is reported as already done.
+ *
+ * @param {object} params
+ * @param {string} params.bookingId Nylas booking id
+ * @param {object} params.mapping the nylas_bookings row
+ * @param {object} [params.data] the webhook's booking object, for a start time the row may lack
+ */
+const processBookingCancelled = async ({ bookingId, mapping, data }) => {
+  await db.setStatus(bookingId, 'cancelled');
+
+  const transactionId = mapping.sharetribe_transaction_id;
+  const { metadata } = await getTransactionBasics(transactionId);
+
+  // Who cancelled. The client's cancel button leaves `cancelRequestedBy: customer` before it asks
+  // Nylas (cancelBookingEndpoint.js); a cancellation without that note can only have come from
+  // the coach's own calendar. Decided Nov 5, 2026: a coach cancellation always refunds the client,
+  // at any time; only the client's own cancellation inside 48 hours is charged.
+  const byClient = metadata.cancelRequestedBy === 'customer';
+
+  let late = false;
+  if (byClient) {
+    const bookingStart = mapping.booking_start ?? (data && extractBookingStart(data));
+    if (!bookingStart) {
+      // Refusing to guess: without a start time there is no way to tell a free cancellation from a
+      // chargeable one, and picking either silently is a billing dispute nobody notices.
+      throw new Error(`Cannot decide refund for booking ${bookingId}: no booking start time`);
+    }
+    late = !isFreeCancellation({ bookingStart, cancelledAt: new Date() });
+  }
+
+  if (late) {
+    await handleLateCancellation(transactionId, metadata);
+    return { handled: true, action: 'charged-late-cancellation' };
+  }
+
+  const result = await applyTransition(transactionId, 'transition/cancel');
+  if (!result.ok && !result.alreadyApplied) throw result.error;
+  await recordCancellation(transactionId, metadata, {
+    cancelledBy: byClient ? 'client' : 'provider',
+    late: false,
+  });
+  return { handled: true, action: result.alreadyApplied ? 'already-cancelled' : 'refunded' };
+};
+
 const handleBookingWebhook = async ({ trigger, data, grantId }) => {
   const bookingId = extractBookingId(data);
   if (!bookingId) return { handled: false, reason: 'no-booking-id' };
@@ -170,38 +220,7 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
   if (trigger === 'booking.cancelled') {
     const mapping = await db.findByBookingId(bookingId);
     if (!mapping) return { handled: false, reason: 'unknown-booking' };
-
-    await db.setStatus(bookingId, 'cancelled');
-
-    const bookingStart = mapping.booking_start ?? extractBookingStart(data);
-    if (!bookingStart) {
-      // Refusing to guess: without a start time there is no way to tell a free cancellation from a
-      // chargeable one, and picking either silently is a billing dispute nobody notices.
-      throw new Error(`Cannot decide refund for booking ${bookingId}: no booking start time`);
-    }
-
-    const transactionId = mapping.sharetribe_transaction_id;
-    const { metadata } = await getTransactionBasics(transactionId);
-
-    // Who cancelled. The client's cancel button leaves `cancelRequestedBy: customer` before it asks
-    // Nylas (cancelBookingEndpoint.js); a cancellation without that note can only have come from
-    // the coach's own calendar. Decided Nov 5, 2026: a coach cancellation always refunds the client,
-    // at any time; only the client's own cancellation inside 48 hours is charged.
-    const byClient = metadata.cancelRequestedBy === 'customer';
-    const late = byClient && !isFreeCancellation({ bookingStart, cancelledAt: new Date() });
-
-    if (late) {
-      await handleLateCancellation(transactionId, metadata);
-      return { handled: true, action: 'charged-late-cancellation' };
-    }
-
-    const result = await applyTransition(transactionId, 'transition/cancel');
-    if (!result.ok && !result.alreadyApplied) throw result.error;
-    await recordCancellation(transactionId, metadata, {
-      cancelledBy: byClient ? 'client' : 'provider',
-      late: false,
-    });
-    return { handled: true, action: result.alreadyApplied ? 'already-cancelled' : 'refunded' };
+    return processBookingCancelled({ bookingId, mapping, data });
   }
 
   if (trigger === 'booking.rescheduled') {
@@ -238,4 +257,5 @@ module.exports = {
   extractBookingEnd,
   extractBookingId,
   handleBookingWebhook,
+  processBookingCancelled,
 };

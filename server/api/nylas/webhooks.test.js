@@ -174,6 +174,75 @@ describe('receive()', () => {
     }
   );
 
+  describe('calendar event notifications', () => {
+    const eventPayload = type => ({
+      type,
+      data: { object: { id: 'ev-1', grant_id: 'g-1', calendar_id: 'cal-1', status: 'cancelled' } },
+    });
+
+    // A fresh module graph with the calendar handler replaced, to see where a notification goes.
+    const loadWithCalendarHandler = handler => {
+      let mod;
+      jest.isolateModules(() => {
+        process.env.NYLAS_WEBHOOK_SECRET = SECRET;
+        jest.doMock('./calendarEventSync', () => ({ handleCalendarEvent: handler }));
+        mod = require('./webhooks');
+      });
+      delete process.env.NYLAS_WEBHOOK_SECRET;
+      return mod;
+    };
+
+    it.each(['event.updated', 'event.deleted'])(
+      'routes %s to the calendar handler, not the booking one',
+      async type => {
+        const handler = jest.fn(async () => ({ handled: true, action: 'refunded' }));
+        const { receive } = loadWithCalendarHandler(handler);
+        const res = mockRes();
+        await receive(signedRequest(eventPayload(type), SECRET), res);
+
+        expect(handler).toHaveBeenCalledWith({
+          trigger: type,
+          data: expect.objectContaining({ id: 'ev-1', grant_id: 'g-1' }),
+          grantId: 'g-1',
+        });
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toMatchObject({ received: true, handled: true, action: 'refunded' });
+      }
+    );
+
+    it('says nothing more in the log about an event that is not a Revie booking', async () => {
+      const handler = jest.fn(async () => ({ handled: false, reason: 'not-a-revie-booking' }));
+      const { receive } = loadWithCalendarHandler(handler);
+      const req = signedRequest(eventPayload('event.updated'), SECRET);
+      req.method = 'POST';
+      req.path = '/api/nylas/webhooks';
+      const res = mockRes();
+      await receive(req, res);
+
+      const lines = console.log.mock.calls.flat().map(String);
+      expect(lines.filter(l => l.startsWith('[nylas] event.updated'))).toEqual([]);
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual({ received: true, handled: false, reason: 'not-a-revie-booking' });
+    });
+
+    it('logs the ones that were acted on', async () => {
+      const handler = jest.fn(async () => ({ handled: true, action: 'refunded' }));
+      const { receive } = loadWithCalendarHandler(handler);
+      await receive(signedRequest(eventPayload('event.deleted'), SECRET), mockRes());
+      expect(console.log).toHaveBeenCalledWith('[nylas] event.deleted -> refunded');
+    });
+
+    it('answers 500 when handling fails, so Nylas delivers it again', async () => {
+      const handler = jest.fn(async () => {
+        throw new Error('stripe down');
+      });
+      const { receive } = loadWithCalendarHandler(handler);
+      const res = mockRes();
+      await receive(signedRequest(eventPayload('event.updated'), SECRET), res);
+      expect(res.statusCode).toBe(500);
+    });
+  });
+
   it('acknowledges but does not handle an unrecognised trigger', async () => {
     const { receive } = loadWebhooks(SECRET);
     const res = mockRes();
