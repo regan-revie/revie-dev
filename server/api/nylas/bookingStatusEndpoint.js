@@ -12,12 +12,21 @@ const { createCookieTokenStore, getSdk, handleError } = require('../../api-util/
 const { isConfigured } = require('./config');
 const { loadCalendarBookingTransaction } = require('./manageBookingShared');
 const db = require('./db');
-const { isFreeCancellation } = require('./scheduler');
+const { isFreeCancellation, canClientReschedule } = require('./scheduler');
 
 /** isFreeCancellation throws on a bad time; for display, "unknown" (null) is the honest answer. */
 const freeAt = (bookingStart, at) => {
   try {
     return isFreeCancellation({ bookingStart, cancelledAt: at });
+  } catch (e) {
+    return null;
+  }
+};
+
+/** Same idea for the Reschedule button: null when the time cannot be read. */
+const movableAt = (bookingStart, at) => {
+  try {
+    return canClientReschedule({ bookingStart, now: at });
   } catch (e) {
     return null;
   }
@@ -54,6 +63,9 @@ module.exports = async (req, res) => {
           // (isFreeCancellation), so the confirmation the client sees cannot disagree with the
           // refund the webhook will actually make.
           freeCancellationNow: freeAt(active.booking_start, new Date()),
+          // Whether the client may still move the session (the same 48 hours; the server enforces
+          // it in rescheduleBookingEndpoint.js, this only lets the page say so first).
+          rescheduleAllowed: movableAt(active.booking_start, new Date()),
         });
         return;
       }

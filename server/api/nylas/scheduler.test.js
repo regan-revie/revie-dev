@@ -287,6 +287,34 @@ describe('cancellation notice', () => {
   });
 });
 
+describe('canClientReschedule()', () => {
+  const { canClientReschedule } = require('./scheduler');
+  const NOW = new Date('2026-06-01T12:00:00Z');
+  const startIn = h => new Date(NOW.getTime() + h * 3600000);
+
+  it('lets a client move a session 49 hours away', () => {
+    expect(canClientReschedule({ bookingStart: startIn(49), now: NOW })).toBe(true);
+  });
+
+  it('refuses a session 47 hours away', () => {
+    expect(canClientReschedule({ bookingStart: startIn(47), now: NOW })).toBe(false);
+  });
+
+  it('is exactly the free-cancellation window, boundary included', () => {
+    const { isFreeCancellation } = require('./scheduler');
+    [72, 48, 47.99, 12, -1].forEach(h => {
+      expect(canClientReschedule({ bookingStart: startIn(h), now: NOW })).toBe(
+        isFreeCancellation({ bookingStart: startIn(h), cancelledAt: NOW })
+      );
+    });
+    expect(canClientReschedule({ bookingStart: startIn(48), now: NOW })).toBe(true);
+  });
+
+  it('throws on a missing time rather than guessing', () => {
+    expect(() => canClientReschedule({ bookingStart: null, now: NOW })).toThrow();
+  });
+});
+
 describe('isFreeCancellation()', () => {
   const { isFreeCancellation } = require('./scheduler');
   const START = '2026-06-01T12:00:00Z';

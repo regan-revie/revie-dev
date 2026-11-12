@@ -31,6 +31,7 @@ import css from './ManageCalendarBooking.module.css';
 const ManageCalendarBooking = ({
   transactionId: transactionIdMaybe,
   listingId: listingIdMaybe,
+  coachFirstName,
   onCancelled,
 }) => {
   // Callers pass the SDK entities' own .id (transaction.id, listing.id), which may be a UUID
@@ -47,6 +48,10 @@ const ManageCalendarBooking = ({
   // cancellation when Nylas's webhook arrives a moment later, so the page cannot wait for it to
   // say "cancelled" - and the refund outcome shown is the one the client was told when confirming.
   const [justCancelled, setJustCancelled] = useState(null);
+  // Set the moment our own reschedule succeeds: the time the client picked. Like a cancellation, the
+  // new time reaches booking-status only when Nylas's webhook arrives a moment later, so until it
+  // does the page shows what was just chosen instead of the old time.
+  const [justRescheduled, setJustRescheduled] = useState(null);
 
   const loadStatus = () => {
     setStatus({ state: 'loading' });
@@ -59,6 +64,40 @@ const ManageCalendarBooking = ({
     loadStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionId]);
+
+  // After a reschedule, ask again every few seconds until the status shows the new time (or give up
+  // after about a minute and leave the chosen time on screen - it is right either way).
+  useEffect(() => {
+    if (!justRescheduled || justRescheduled.settled) return undefined;
+    let attempts = 0;
+    let cancelled = false;
+    let timer = null;
+    const check = () => {
+      attempts += 1;
+      nylasBookingStatus({ transactionId })
+        .then(data => {
+          if (cancelled) return;
+          const arrived =
+            data.bookingStart &&
+            Math.abs(new Date(data.bookingStart) - new Date(justRescheduled.start)) < 60000;
+          if (arrived) {
+            setStatus({ state: 'loaded', ...data });
+            setJustRescheduled(current => (current ? { ...current, settled: true } : current));
+          } else if (attempts < 20) {
+            timer = setTimeout(check, 3000);
+          }
+        })
+        .catch(() => {
+          if (!cancelled && attempts < 20) timer = setTimeout(check, 3000);
+        });
+    };
+    timer = setTimeout(check, 2000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justRescheduled, transactionId]);
 
   const durationMinutes =
     status.state === 'loaded' && status.bookingStart && status.bookingEnd
@@ -110,11 +149,17 @@ const ManageCalendarBooking = ({
       .then(() => {
         setActionInProgress(false);
         setMode('idle');
-        loadStatus();
+        setJustRescheduled({ start: slot.start, end: slot.end, settled: false });
       })
       .catch(e => {
         setActionInProgress(false);
         setActionError(e);
+        // The server turned it down because the session is now inside the 48 hours: say so and show
+        // the page as it really is, instead of leaving a button that cannot work.
+        if (e && e.code === 'reschedule-too-late') {
+          setMode('idle');
+          loadStatus();
+        }
       });
   };
 
@@ -123,16 +168,30 @@ const ManageCalendarBooking = ({
   }
 
   const timeZone = getDefaultTimeZoneOnBrowser();
-  const formattedTime =
-    status.bookingStart && status.bookingEnd
-      ? `${intl.formatDate(new Date(status.bookingStart), {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        })}, ${intl.formatTime(new Date(status.bookingStart))} – ${intl.formatTime(
-          new Date(status.bookingEnd)
-        )}`
-      : null;
+  const formatSession = (start, end) =>
+    `${intl.formatDate(new Date(start), {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    })}, ${intl.formatTime(new Date(start))} – ${intl.formatTime(new Date(end))}`;
+
+  // Until the status endpoint has caught up with a reschedule, show the time just chosen.
+  const showingChosen = justRescheduled && !justRescheduled.settled;
+  const sessionStart = showingChosen ? justRescheduled.start : status.bookingStart;
+  const sessionEnd = showingChosen ? justRescheduled.end : status.bookingEnd;
+  const formattedTime = sessionStart && sessionEnd ? formatSession(sessionStart, sessionEnd) : null;
+  // "Fri, Nov 20, 11:30 AM": the confirmation names the start, which is what people look for.
+  const rescheduledTo = justRescheduled
+    ? `${intl.formatDate(new Date(justRescheduled.start), {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      })}, ${intl.formatTime(new Date(justRescheduled.start))}`
+    : null;
+
+  // Moving a session is allowed while cancelling it is still free; the server decides and enforces
+  // it (rescheduleBookingEndpoint.js). Only a definite "no" disables the button.
+  const rescheduleLocked = status.rescheduleAllowed === false;
 
   const cancelledState = justCancelled
     ? justCancelled.free
@@ -175,15 +234,39 @@ const ManageCalendarBooking = ({
 
       {formattedTime ? <p className={css.time}>{formattedTime}</p> : null}
 
+      {justRescheduled ? (
+        <p className={css.rescheduledMessage} role="status">
+          <FormattedMessage
+            id="ManageCalendarBooking.rescheduled"
+            values={{ time: rescheduledTo }}
+          />
+        </p>
+      ) : null}
+
       {actionError ? (
         <p className={css.error}>
-          <FormattedMessage id="ManageCalendarBooking.genericError" />
+          <FormattedMessage
+            id={
+              actionError.code === 'reschedule-too-soon'
+                ? 'ManageCalendarBooking.rescheduleTooSoon'
+                : 'ManageCalendarBooking.genericError'
+            }
+          />
+        </p>
+      ) : null}
+
+      {rescheduleLocked && mode === 'idle' ? (
+        <p className={css.lockedNote}>
+          <FormattedMessage
+            id="ManageCalendarBooking.rescheduleLocked"
+            values={{ coachFirstName: coachFirstName || 'your coach' }}
+          />
         </p>
       ) : null}
 
       {mode === 'idle' ? (
         <div className={css.actions}>
-          <SecondaryButton onClick={startReschedule}>
+          <SecondaryButton onClick={startReschedule} disabled={rescheduleLocked}>
             <FormattedMessage id="ManageCalendarBooking.rescheduleButton" />
           </SecondaryButton>
           <InlineTextButton

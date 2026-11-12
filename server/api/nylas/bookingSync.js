@@ -15,6 +15,7 @@
  *                        Sharetribe and only the metadata records it.
  */
 
+const log = require('../../log');
 const db = require('./db');
 const {
   applyTransition,
@@ -173,6 +174,41 @@ const handleLateCancellation = async (transactionId, metadata) => {
   await recordCancellation(transactionId, metadata, { cancelledBy: 'client', late: true });
 };
 
+/** How many moves are kept on a transaction. A session is not moved this often; the cap is a guard. */
+const MAX_RECORDED_RESCHEDULES = 20;
+
+/**
+ * Note a move on the transaction's metadata so the Activity list can say "moved to ...". Sharetribe's
+ * booking cannot show it, and a metadata entry works the same on every process version. Stored are
+ * only times and the moment it was noticed, nothing about who.
+ *
+ * Best effort: a failure here is reported but never fails the webhook, since answering 500 would
+ * make Nylas deliver it again and repeat the real work for the sake of a line in a list. A
+ * redelivery of the same move is recognised by the last entry and not added twice.
+ */
+const recordReschedule = async (transactionId, { fromStart, toStart, toEnd }) => {
+  try {
+    const { metadata } = await getTransactionBasics(transactionId);
+    const existing = Array.isArray(metadata.reschedules) ? metadata.reschedules : [];
+    const iso = value => (value ? new Date(value).toISOString() : null);
+    const entry = {
+      at: new Date().toISOString(),
+      fromStart: iso(fromStart),
+      toStart: iso(toStart),
+      toEnd: iso(toEnd),
+    };
+    const last = existing[existing.length - 1];
+    if (last && last.fromStart === entry.fromStart && last.toStart === entry.toStart) return;
+
+    const result = await updateTransactionMetadata(transactionId, {
+      reschedules: [...existing, entry].slice(-MAX_RECORDED_RESCHEDULES),
+    });
+    if (!result.ok) throw result.error;
+  } catch (e) {
+    log.error(e, 'nylas-reschedule-note-failed', { transactionId });
+  }
+};
+
 /**
  * A booking is cancelled, from whichever side, and the money has to follow. Shared by the Scheduler's
  * `booking.cancelled` and by calendarEventSync.js (the coach deleting the event on their own
@@ -225,7 +261,33 @@ const processBookingCancelled = async ({ bookingId, mapping, data }) => {
   });
   const result = await applyTransition(transactionId, 'transition/cancel');
   if (!result.ok && !result.alreadyApplied) throw result.error;
-  return { handled: true, action: result.alreadyApplied ? 'already-cancelled' : 'refunded' };
+  if (!result.alreadyApplied) return { handled: true, action: 'refunded' };
+
+  // Sharetribe refused with a 409. That is normal for a redelivered notification (the transaction
+  // is already cancelled), but the same answer comes when the transaction is in a state the cancel
+  // cannot run from - for example `delivered`, after the payout. Reporting that as "already
+  // cancelled" would leave a client unrefunded with nothing in any log, so the transaction is read
+  // again and only a real cancellation is treated as quiet.
+  const current = await getTransactionBasics(transactionId).catch(() => null);
+  if (current && current.lastTransition === 'transition/cancel') {
+    return { handled: true, action: 'already-cancelled' };
+  }
+  log.error(
+    new Error(
+      `Cancel refused: booking ${bookingId} was cancelled but transaction ${transactionId} is not cancelled (last transition: ${
+        current ? current.lastTransition : 'unknown'
+      })`
+    ),
+    'nylas-cancel-refused',
+    {
+      transactionId,
+      bookingId,
+      lastTransition: current ? current.lastTransition : null,
+      cancelledBy: byClient ? 'client' : 'provider',
+    }
+  );
+  // Answering 500 would only make Nylas deliver it again to be refused again; the alert is the point.
+  return { handled: true, action: 'cancel-refused' };
 };
 
 /**
@@ -337,6 +399,11 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
     // Reminders follow the new time, and both people are told it moved. Nothing for a booking that
     // has been cancelled in the meantime.
     if (wasActive) {
+      await recordReschedule(mapping.sharetribe_transaction_id, {
+        fromStart: oldStart,
+        toStart: newStart,
+        toEnd: newEnd,
+      });
       await safeRescheduleEmails({ bookingId, oldStart, oldEnd, newStart, newEnd });
     }
     return { handled: true, action: 'rescheduled' };

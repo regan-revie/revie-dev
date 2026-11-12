@@ -46,3 +46,16 @@
   margin: 0;
   color: var(--colorGrey700);
 }
+
+/* The confirmation after moving the session: a plain statement that the change happened. */
+.rescheduledMessage {
+  margin: 0 0 16px;
+  color: var(--colorGrey700);
+  font-weight: var(--fontWeightSemiBold);
+}
+
+/* Why Reschedule is unavailable; the explanation sits above the buttons so it is read first. */
+.lockedNote {
+  margin: 0 0 16px;
+  color: var(--colorGrey700);
+}

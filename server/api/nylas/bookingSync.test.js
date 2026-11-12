@@ -1,3 +1,4 @@
+jest.mock('../../log', () => ({ error: jest.fn() }));
 jest.mock('./db', () => ({
   isAvailable: jest.fn(() => true),
   recordBooking: jest.fn(async () => ({})),
@@ -24,6 +25,7 @@ jest.mock('./bookingRecovery', () => ({
   cancelIfDeclined: jest.fn(async () => false),
 }));
 
+const log = require('../../log');
 const db = require('./db');
 const {
   applyTransition,
@@ -184,6 +186,86 @@ describe('booking.created', () => {
   });
 });
 
+describe('booking.rescheduled, inside 48 hours of the session (a coach moving the event)', () => {
+  const HOUR = 3600000;
+  const oldStart = new Date(Date.now() + 10 * HOUR); // 10 hours away: a client could not move this
+  const newSeconds = Math.floor((Date.now() + 100 * HOUR) / 1000);
+  const rescheduled = {
+    trigger: 'booking.rescheduled',
+    grantId: 'g1',
+    data: {
+      booking_id: BOOKING,
+      booking_info: { start_time: newSeconds, end_time: newSeconds + 3600 },
+    },
+  };
+  const row = (status = 'created') => ({
+    sharetribe_transaction_id: TX,
+    nylas_grant_id: 'g1',
+    booking_start: oldStart,
+    booking_end: new Date(oldStart.getTime() + HOUR),
+    status,
+  });
+
+  it('is applied as before: the coach is not limited, the new time is recorded and the emails go out', async () => {
+    db.findByBookingId.mockResolvedValue(row());
+    const result = await handleBookingWebhook(rescheduled);
+    expect(result.action).toBe('rescheduled');
+    expect(db.recordBooking).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'rescheduled' })
+    );
+    expect(safeRescheduleEmails).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a note on the transaction for the Activity list: the new times and when, nothing about who', async () => {
+    db.findByBookingId.mockResolvedValue(row());
+    await handleBookingWebhook(rescheduled);
+    const call = updateTransactionMetadata.mock.calls.find(c => c[1].reschedules);
+    expect(call[0]).toBe(TX);
+    expect(call[1].reschedules).toHaveLength(1);
+    expect(call[1].reschedules[0]).toEqual({
+      at: expect.any(String),
+      fromStart: oldStart.toISOString(),
+      toStart: new Date(newSeconds * 1000).toISOString(),
+      toEnd: new Date((newSeconds + 3600) * 1000).toISOString(),
+    });
+  });
+
+  it('adds to earlier notes, and does not add the same move twice when the webhook is redelivered', async () => {
+    db.findByBookingId.mockResolvedValue(row());
+    const earlier = { at: 'x', fromStart: 'a', toStart: 'b', toEnd: 'c' };
+    getTransactionBasics.mockResolvedValue({
+      metadata: { reschedules: [earlier] },
+      lastTransition: 'transition/operator-accept',
+    });
+    await handleBookingWebhook(rescheduled);
+    const written = updateTransactionMetadata.mock.calls.find(c => c[1].reschedules)[1].reschedules;
+    expect(written).toHaveLength(2);
+    expect(written[0]).toEqual(earlier);
+
+    updateTransactionMetadata.mockClear();
+    getTransactionBasics.mockResolvedValue({
+      metadata: { reschedules: written },
+      lastTransition: 'transition/operator-accept',
+    });
+    await handleBookingWebhook(rescheduled);
+    expect(updateTransactionMetadata.mock.calls.find(c => c[1].reschedules)).toBeUndefined();
+  });
+
+  it('never fails the webhook because the note could not be written', async () => {
+    db.findByBookingId.mockResolvedValue(row());
+    updateTransactionMetadata.mockResolvedValue({ ok: false, error: new Error('sharetribe down') });
+    const result = await handleBookingWebhook(rescheduled);
+    expect(result.action).toBe('rescheduled');
+    expect(log.error.mock.calls.some(c => c[1] === 'nylas-reschedule-note-failed')).toBe(true);
+  });
+
+  it('writes no note for a booking that was cancelled in the meantime', async () => {
+    db.findByBookingId.mockResolvedValue(row('cancelled'));
+    await handleBookingWebhook(rescheduled);
+    expect(updateTransactionMetadata.mock.calls.find(c => c[1].reschedules)).toBeUndefined();
+  });
+});
+
 describe('booking.cancelled', () => {
   const cancelled = { trigger: 'booking.cancelled', grantId: 'g1', data: { booking_id: BOOKING } };
   const startingIn = hours => new Date(Date.now() + hours * 3600000);
@@ -243,12 +325,48 @@ describe('booking.cancelled', () => {
 
     it('is not overwritten by a redelivery that arrives after the refund, when the total reads zero', async () => {
       mapping(72);
-      basics({ cancelledBy: 'provider', refundAmount: 50, refundCurrency: 'USD' }, paid(0));
+      getTransactionBasics.mockResolvedValue({
+        metadata: { cancelledBy: 'provider', refundAmount: 50, refundCurrency: 'USD' },
+        lastTransition: 'transition/cancel',
+        payinTotal: paid(0),
+      });
       applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
       const result = await handleBookingWebhook(cancelled);
 
       expect(updateTransactionMetadata).not.toHaveBeenCalled();
       expect(result.action).toBe('already-cancelled');
+      expect(log.error).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['after the payout', 'transition/complete'],
+      ['still accepted (the refund did not happen)', 'transition/operator-accept'],
+    ])(
+      'is reported to Sentry as nylas-cancel-refused when Sharetribe refuses the cancel and the transaction is %s',
+      async (_, lastTransition) => {
+        mapping(72);
+        basics({}, paid(5000));
+        applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+        getTransactionBasics.mockResolvedValue({ metadata: {}, lastTransition });
+        const result = await handleBookingWebhook(cancelled);
+
+        expect(result).toEqual({ handled: true, action: 'cancel-refused' });
+        expect(log.error).toHaveBeenCalledTimes(1);
+        const [error, code, data] = log.error.mock.calls[0];
+        expect(code).toBe('nylas-cancel-refused');
+        expect(error.message).toContain(TX);
+        expect(data).toMatchObject({ transactionId: TX, bookingId: BOOKING, lastTransition });
+      }
+    );
+
+    it('is reported too when the transaction cannot be read to check', async () => {
+      mapping(72);
+      applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+      getTransactionBasics.mockResolvedValueOnce({ metadata: {}, lastTransition: 'x' });
+      getTransactionBasics.mockRejectedValueOnce(new Error('sharetribe down'));
+      const result = await handleBookingWebhook(cancelled);
+      expect(result.action).toBe('cancel-refused');
+      expect(log.error.mock.calls[0][1]).toBe('nylas-cancel-refused');
     });
 
     it('writes no amount when there is nothing to refund, rather than a zero', async () => {

@@ -19,6 +19,23 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-13 (reschedule confirmation, Activity entry, 48-hour limit, loud 409)
+
+**Branch / PR:** `reschedule-confirmation`, one PR against `main`, not merged. Independent of the release-6 work (a separate PR).
+
+**What changed**
+- After a client reschedules, the "Your session" card says "Moved to Fri, Nov 20, 11:30 AM" at once (the time they picked) and then waits for our database to catch up with Nylas's webhook; the Activity list gets a line "The session was moved to ...", read from `metadata.reschedules` (written by the `booking.rescheduled` handler). Works on every process version.
+- A client can no longer reschedule inside 48 hours of the session's real start (our database's time): rejected by the server (409 `reschedule-too-late`) and the Reschedule button is disabled with: "This session is less than 48 hours away, so it can't be moved. You can still cancel (charged in full), or message {coach first name} to ask." The new time must still have the listing's normal booking notice (24 hours by default), now checked on the server too. Coaches moving the event in their calendar are not limited.
+- A cancel refused by Sharetribe (409) when the transaction is not actually cancelled is reported to Sentry as `nylas-cancel-refused` instead of "already cancelled".
+
+**Tests:** 49 hours allowed / 47 hours rejected on the server and disabled in the UI; coach reschedule inside 48 hours still applied; banner, feed lines, notice, loud 409.
+
+**Not verified:** none of this has run against Dev with a real reschedule yet. Try: book, reschedule from 3+ days out (banner appears, Activity list shows the move), then check a session under 48 hours away shows the locked card.
+
+**Next:** release-6 (Sharetribe's booking follows the reschedule), after the Dev payout-timer test, which is waiting on a booking on the `timer-spike` listing.
+
+---
+
 ## HANDOFF — 2026-11-13 (coach-delete retest failed: event matching)
 
 **Branch / PR:** `fix-event-match`, one PR against `main`, not merged.
