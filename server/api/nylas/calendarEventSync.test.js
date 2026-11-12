@@ -10,11 +10,27 @@ jest.mock('./integration', () => ({
 }));
 jest.mock('./client', () => ({ nylasRequest: jest.fn() }));
 jest.mock('./bookingRecovery', () => ({ cancelIfDeclined: jest.fn() }));
+// Reading a booking back from Nylas: what Nylas says each booking's event is (mockNylasEvents).
+const mockNylasEvents = {};
+jest.mock('./eventIdBackfill', () => ({ lookupEventId: jest.fn() }));
 
 // The "database" lives outside the module registry, so it survives a simulated restart.
 const mockStore = { bookings: new Map(), events: new Map(), waits: new Map() };
 jest.mock('./db', () => ({
   isAvailable: jest.fn(() => true),
+  findActiveBookingsByGrant: jest.fn(async grant =>
+    [...mockStore.bookings.values()].filter(
+      b => b.nylas_grant_id === grant && ['created', 'rescheduled'].includes(b.status)
+    )
+  ),
+  recordBookingEvent: jest.fn(async ({ nylasBookingId, nylasEventId, nylasGrantId, verified }) => {
+    mockStore.events.set(nylasBookingId, {
+      booking: nylasBookingId,
+      grant: nylasGrantId,
+      event: nylasEventId,
+      verified: Boolean(verified),
+    });
+  }),
   findBookingByEvent: jest.fn(async (grant, event) => {
     const e = [...mockStore.events.values()].find(x => x.grant === grant && x.event === event);
     return e ? mockStore.bookings.get(e.booking) || null : null;
@@ -105,6 +121,11 @@ const loadSync = () => {
     payinTotal: { amount: mockTx.cancelled ? 0 : 5000, currency: 'USD' },
   }));
   nylasRequest.mockImplementation(async () => ({ status: eventStatus }));
+  require('./eventIdBackfill').lookupEventId.mockImplementation(async row => {
+    const id = mockNylasEvents[row.nylas_booking_id];
+    if (!id) throw new Error('the booking has no event id');
+    return id;
+  });
 
   return { calendar: require('./calendarEventSync'), booking: require('./bookingSync') };
 };
@@ -136,6 +157,8 @@ beforeEach(() => {
   mockStore.events.set(BOOKING, { booking: BOOKING, grant: GRANT, event: EVENT });
 
   eventStatus = 'cancelled';
+  Object.keys(mockNylasEvents).forEach(k => delete mockNylasEvents[k]);
+  mockNylasEvents[BOOKING] = EVENT;
   mockTx.cancelled = false;
   mockTx.refunds = 0;
   mockTx.metadata = {};
@@ -236,6 +259,168 @@ describe("the coach deletes a Revie session's event", () => {
     expect(summary.checked).toBe(0);
     expect(integration.applyTransition).not.toHaveBeenCalled();
     expect(nylasRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('when the stored event id is not the one Nylas uses (the failed retest)', () => {
+  const logged = () => console.log.mock.calls.flat().map(String);
+
+  it("REPRODUCTION: an id stored at creation that Nylas does not call the event by no longer hides the deletion; the booking's own answer finds it", async () => {
+    // What was stored when the booking was made does not match what Nylas puts in its notices.
+    mockStore.events.set(BOOKING, {
+      booking: BOOKING,
+      grant: GRANT,
+      event: 'id-from-creation-response',
+      verified: false,
+    });
+    const { calendar } = loadSync();
+
+    // Before: the notice matches nothing and the deletion is silently dropped.
+    // Now: Nylas is asked what the booking's event really is, which settles it.
+    const result = await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+
+    expect(result).toEqual({ handled: true, action: 'cancellation-scheduled' });
+    expect(mockStore.events.get(BOOKING)).toMatchObject({
+      event: EVENT,
+      grant: GRANT,
+      verified: true,
+    });
+
+    advance(5);
+    await calendar.processDueEventCancellations();
+    expect(refundCalls()).toHaveLength(1);
+  });
+
+  it('and the next notice matches directly, without asking Nylas again', async () => {
+    mockStore.events.set(BOOKING, {
+      booking: BOOKING,
+      grant: GRANT,
+      event: 'stale',
+      verified: false,
+    });
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    const lookup = require('./eventIdBackfill').lookupEventId;
+    const calls = lookup.mock.calls.length;
+
+    const again = await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    expect(again.action).toBe('cancellation-already-scheduled');
+    expect(lookup.mock.calls.length).toBe(calls);
+  });
+
+  it('a booking with no stored id at all is found the same way', async () => {
+    mockStore.events.clear();
+    const { calendar } = loadSync();
+    const result = await calendar.handleCalendarEvent({
+      trigger: 'event.updated',
+      data: event({ status: 'cancelled' }),
+    });
+    expect(result.action).toBe('cancellation-scheduled');
+  });
+
+  it('a notice with no status is also checked, quietly', async () => {
+    mockStore.events.set(BOOKING, {
+      booking: BOOKING,
+      grant: GRANT,
+      event: 'stale',
+      verified: false,
+    });
+    const { calendar } = loadSync();
+    const result = await calendar.handleCalendarEvent({ trigger: 'event.updated', data: event() });
+    expect(result.action).toBe('cancellation-scheduled');
+  });
+
+  it("only ever looks at the notice's own grant: the same Google event id in a guest's copy is not the organiser's event", async () => {
+    const { calendar } = loadSync();
+    mockStore.bookings.get(BOOKING).nylas_grant_id = 'coach-grant';
+    mockStore.events.set(BOOKING, {
+      booking: BOOKING,
+      grant: 'coach-grant',
+      event: 'stale',
+      verified: false,
+    });
+
+    // A deletion of the same event id, but in another grant's calendar (a guest's copy).
+    const result = await calendar.handleCalendarEvent({
+      trigger: 'event.deleted',
+      data: { id: EVENT, grant_id: 'a-guests-grant', calendar_id: 'their-cal' },
+    });
+
+    expect(result).toEqual({ handled: false, reason: 'not-a-revie-booking' });
+    expect(db.findActiveBookingsByGrant).toHaveBeenCalledTimes(1);
+    expect(db.findActiveBookingsByGrant).toHaveBeenCalledWith('a-guests-grant');
+    expect(integration.applyTransition).not.toHaveBeenCalled();
+  });
+
+  it('asks Nylas at most once every 30 seconds however many unmatched notices arrive', async () => {
+    mockStore.events.clear();
+    mockNylasEvents[BOOKING] = 'some-other-event';
+    const { calendar } = loadSync();
+    const lookup = require('./eventIdBackfill').lookupEventId;
+
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event({ id: 'x2' }) });
+    expect(lookup).toHaveBeenCalledTimes(1);
+
+    advance(31 / 60);
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event({ id: 'x3' }) });
+    expect(lookup).toHaveBeenCalledTimes(2);
+  });
+
+  describe('logs', () => {
+    it('says which booking a deletion matched and when the cancel is scheduled for, with ids only', async () => {
+      const { calendar } = loadSync();
+      await calendar.handleCalendarEvent({
+        trigger: 'event.deleted',
+        data: event({ title: 'Find your focus with Alex Client' }),
+      });
+      const line = logged().find(l => l.includes('matched booking'));
+      expect(line).toMatch(
+        /^\[nylas\] calendar event matched booking booking-, cancel scheduled for \d\d:\d\d UTC$/
+      );
+      expect(line).not.toMatch(/Alex|Find your focus|@/);
+    });
+
+    it('says when a deletion matched nothing, with short ids and no personal data', async () => {
+      mockStore.bookings.clear();
+      mockStore.events.clear();
+      const { calendar } = loadSync();
+      await calendar.handleCalendarEvent({
+        trigger: 'event.deleted',
+        data: {
+          id: 'abcdefghijklmnop',
+          grant_id: 'grant-9999999',
+          calendar_id: 'cal',
+          title: 'Dentist',
+          participants: [{ email: 'x@y.example' }],
+        },
+      });
+      const line = logged().find(l => l.includes('did not match any booking'));
+      expect(line).toBe(
+        '[nylas] calendar event did not match any booking (event.deleted, grant grant-99, event abcdefgh)'
+      );
+      expect(line).not.toMatch(/Dentist|@|y\.example/);
+    });
+
+    it('says nothing about every ordinary edit of an unrelated event', async () => {
+      mockStore.events.clear();
+      mockStore.bookings.clear();
+      const { calendar } = loadSync();
+      await calendar.handleCalendarEvent({
+        trigger: 'event.updated',
+        data: event({ status: 'confirmed' }),
+      });
+      expect(logged().filter(l => l.includes('calendar event'))).toEqual([]);
+    });
+
+    it('says when a match is for a booking that is already cancelled', async () => {
+      const { calendar } = loadSync();
+      mockStore.bookings.get(BOOKING).status = 'cancelled';
+      await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+      expect(logged().some(l => /matched booking booking-, but it is cancelled/.test(l))).toBe(
+        true
+      );
+    });
   });
 });
 

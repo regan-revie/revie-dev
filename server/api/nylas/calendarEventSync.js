@@ -33,6 +33,7 @@ const log = require('../../log');
 const db = require('./db');
 const { nylasRequest } = require('./client');
 const { processBookingCancelled } = require('./bookingSync');
+const { lookupEventId } = require('./eventIdBackfill');
 const { isConfigured: integrationConfigured, getTransactionBasics } = require('./integration');
 
 // How long a deletion has to stand before it is believed.
@@ -49,6 +50,49 @@ const CANCELLED_TRANSITIONS = [
   'transition/late-cancel',
   'transition/complete-late-cancelled',
 ];
+
+/** First eight characters of an id, for logs: enough to find it, nothing personal. */
+const short = id => String(id || '').slice(0, 8);
+
+// How long after a lookup on a miss before the next one (it asks Nylas about each of a grant's bookings).
+const LOOKUP_COOLDOWN_MS = 30 * 1000;
+let lastLookupAt = 0;
+
+/**
+ * A cancelled or deleted event that matched no stored id: ask Nylas which event each of that grant's
+ * upcoming bookings really has. Our stored id is only ever a record of what Nylas told us once; if
+ * it is missing, from the wrong source or out of date, the booking's own answer settles it. A booking
+ * found is corrected in the table so the next notice matches directly.
+ *
+ * Only the notice's own grant is ever searched, never other coaches' bookings: the same Google event
+ * carries the same id in every guest's copy, so an id seen under another grant (a coach who is
+ * someone's client, say) must not be mistaken for the organiser's event.
+ *
+ * @returns {Promise<object|null>} the nylas_bookings row, or null
+ */
+const findBookingByLookup = async ({ grant, eventId, now = Date.now() }) => {
+  if (now - lastLookupAt < LOOKUP_COOLDOWN_MS) return null;
+  lastLookupAt = now;
+
+  const candidates = await db.findActiveBookingsByGrant(grant);
+  for (const booking of candidates.slice(0, 20)) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const real = await lookupEventId(booking);
+      // eslint-disable-next-line no-await-in-loop
+      await db.recordBookingEvent({
+        nylasBookingId: booking.nylas_booking_id,
+        nylasEventId: real,
+        nylasGrantId: booking.nylas_grant_id,
+        verified: true,
+      });
+      if (real === eventId) return booking;
+    } catch (e) {
+      // This booking cannot be read right now; the others still can.
+    }
+  }
+  return null;
+};
 
 /** The event's current status from Nylas, for a notification that did not carry one. */
 const fetchEventStatus = async ({ grantId, calendarId, eventId }) => {
@@ -86,12 +130,35 @@ const handleCalendarEvent = async ({
 
   if (!db.isAvailable()) return { handled: false, reason: 'no-database' };
 
+  // A notice that could be a deletion: it says so, or it says nothing about the status. Only those
+  // are worth a log line when they match nothing; every other change to every event on every
+  // connected calendar would be noise.
+  const plainlyCancelled = trigger === 'event.deleted' || data.status === 'cancelled';
+  const couldBeCancelled = plainlyCancelled || !data.status;
+
   // The question that matters, asked first and answered from our own records.
-  const mapping = await db.findBookingByEvent(grant, eventId);
-  if (!mapping) return { handled: false, reason: 'not-a-revie-booking' };
+  let mapping = await db.findBookingByEvent(grant, eventId);
+  if (!mapping && couldBeCancelled) {
+    mapping = await findBookingByLookup({ grant, eventId });
+  }
+  if (!mapping) {
+    if (plainlyCancelled) {
+      console.log(
+        `[nylas] calendar event did not match any booking (${trigger}, grant ${short(
+          grant
+        )}, event ${short(eventId)})`
+      );
+    }
+    return { handled: false, reason: 'not-a-revie-booking' };
+  }
 
   if (!integrationConfigured()) return { handled: false, reason: 'no-integration-credentials' };
   if (!ACTIVE_STATUSES.includes(mapping.status)) {
+    console.log(
+      `[nylas] calendar event matched booking ${short(mapping.nylas_booking_id)}, but it is ${
+        mapping.status
+      }: nothing to do`
+    );
     return { handled: false, reason: 'booking-not-active' };
   }
 
@@ -108,6 +175,19 @@ const handleCalendarEvent = async ({
       calendarId: data.calendar_id,
       delayMinutes: CANCEL_DELAY_MINUTES,
     });
+    const due = new Date(Date.now() + CANCEL_DELAY_MINUTES * 60000);
+    const dueText = `${String(due.getUTCHours()).padStart(2, '0')}:${String(
+      due.getUTCMinutes()
+    ).padStart(2, '0')} UTC`;
+    console.log(
+      started
+        ? `[nylas] calendar event matched booking ${short(
+            mapping.nylas_booking_id
+          )}, cancel scheduled for ${dueText}`
+        : `[nylas] calendar event matched booking ${short(
+            mapping.nylas_booking_id
+          )}, cancel already scheduled`
+    );
     // Already waiting: a repeat of the same notice, which must not push the time back.
     return {
       handled: true,
@@ -199,6 +279,10 @@ module.exports = {
   handleCalendarEvent,
   processDueEventCancellations,
   fetchEventStatus,
+  findBookingByLookup,
   ACTIVE_STATUSES,
   CANCEL_DELAY_MINUTES,
+  resetLookupCooldown: () => {
+    lastLookupAt = 0;
+  },
 };

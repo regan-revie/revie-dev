@@ -101,6 +101,21 @@ const initSchema = async () => {
     `CREATE INDEX IF NOT EXISTS nylas_booking_events_event_idx
        ON nylas_booking_events (nylas_grant_id, nylas_event_id)`
   );
+  // Whether an event id came from Nylas itself (a booking notification, or reading the booking back)
+  // rather than from the response to creating it. Only the first is trusted to match what Nylas later
+  // calls the event; see eventIdBackfill.js. Added to a table that already exists.
+  await query(
+    `ALTER TABLE nylas_booking_events ADD COLUMN IF NOT EXISTS verified boolean NOT NULL DEFAULT false`
+  );
+  // Bookings whose event could not be found, so that a booking which never can be is given up on
+  // once and stays given up across restarts, instead of being retried and logged every few minutes.
+  await query(`
+    CREATE TABLE IF NOT EXISTS nylas_event_lookups (
+      nylas_booking_id text PRIMARY KEY,
+      attempts         integer NOT NULL DEFAULT 0,
+      last_attempt_at  timestamptz NOT NULL DEFAULT now()
+    )
+  `);
   // A calendar deletion waits here before it cancels anything (see calendarEventSync.js): in the
   // database, not in a timer, so a restart or deploy during the wait loses nothing.
   await query(`
@@ -240,17 +255,32 @@ const findByTransactionId = async sharetribeTransactionId => {
   return rows;
 };
 
-/** Remember which calendar event a booking created. Safe to repeat. */
-const recordBookingEvent = async ({ nylasBookingId, nylasEventId, nylasGrantId }) => {
+/**
+ * Remember which calendar event a booking created. Safe to repeat.
+ *
+ * `verified` says the id came from Nylas itself rather than from the response to creating the
+ * booking. A verified row is never replaced by an unverified write (the response to creating a
+ * booking can arrive after the notification about it), and an unverified row is replaced by any.
+ */
+const recordBookingEvent = async ({
+  nylasBookingId,
+  nylasEventId,
+  nylasGrantId,
+  verified = false,
+}) => {
   const { rows } = await query(
-    `INSERT INTO nylas_booking_events (nylas_booking_id, nylas_event_id, nylas_grant_id)
-     VALUES ($1, $2, $3)
+    `INSERT INTO nylas_booking_events (nylas_booking_id, nylas_event_id, nylas_grant_id, verified)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (nylas_booking_id) DO UPDATE
        SET nylas_event_id = EXCLUDED.nylas_event_id,
            nylas_grant_id = EXCLUDED.nylas_grant_id,
+           verified       = EXCLUDED.verified
+                            OR (nylas_booking_events.verified
+                                AND nylas_booking_events.nylas_event_id = EXCLUDED.nylas_event_id),
            updated_at     = now()
+       WHERE EXCLUDED.verified OR NOT nylas_booking_events.verified
      RETURNING *`,
-    [nylasBookingId, nylasEventId, nylasGrantId]
+    [nylasBookingId, nylasEventId, nylasGrantId, verified]
   );
   return rows[0];
 };
@@ -269,17 +299,55 @@ const findBookingByEvent = async (nylasGrantId, nylasEventId) => {
   return rows[0] || null;
 };
 
-/** Active, upcoming bookings with no stored event id (made before this existed, or its call failed). */
-const findBookingsMissingEvent = async (limit = 10) => {
+/**
+ * Active, upcoming bookings whose event id is missing or has not been confirmed by Nylas, and that
+ * are due another look: not looked at in the last few minutes, and not given up on.
+ */
+const findBookingsNeedingEventCheck = async (
+  limit = 10,
+  retryAfterMinutes = 5,
+  maxAttempts = 3
+) => {
   const { rows } = await query(
     `SELECT b.* FROM nylas_bookings b
        LEFT JOIN nylas_booking_events e ON e.nylas_booking_id = b.nylas_booking_id
-      WHERE e.nylas_booking_id IS NULL
+       LEFT JOIN nylas_event_lookups f ON f.nylas_booking_id = b.nylas_booking_id
+      WHERE (e.nylas_booking_id IS NULL OR e.verified = false)
         AND b.status IN ('created', 'rescheduled')
         AND (b.booking_start IS NULL OR b.booking_start > now())
+        AND COALESCE(f.attempts, 0) < $3
+        AND (f.last_attempt_at IS NULL
+             OR f.last_attempt_at < now() - ($2 || ' minutes')::interval)
       ORDER BY b.created_at DESC
       LIMIT $1`,
-    [limit]
+    [limit, String(retryAfterMinutes), maxAttempts]
+  );
+  return rows;
+};
+
+/** Count one more failed attempt to find a booking's event. @returns the attempts so far. */
+const recordEventLookupFailure = async nylasBookingId => {
+  const { rows } = await query(
+    `INSERT INTO nylas_event_lookups (nylas_booking_id, attempts, last_attempt_at)
+     VALUES ($1, 1, now())
+     ON CONFLICT (nylas_booking_id) DO UPDATE
+       SET attempts = nylas_event_lookups.attempts + 1, last_attempt_at = now()
+     RETURNING attempts`,
+    [nylasBookingId]
+  );
+  return rows[0].attempts;
+};
+
+/** A grant's active upcoming bookings, newest first: what an event notice that matched nothing is checked against. */
+const findActiveBookingsByGrant = async (nylasGrantId, limit = 20) => {
+  const { rows } = await query(
+    `SELECT * FROM nylas_bookings
+      WHERE nylas_grant_id = $1
+        AND status IN ('created', 'rescheduled')
+        AND (booking_start IS NULL OR booking_start > now())
+      ORDER BY created_at DESC
+      LIMIT $2`,
+    [nylasGrantId, limit]
   );
   return rows;
 };
@@ -446,7 +514,9 @@ module.exports = {
   findUpcomingByGrantId,
   recordBookingEvent,
   findBookingByEvent,
-  findBookingsMissingEvent,
+  findBookingsNeedingEventCheck,
+  recordEventLookupFailure,
+  findActiveBookingsByGrant,
   withAdvisoryLock,
   scheduleEventCancellation,
   markEventRestored,

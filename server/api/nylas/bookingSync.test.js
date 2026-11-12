@@ -3,6 +3,7 @@ jest.mock('./db', () => ({
   recordBooking: jest.fn(async () => ({})),
   findByBookingId: jest.fn(async () => null),
   setStatus: jest.fn(async () => ({})),
+  recordBookingEvent: jest.fn(async () => ({})),
 }));
 jest.mock('./integration', () => ({
   isConfigured: jest.fn(() => true),
@@ -428,5 +429,54 @@ describe('booking.rescheduled', () => {
       reason: 'unknown-booking',
     });
     expect(db.recordBooking).not.toHaveBeenCalled();
+  });
+});
+
+describe('the calendar event id in a booking notice', () => {
+  const noticeWith = (trigger, eventId) => ({
+    trigger,
+    grantId: 'g1',
+    data: {
+      booking_id: BOOKING,
+      booking_info: {
+        event_id: eventId,
+        additional_fields: { [TRANSACTION_FIELD]: TX },
+      },
+    },
+  });
+
+  it("is stored as soon as a booking is confirmed, marked as coming from Nylas, under the notice's grant", async () => {
+    await handleBookingWebhook(noticeWith('booking.created', 'ev-real'));
+    expect(db.recordBookingEvent).toHaveBeenCalledWith({
+      nylasBookingId: BOOKING,
+      nylasEventId: 'ev-real',
+      nylasGrantId: 'g1',
+      verified: true,
+    });
+  });
+
+  it('is stored again when a booking is rescheduled', async () => {
+    db.findByBookingId.mockResolvedValue({
+      sharetribe_transaction_id: TX,
+      nylas_grant_id: 'g1',
+      booking_start: new Date(),
+      booking_end: new Date(),
+      status: 'created',
+    });
+    await handleBookingWebhook(noticeWith('booking.rescheduled', 'ev-moved'));
+    expect(db.recordBookingEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ nylasEventId: 'ev-moved', verified: true })
+    );
+  });
+
+  it('is simply skipped when the notice carries none, and a failure to store it never breaks the booking', async () => {
+    await handleBookingWebhook(noticeWith('booking.created', undefined));
+    expect(db.recordBookingEvent).not.toHaveBeenCalled();
+
+    db.recordBookingEvent.mockRejectedValueOnce(new Error('db down'));
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await handleBookingWebhook(noticeWith('booking.created', 'ev-real'));
+    expect(result.action).toBe('accepted');
+    spy.mockRestore();
   });
 });

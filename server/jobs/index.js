@@ -38,7 +38,8 @@ const start = () => {
       }
       // Bookings with no calendar event recorded yet, so the coach deleting one is recognised.
       const backfill = await resolveMissingEventIds();
-      if (backfill.checked > 0) {
+      // Said when something changed; a booking that cannot be resolved is logged once, as it is given up on.
+      if (backfill.resolved > 0 || backfill.gaveUp > 0) {
         console.log('[jobs] event id backfill', JSON.stringify(backfill)); // eslint-disable-line no-console
       }
     } catch (e) {

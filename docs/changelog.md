@@ -19,6 +19,32 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-13 (coach-delete retest failed: event matching)
+
+**Branch / PR:** `fix-event-match`, one PR against `main`, not merged.
+
+**What was established (from Render's logs, Nylas and Sharetribe; I could not read Postgres: access to its credentials was blocked, so the table contents below are inferred, not seen)**
+- Booking `d4778950…` was created at 20:10:03 UTC and its calendar event, `jp2g3vc1e6…`, is **now `cancelled` in Google/Nylas** (last changed 20:14:15 UTC, matching the `event.updated` notice at 20:14:12). Nylas's own record of the booking names that same event id, so the event really was deleted and Nylas really did tell us.
+- Every notice reached our handler (signature valid, answered 200 in about 25 ms) and **returned "not handled" without a log line**, because the handler logged only when it acted. So the notice did not match a stored booking (or matched one it ignored): the handler had no way to tell us which.
+- The booking was **not** listed by the event-id backfill at 20:11 and 20:13, which means a row for it existed in `nylas_booking_events` (the backfill lists only bookings with no row). So an id *was* stored, and it still did not match what Nylas put in the notices. The only other time matching has worked (Nov 11 19:48) was for a booking whose id had been read back from Nylas by the backfill, not captured at creation. So **the id captured from the creation response is the suspect**; this is the likeliest explanation, not a proven one. The deploys at 20:10:31 and 20:12:45 did not drop anything: the booking's event row had been written before the first deletion notice, and the release-5 move changed no ids.
+- The two other facts I could confirm: the event description was written through the creation-time id (so that id is a real event id), and Nylas's list-events call can show a deleted event as still `confirmed` for minutes while a direct lookup says `cancelled`.
+
+**What changed**
+1. **The id Nylas itself uses is now what we match on.** Booking notices carry `booking_info.event_id`; it is stored as verified on `booking.created` and `booking.rescheduled`. The backfill now reads back and verifies *every* upcoming booking whose id is missing or unverified (not just missing ones) and stores Nylas's answer, so a wrong creation-time id is corrected within minutes. A verified id is never overwritten by an unverified one.
+2. **A deletion that matches nothing is no longer dropped.** It reads back that grant's upcoming bookings from Nylas (at most every 30 seconds), corrects what is stored and matches. It never looks at another grant's bookings (the same Google event id appears in every guest's copy, so that would let a guest's deletion cancel the organiser's session).
+3. **Logs** (info level, short ids, no personal data): `calendar event matched booking <id>, cancel scheduled for HH:MM UTC`; `calendar event did not match any booking (<trigger>, grant <id>, event <id>)` for deletions and cancellations only; `... matched booking <id>, but it is <status>: nothing to do`.
+4. **The backfill log spam.** Booking `01c80d5b…` has no event on Nylas's side, so it failed every tick and its one-hour pause lived in memory, which every deploy wiped. It is now tried three times, five minutes apart, then given up on **once with one log line**, and the count is in Postgres so deploys do not reset it. Cancelled and past bookings were never retried; that is unchanged.
+
+**Retest (after deploy)**
+1. Wait two minutes (the backfill verifies existing upcoming bookings; Render shows `[jobs] event id backfill {...resolved: N...}`).
+2. Book a session, then within a minute delete its event in Google Calendar.
+3. Render should show, within seconds: `[nylas] calendar event matched booking <id>, cancel scheduled for HH:MM UTC`. Five minutes later: `calendar event deleted, still gone after the wait -> refunded`, the booking cancelled, the refund and the Sharetribe emails.
+4. If instead you see `calendar event did not match any booking (event.deleted, grant xxxxxxxx, event xxxxxxxx)`, send me those two short ids: they say exactly what Nylas called the event.
+
+**Not verified:** the cause itself (see above), and the new matching against live Nylas.
+
+---
+
 ## HANDOFF — 2026-11-12 (release-5 on Dev)
 
 **Branch / PR:** `release-5-dev-rollout`, one PR against `main`, not merged. The Sharetribe changes below are already done on Dev.
