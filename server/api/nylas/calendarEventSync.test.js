@@ -15,6 +15,7 @@ jest.mock('./bookingRecovery', () => ({ cancelIfDeclined: jest.fn() }));
 const mockStore = { bookings: new Map(), events: new Map(), waits: new Map() };
 jest.mock('./db', () => ({
   isAvailable: jest.fn(() => true),
+  cancelSessionEmails: jest.fn(async () => 2),
   findBookingByEvent: jest.fn(async (grant, event) => {
     const e = [...mockStore.events.values()].find(x => x.grant === grant && x.event === event);
     return e ? mockStore.bookings.get(e.booking) || null : null;
@@ -236,6 +237,27 @@ describe("the coach deletes a Revie session's event", () => {
     expect(summary.checked).toBe(0);
     expect(integration.applyTransition).not.toHaveBeenCalled();
     expect(nylasRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('session emails when the coach deletes the event', () => {
+  it('the pending reminders are cancelled when the wait ends in a cancellation, not when it starts', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    expect(db.cancelSessionEmails).not.toHaveBeenCalled(); // an accidental deletion keeps its reminders
+
+    advance(5);
+    await calendar.processDueEventCancellations();
+    expect(db.cancelSessionEmails).toHaveBeenCalledWith(BOOKING);
+  });
+
+  it('and are kept when the coach undoes the deletion', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    eventStatus = 'confirmed';
+    advance(5);
+    await calendar.processDueEventCancellations();
+    expect(db.cancelSessionEmails).not.toHaveBeenCalled();
   });
 });
 

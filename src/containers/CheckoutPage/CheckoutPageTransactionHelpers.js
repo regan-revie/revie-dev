@@ -24,6 +24,25 @@ export const getTransactionTypeData = (listingType, unitTypeInPublicData, config
 };
 
 /**
+ * The client's timezone, for the emails Revie sends about a calendar-booked session (reminders and
+ * reschedule confirmations show times in it). Saved with the booking in protectedData. Browser only,
+ * and only for calendar bookings; missing is fine (the emails then use the coach's timezone and say
+ * so).
+ *
+ * @param {Object} listing
+ * @returns {{clientTimeZone: string}|{}}
+ */
+export const clientTimeZoneMaybe = listing => {
+  if (!listing?.attributes?.publicData?.calendarBookingEnabled) return {};
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return timeZone ? { clientTimeZone: timeZone } : {};
+  } catch (e) {
+    return {};
+  }
+};
+
+/**
  * This just makes it easier to transfrom bookingDates object if needed
  * (or manibulate bookingStart and bookingEnd)
  *

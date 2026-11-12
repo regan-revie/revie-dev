@@ -74,6 +74,13 @@ services:
       - key: BOOKING_PROCESS_ALIAS
         value: default-booking/release-5
 
+      # Postmark sends the session reminders and reschedule confirmations (server/email/postmark.js);
+      # everything else is Sharetribe's. Nothing is sent unless this is exactly "true", so it stays off
+      # until you switch it on in the Render dashboard (and then it survives Blueprint syncs only if
+      # you change the value here too).
+      - key: POSTMARK_SENDING_ENABLED
+        value: "false"
+
       # Set in the Render dashboard after the first deploy, to the service's own
       # public URL (https://<service>.onrender.com), with no trailing slash.
       - key: REACT_APP_MARKETPLACE_ROOT_URL
@@ -87,6 +94,9 @@ services:
       - key: SHARETRIBE_SDK_CLIENT_SECRET
         sync: false
       - key: NYLAS_API_KEY
+        sync: false
+      # The Postmark server token for this environment (Postmark > Servers > revie-dev > API Tokens).
+      - key: POSTMARK_SERVER_TOKEN
         sync: false
       - key: NYLAS_CLIENT_ID
         sync: false
