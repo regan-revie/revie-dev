@@ -16,6 +16,7 @@ const { rescheduleBooking } = require('./availability');
 const { isConfigured } = require('./config');
 const { loadCalendarBookingTransaction } = require('./manageBookingShared');
 const db = require('./db');
+const { canClientReschedule, resolveMinBookingNotice } = require('./scheduler');
 
 module.exports = async (req, res) => {
   if (!isConfigured()) {
@@ -52,7 +53,7 @@ module.exports = async (req, res) => {
   const sdk = getSdk(req, res, tokenStore);
 
   try {
-    const { configurationId, lengthMinutes } = await loadCalendarBookingTransaction(
+    const { configurationId, lengthMinutes, listing } = await loadCalendarBookingTransaction(
       sdk,
       transactionId
     );
@@ -73,6 +74,37 @@ module.exports = async (req, res) => {
     const active = mappings.find(m => m.status !== 'cancelled');
     if (!active) {
       res.status(409).json({ error: 'No active calendar booking found for this transaction' });
+      return;
+    }
+
+    // A client may move a session only while cancelling it would still be free (48 hours), measured
+    // from the session's real start - our database's time, not Sharetribe's original booking. This
+    // is enforced here, not only by the disabled button, which a client could simply bypass. A row
+    // with no usable start is refused rather than guessed at.
+    let movable = false;
+    try {
+      movable = canClientReschedule({ bookingStart: active.booking_start });
+    } catch (e) {
+      movable = false;
+    }
+    if (!movable) {
+      res.status(409).json({
+        code: 'reschedule-too-late',
+        error: 'This session is less than 48 hours away, so it cannot be moved.',
+      });
+      return;
+    }
+
+    // The new time needs the same notice as any new booking (the listing's own, 24 hours unless the
+    // coach chose otherwise). The picker already hides earlier times; this is the check that holds.
+    const noticeMinutes = resolveMinBookingNotice(
+      listing?.attributes?.publicData?.nylasMinBookingNoticeMinutes
+    );
+    if (startDate.getTime() < Date.now() + noticeMinutes * 60000) {
+      res.status(400).json({
+        code: 'reschedule-too-soon',
+        error: `The new time needs at least ${noticeMinutes / 60} hours' notice.`,
+      });
       return;
     }
 

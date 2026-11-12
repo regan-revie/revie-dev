@@ -291,6 +291,93 @@ describe('ActivityFeed for a late-cancelled session', () => {
   });
 });
 
+describe('ActivityFeed for a rescheduled session', () => {
+  const bookingTransitions = getProcess('default-booking').transitions;
+
+  const feedProps = metadata => {
+    const customer = createUser('user1');
+    const provider = createUser('user2');
+    const listing = createListing('listing');
+    const transaction = createTransaction({
+      id: 'tx1',
+      processName: 'default-booking',
+      customer,
+      provider,
+      listing,
+      transitions: [
+        createTxTransition({
+          createdAt: new Date(Date.UTC(2026, 10, 12, 20, 0)),
+          by: 'operator',
+          transition: bookingTransitions.OPERATOR_ACCEPT,
+        }),
+      ],
+    });
+    transaction.attributes.metadata = metadata;
+    return {
+      messages: [],
+      transaction,
+      stateData: { processName: 'default-booking', processState: 'accepted' },
+      currentUser: createCurrentUser('user1'),
+      hasOlderMessages: false,
+      fetchMessagesInProgress: false,
+      onOpenReviewModal: noop,
+      onShowOlderMessages: noop,
+      intl: fakeIntl,
+    };
+  };
+
+  const move = (at, toStart) => ({
+    at,
+    fromStart: '2026-11-17T18:00:00.000Z',
+    toStart,
+    toEnd: new Date(new Date(toStart).getTime() + 3600000).toISOString(),
+  });
+
+  it('lists a move after the booking, dated from when it was recorded', () => {
+    render(
+      <ActivityFeed
+        {...feedProps({
+          reschedules: [move('2026-11-13T20:00:00.000Z', '2026-11-20T19:30:00.000Z')],
+        })}
+      />
+    );
+    const items = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(items.length).toBe(2);
+    expect(
+      within(items[0]).getByText('TransactionPage.ActivityFeed.default-booking.accepted')
+    ).toBeInTheDocument();
+    expect(
+      within(items[1]).getByText('TransactionPage.ActivityFeed.rescheduled')
+    ).toBeInTheDocument();
+  });
+
+  it('lists every move, in order', () => {
+    render(
+      <ActivityFeed
+        {...feedProps({
+          reschedules: [
+            move('2026-11-15T09:00:00.000Z', '2026-11-24T19:30:00.000Z'),
+            move('2026-11-13T20:00:00.000Z', '2026-11-20T19:30:00.000Z'),
+          ],
+        })}
+      />
+    );
+    expect(within(screen.getByRole('list')).getAllByRole('listitem').length).toBe(3);
+  });
+
+  it('skips a note it cannot read instead of showing a broken line', () => {
+    render(
+      <ActivityFeed {...feedProps({ reschedules: [{ at: 'not a date' }, { toStart: null }] })} />
+    );
+    expect(within(screen.getByRole('list')).getAllByRole('listitem').length).toBe(1);
+  });
+
+  it('adds nothing for a session that was never moved', () => {
+    render(<ActivityFeed {...feedProps({})} />);
+    expect(within(screen.getByRole('list')).getAllByRole('listitem').length).toBe(1);
+  });
+});
+
 describe('ActivityFeed file display and download', () => {
   it('own message with one attached file renders the file name and icon', () => {
     const customer = createUser('user1');

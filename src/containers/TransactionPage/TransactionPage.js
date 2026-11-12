@@ -1056,6 +1056,7 @@ export const TransactionPageComponent = props => {
             <ManageCalendarBooking
               transactionId={transaction?.id}
               listingId={listing?.id}
+              coachFirstName={(provider?.attributes?.profile?.displayName || '').split(' ')[0]}
               onCancelled={onTransactionCancelledOnCalendar}
             />
           ) : null}

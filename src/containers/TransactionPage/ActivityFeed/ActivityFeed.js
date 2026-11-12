@@ -26,6 +26,8 @@ import {
   LATE_CANCELLED,
 } from '../../../transactions/lateCancellation';
 
+import { getReschedules, RESCHEDULE_FEED_ITEM } from '../../../transactions/reschedules';
+
 import css from './ActivityFeed.module.css';
 
 const { Money } = sdkTypes;
@@ -69,6 +71,17 @@ const TransitionMessage = props => {
   const { processName, processState, showReviewAsFirstLink, showReviewAsSecondLink } = stateData;
   const stateStatus = nextState === processState ? 'current' : 'past';
   const transitionName = transition.transition;
+
+  // Revie: a move of the session, listed from transaction metadata (see transactions/reschedules.js).
+  // Worded without an actor, since the server records when and to what, not who.
+  if (transitionName === RESCHEDULE_FEED_ITEM) {
+    const when = `${intl.formatDate(transition.toStart, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    })}, ${intl.formatTime(transition.toStart)}`;
+    return intl.formatMessage({ id: 'TransactionPage.ActivityFeed.rescheduled' }, { time: when });
+  }
 
   // actor: 'you', 'system', 'operator', or display name of the other party
   const actor =
@@ -261,7 +274,7 @@ export const ActivityFeed = props => {
   // Release-4 has a real `transition/late-cancel`, which the feed already lists.
   const lateCancellation = getLateCancellation(transaction);
   const hasRealLateCancel = transitions.some(t => t.transition === 'transition/late-cancel');
-  const feedTransitions =
+  const withLateCancellation =
     lateCancellation && !hasRealLateCancel && stateData.processState === LATE_CANCELLED
       ? [
           ...relevantTransitions,
@@ -272,6 +285,18 @@ export const ActivityFeed = props => {
           },
         ]
       : relevantTransitions;
+
+  // Revie: each time the session was moved, from the transaction's metadata.
+  const feedTransitions = [
+    ...withLateCancellation,
+    ...getReschedules(transaction).map(move => ({
+      transition: RESCHEDULE_FEED_ITEM,
+      createdAt: move.at,
+      by: TX_TRANSITION_ACTOR_OPERATOR,
+      toStart: move.toStart,
+      toEnd: move.toEnd,
+    })),
+  ];
 
   // combine messages and transaction transitions
   const hideOldTransitions = hasOlderMessages || fetchMessagesInProgress;
@@ -325,9 +350,10 @@ export const ActivityFeed = props => {
     if (currentUser?.id && customer?.id && provider?.id && listing?.id) {
       const transitionName = transition.transition;
       const isLateCancellationItem = transitionName === LATE_CANCELLATION_FEED_ITEM;
-      const nextState = isLateCancellationItem
-        ? stateData.processState
-        : process.getStateAfterTransition(transition.transition);
+      const nextState =
+        isLateCancellationItem || transitionName === RESCHEDULE_FEED_ITEM
+          ? stateData.processState
+          : process.getStateAfterTransition(transition.transition);
       const isCustomerReview = process.isCustomerReview(transitionName);
       const isProviderRieview = process.isProviderReview(transitionName);
       const reviewEntity = isCustomerReview

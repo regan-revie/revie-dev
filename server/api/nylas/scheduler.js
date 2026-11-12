@@ -310,8 +310,29 @@ const isFreeCancellation = ({ bookingStart, cancelledAt }) => {
   return noticeMinutes >= SCHEDULING_DEFAULTS.freeCancellationMinutes;
 };
 
+/**
+ * May a client move this session? Only while cancelling it would still be free: the same 48-hour
+ * window, from the same rule, so the two can never disagree. Coaches are not limited (they move the
+ * event in their own calendar, and nothing here is asked).
+ *
+ * Throws on a missing or unparseable time, like isFreeCancellation: a row we cannot date is not
+ * guessed at.
+ *
+ * @param {Date|string|number} bookingStart the session's real start (our database's time)
+ * @param {Date|string|number} [now]
+ * @returns {boolean}
+ */
+const canClientReschedule = ({ bookingStart, now = new Date() }) => {
+  // new Date(null) is 1970 and passes for a real time, so an absent start is refused explicitly.
+  if (bookingStart === null || bookingStart === undefined || bookingStart === '') {
+    throw new Error('canClientReschedule needs a valid bookingStart');
+  }
+  return isFreeCancellation({ bookingStart, cancelledAt: now });
+};
+
 module.exports = {
   isFreeCancellation,
+  canClientReschedule,
   TRANSACTION_FIELD,
   EVENT_TYPES,
   SCHEDULING_DEFAULTS,
