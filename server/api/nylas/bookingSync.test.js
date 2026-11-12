@@ -21,6 +21,7 @@ jest.mock('./sessionEmails', () => ({
   safeRescheduleEmails: jest.fn(async () => ({})),
   safeCancelBookingEmails: jest.fn(async () => 0),
 }));
+jest.mock('./bookingTimeSync', () => ({ applyBookingTime: jest.fn() }));
 jest.mock('./bookingRecovery', () => ({
   cancelIfDeclined: jest.fn(async () => false),
 }));
@@ -33,6 +34,7 @@ const {
   updateTransactionMetadata,
 } = require('./integration');
 const { cancelIfDeclined } = require('./bookingRecovery');
+const { applyBookingTime } = require('./bookingTimeSync');
 const {
   safeScheduleReminders,
   safeRescheduleEmails,
@@ -59,6 +61,7 @@ beforeEach(() => {
   });
   updateTransactionMetadata.mockResolvedValue({ ok: true });
   cancelIfDeclined.mockResolvedValue(false);
+  applyBookingTime.mockResolvedValue({ outcome: 'updated' });
 });
 
 describe('extractTransactionId()', () => {
@@ -257,6 +260,36 @@ describe('booking.rescheduled, inside 48 hours of the session (a coach moving th
     const result = await handleBookingWebhook(rescheduled);
     expect(result.action).toBe('rescheduled');
     expect(log.error.mock.calls.some(c => c[1] === 'nylas-reschedule-note-failed')).toBe(true);
+  });
+
+  it("moves Sharetribe's booking to the new time after Nylas's, last, with the same times", async () => {
+    db.findByBookingId.mockResolvedValue(row());
+    await handleBookingWebhook(rescheduled);
+    expect(applyBookingTime).toHaveBeenCalledWith({
+      transactionId: TX,
+      bookingId: BOOKING,
+      start: new Date(newSeconds * 1000),
+      end: new Date((newSeconds + 3600) * 1000),
+    });
+    // Our row and the emails come first, so a failure of the Sharetribe step repeats only safe work.
+    expect(db.recordBooking.mock.invocationCallOrder[0]).toBeLessThan(
+      applyBookingTime.mock.invocationCallOrder[0]
+    );
+    expect(safeRescheduleEmails.mock.invocationCallOrder[0]).toBeLessThan(
+      applyBookingTime.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('fails the webhook (so Nylas delivers it again) when the Sharetribe update fails', async () => {
+    db.findByBookingId.mockResolvedValue(row());
+    applyBookingTime.mockRejectedValue(new Error('sharetribe down'));
+    await expect(handleBookingWebhook(rescheduled)).rejects.toThrow('sharetribe down');
+  });
+
+  it("does not touch Sharetribe's booking for a booking that was cancelled in the meantime", async () => {
+    db.findByBookingId.mockResolvedValue(row('cancelled'));
+    await handleBookingWebhook(rescheduled);
+    expect(applyBookingTime).not.toHaveBeenCalled();
   });
 
   it('writes no note for a booking that was cancelled in the meantime', async () => {

@@ -1,3 +1,14 @@
+;; Revie changes (release-6, see docs/decisions.md and docs/tech-constraints.md "Sharetribe's booking follows a reschedule"):
+;; - :transition/update-booking (operator, :state/accepted -> :state/accepted) runs :action/update-booking,
+;;   so a client's reschedule moves Sharetribe's booking to the new time as well as the calendar event.
+;;   Run by the server (server/api/nylas/bookingTimeSync.js) with bookingStart/bookingEnd params after
+;;   Nylas has accepted the move. No notification: the reschedule emails come from Postmark.
+;; - Why it matters for money: the payout (:transition/complete, booking end + 2 days) and the review
+;;   windows are timed off the booking. Verified on Dev (Nov 12): after update-booking the payout timer
+;;   fires from the NEW end, not the original one. Before this, a session moved later was paid out
+;;   2 days after its ORIGINAL date, possibly before it happened, after which no refund was possible.
+;; - Availability: Sharetribe checks the new slot against the listing (the booking's own current slot
+;;   counts as free). Only for accepted bookings; the booking must keep the same length.
 ;; Revie changes (release-5, emails only; the process graph is unchanged from release-4):
 ;; - booking-canceled-to-customer showed "Your refund of 0.00 USD": the cancel transition refunds in
 ;;   full and the email is rendered afterwards, when payin-total is already zero. It now reads the
@@ -135,6 +146,11 @@
     {:name :action/cancel-booking}],
    :from :state/accepted,
    :to :state/cancelled}
+  {:name :transition/update-booking,
+   :actor :actor.role/operator,
+   :actions [{:name :action/update-booking, :config {:type :time}}],
+   :from :state/accepted,
+   :to :state/accepted}
   {:name :transition/late-cancel,
    :actor :actor.role/operator,
    :actions [],

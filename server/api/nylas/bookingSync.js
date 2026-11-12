@@ -25,6 +25,7 @@ const {
 } = require('./integration');
 const { isFreeCancellation, TRANSACTION_FIELD } = require('./scheduler');
 const { cancelIfDeclined } = require('./bookingRecovery');
+const { applyBookingTime } = require('./bookingTimeSync');
 const {
   safeScheduleReminders,
   safeRescheduleEmails,
@@ -405,6 +406,17 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
         toEnd: newEnd,
       });
       await safeRescheduleEmails({ bookingId, oldStart, oldEnd, newStart, newEnd });
+
+      // Last, and allowed to throw: Nylas has already moved the session and our row says so, and
+      // Sharetribe's booking (payout timing, review windows, the order page) now has to follow. A
+      // failure here answers 500 so Nylas delivers the notice again; everything above is safe to
+      // repeat. See bookingTimeSync.js, and for transactions before release-6 what it reports.
+      await applyBookingTime({
+        transactionId: mapping.sharetribe_transaction_id,
+        bookingId,
+        start: newStart,
+        end: newEnd,
+      });
     }
     return { handled: true, action: 'rescheduled' };
   }
