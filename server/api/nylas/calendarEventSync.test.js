@@ -1,11 +1,7 @@
-// Real bookingSync (so the refund path is the one that runs in production); the database, the
-// Integration API and Nylas are mocked.
-jest.mock('./db', () => ({
-  isAvailable: jest.fn(),
-  findBookingByEvent: jest.fn(),
-  findByBookingId: jest.fn(),
-  setStatus: jest.fn(),
-}));
+// Real bookingSync and calendarEventSync, a stand-in database that behaves like the real one
+// (waits that persist, come due and are claimed), a controllable clock, and mocks only for the
+// Integration API (Sharetribe), Nylas and Sentry.
+jest.mock('../../log', () => ({ error: jest.fn() }));
 jest.mock('./integration', () => ({
   isConfigured: jest.fn(),
   applyTransition: jest.fn(),
@@ -15,237 +11,488 @@ jest.mock('./integration', () => ({
 jest.mock('./client', () => ({ nylasRequest: jest.fn() }));
 jest.mock('./bookingRecovery', () => ({ cancelIfDeclined: jest.fn() }));
 
-const db = require('./db');
-const integration = require('./integration');
-const { handleCalendarEvent } = require('./calendarEventSync');
+// The "database" lives outside the module registry, so it survives a simulated restart.
+const mockStore = { bookings: new Map(), events: new Map(), waits: new Map() };
+jest.mock('./db', () => ({
+  isAvailable: jest.fn(() => true),
+  findBookingByEvent: jest.fn(async (grant, event) => {
+    const e = [...mockStore.events.values()].find(x => x.grant === grant && x.event === event);
+    return e ? mockStore.bookings.get(e.booking) || null : null;
+  }),
+  findByBookingId: jest.fn(async id => mockStore.bookings.get(id) || null),
+  setStatus: jest.fn(async (id, status) => {
+    const b = mockStore.bookings.get(id);
+    if (b) b.status = status;
+    return b;
+  }),
+  scheduleEventCancellation: jest.fn(async w => {
+    const existing = mockStore.waits.get(w.nylasBookingId);
+    if (existing && existing.status === 'pending') return false;
+    mockStore.waits.set(w.nylasBookingId, {
+      nylas_booking_id: w.nylasBookingId,
+      nylas_event_id: w.nylasEventId,
+      nylas_grant_id: w.nylasGrantId,
+      calendar_id: w.calendarId || null,
+      status: 'pending',
+      due: Date.now() + w.delayMinutes * 60000,
+      lockedUntil: 0,
+    });
+    return true;
+  }),
+  markEventRestored: jest.fn(async id => {
+    const w = mockStore.waits.get(id);
+    if (!w || w.status !== 'pending') return null;
+    w.status = 'restored';
+    return w;
+  }),
+  claimDueEventCancellations: jest.fn(async () => {
+    const now = Date.now();
+    const rows = [...mockStore.waits.values()].filter(
+      w => w.status === 'pending' && w.due <= now && w.lockedUntil <= now
+    );
+    rows.forEach(w => {
+      w.lockedUntil = now + 120000;
+    });
+    return rows;
+  }),
+  finishEventCancellation: jest.fn(async (id, status) => {
+    const w = mockStore.waits.get(id);
+    if (w) w.status = status;
+    return w;
+  }),
+  retryEventCancellation: jest.fn(async (id, seconds) => {
+    const w = mockStore.waits.get(id);
+    if (w && w.status === 'pending') w.lockedUntil = Date.now() + seconds * 1000;
+  }),
+}));
+
+// Everything is loaded fresh by loadSync(), which is also how a server restart is simulated: new
+// module instances with nothing in memory, over the same database.
+let log;
+let integration;
+let nylasRequest;
+let db;
+const mockTx = { cancelled: false, refunds: 0, metadata: {} };
+let eventStatus; // what Nylas says the event is when it is read again
+
+const loadSync = () => {
+  jest.resetModules();
+  log = require('../../log');
+  integration = require('./integration');
+  ({ nylasRequest } = require('./client'));
+  db = require('./db');
+
+  // Mock implementations do not survive between tests in this setup (or a module reset), so every
+  // one is set here.
+  db.isAvailable.mockReturnValue(true);
+  integration.isConfigured.mockReturnValue(true);
+  // A transaction that behaves like Sharetribe's: the first cancel moves it, and a second is refused.
+  integration.applyTransition.mockImplementation(async (id, transition) => {
+    if (transition !== 'transition/cancel') return { ok: true };
+    if (mockTx.cancelled) return { ok: false, alreadyApplied: true };
+    mockTx.cancelled = true;
+    mockTx.refunds += 1;
+    return { ok: true };
+  });
+  // Metadata behaves like Sharetribe's: keys written are kept and merged.
+  integration.updateTransactionMetadata.mockImplementation(async (id, fields) => {
+    mockTx.metadata = { ...mockTx.metadata, ...fields };
+    return { ok: true };
+  });
+  integration.getTransactionBasics.mockImplementation(async () => ({
+    metadata: mockTx.metadata,
+    lastTransition: mockTx.cancelled ? 'transition/cancel' : 'transition/operator-accept',
+    payinTotal: { amount: mockTx.cancelled ? 0 : 5000, currency: 'USD' },
+  }));
+  nylasRequest.mockImplementation(async () => ({ status: eventStatus }));
+
+  return { calendar: require('./calendarEventSync'), booking: require('./bookingSync') };
+};
 
 const GRANT = 'grant-1';
 const EVENT = 'event-1';
 const BOOKING = 'booking-1';
 const TX = 'tx-1';
+const MINUTE = 60000;
 
-const row = (status = 'created') => ({
-  nylas_booking_id: BOOKING,
-  sharetribe_transaction_id: TX,
-  nylas_grant_id: GRANT,
-  booking_start: new Date(Date.now() + 5 * 3600000), // inside 48 hours: a coach cancel is still refunded
-  status,
-});
 const event = (extra = {}) => ({ id: EVENT, grant_id: GRANT, calendar_id: 'cal-1', ...extra });
+const advance = minutes => jest.setSystemTime(Date.now() + minutes * MINUTE);
+// How many refunds Sharetribe actually granted (a refused repeat is not a second one).
+const refundCalls = () => Array(mockTx.refunds).fill('refund');
 
 beforeEach(() => {
+  jest.useFakeTimers({ now: new Date('2026-11-12T10:00:00Z') });
   jest.clearAllMocks();
-  // Mock implementations do not survive between tests in this setup, so every one is set here.
-  db.isAvailable.mockReturnValue(true);
-  db.findBookingByEvent.mockResolvedValue(row());
-  db.setStatus.mockResolvedValue({});
-  integration.isConfigured.mockReturnValue(true);
-  integration.applyTransition.mockResolvedValue({ ok: true });
-  integration.updateTransactionMetadata.mockResolvedValue({ ok: true });
-  integration.getTransactionBasics.mockResolvedValue({
-    metadata: {},
-    lastTransition: 'transition/operator-accept',
+  mockStore.bookings.clear();
+  mockStore.events.clear();
+  mockStore.waits.clear();
+  mockStore.bookings.set(BOOKING, {
+    nylas_booking_id: BOOKING,
+    sharetribe_transaction_id: TX,
+    nylas_grant_id: GRANT,
+    booking_start: new Date(Date.now() + 5 * 3600000), // inside 48 hours: a coach cancel still refunds
+    status: 'created',
   });
+  mockStore.events.set(BOOKING, { booking: BOOKING, grant: GRANT, event: EVENT });
+
+  eventStatus = 'cancelled';
+  mockTx.cancelled = false;
+  mockTx.refunds = 0;
+  mockTx.metadata = {};
+  jest.spyOn(console, 'log').mockImplementation(() => {});
 });
 
-describe("a Revie session event deleted from the coach's calendar", () => {
-  it('refunds in full (the coach-cancel path) when Google reports it as event.updated with status cancelled', async () => {
-    const result = await handleCalendarEvent({
+afterEach(() => {
+  jest.useRealTimers();
+  jest.restoreAllMocks();
+});
+
+describe("the coach deletes a Revie session's event", () => {
+  it('does not cancel at once: it starts a five-minute wait', async () => {
+    const { calendar } = loadSync();
+    const result = await calendar.handleCalendarEvent({
       trigger: 'event.updated',
       data: event({ status: 'cancelled' }),
     });
 
-    expect(db.findBookingByEvent).toHaveBeenCalledWith(GRANT, EVENT);
-    expect(integration.applyTransition).toHaveBeenCalledTimes(1);
-    expect(integration.applyTransition).toHaveBeenCalledWith(TX, 'transition/cancel');
+    expect(result).toEqual({ handled: true, action: 'cancellation-scheduled' });
+    expect(db.scheduleEventCancellation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nylasBookingId: BOOKING,
+        nylasEventId: EVENT,
+        nylasGrantId: GRANT,
+        calendarId: 'cal-1',
+        delayMinutes: 5,
+      })
+    );
+    expect(integration.applyTransition).not.toHaveBeenCalled();
+    expect(mockStore.bookings.get(BOOKING).status).toBe('created');
+  });
+
+  it('does the same for event.deleted', async () => {
+    const { calendar } = loadSync();
+    const result = await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    expect(result.action).toBe('cancellation-scheduled');
+    expect(integration.applyTransition).not.toHaveBeenCalled();
+  });
+
+  it('still deleted after five minutes: one full refund through the coach-cancel path', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({
+      trigger: 'event.updated',
+      data: event({ status: 'cancelled' }),
+    });
+
+    advance(5);
+    const summary = await calendar.processDueEventCancellations();
+
+    expect(summary).toMatchObject({ checked: 1, cancelled: 1, restored: 0, failed: 0 });
+    expect(refundCalls()).toHaveLength(1);
+    expect(integration.applyTransition).not.toHaveBeenCalledWith(TX, 'transition/late-cancel');
+    // The cancellation emails read these, so they are written BEFORE the refund runs: the coach's
+    // cancellation, and the amount that is about to go back (50.00, not the 0 left afterwards).
     expect(integration.updateTransactionMetadata).toHaveBeenCalledWith(TX, {
       cancelledBy: 'provider',
+      refundAmount: 50,
+      refundCurrency: 'USD',
     });
-    expect(db.setStatus).toHaveBeenCalledWith(BOOKING, 'cancelled');
-    expect(result).toEqual({ handled: true, action: 'refunded', via: 'calendar-event' });
+    expect(integration.updateTransactionMetadata.mock.invocationCallOrder[0]).toBeLessThan(
+      integration.applyTransition.mock.invocationCallOrder[0]
+    );
+    expect(mockTx.metadata).toMatchObject({ cancelledBy: 'provider', refundAmount: 50 });
+    expect(mockStore.waits.get(BOOKING).status).toBe('done');
+    expect(mockStore.bookings.get(BOOKING).status).toBe('cancelled');
   });
 
-  it('refunds when the provider reports it as event.deleted', async () => {
-    const result = await handleCalendarEvent({ trigger: 'event.deleted', data: event() });
-    expect(integration.applyTransition).toHaveBeenCalledWith(TX, 'transition/cancel');
-    expect(result.action).toBe('refunded');
+  it('is read again from Nylas before anything is cancelled', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    advance(5);
+    await calendar.processDueEventCancellations();
+
+    const [path] = nylasRequest.mock.calls[0];
+    expect(path).toContain(`/v3/grants/${GRANT}/events/${EVENT}`);
+    expect(path).toContain('calendar_id=cal-1');
+    expect(path).toContain('show_cancelled=true');
   });
 
-  it('refunds even inside 48 hours: a coach cancellation is never charged', async () => {
-    await handleCalendarEvent({ trigger: 'event.deleted', data: event() });
-    expect(integration.applyTransition).not.toHaveBeenCalledWith(TX, 'transition/late-cancel');
+  it('an event that is gone altogether (404) counts as still deleted', async () => {
+    nylasRequest.mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }));
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    advance(5);
+    const summary = await calendar.processDueEventCancellations();
+    expect(summary.cancelled).toBe(1);
+    expect(refundCalls()).toHaveLength(1);
   });
 
-  it('asks Nylas for the status when the notification carries none, and refunds if it is gone', async () => {
-    const getEventStatus = jest.fn(async () => 'cancelled');
-    const result = await handleCalendarEvent({
-      trigger: 'event.updated',
-      data: event(),
-      getEventStatus,
-    });
-    expect(getEventStatus).toHaveBeenCalledWith({
-      grantId: GRANT,
-      calendarId: 'cal-1',
-      eventId: EVENT,
-    });
-    expect(result.action).toBe('refunded');
-  });
+  it('nothing happens before the five minutes are up', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
 
-  it("is treated as the client's cancellation, not the coach's, when the client used our cancel button (their event deletion echoes back)", async () => {
-    integration.getTransactionBasics.mockResolvedValue({
-      metadata: { cancelRequestedBy: 'customer' },
-      lastTransition: 'transition/operator-accept',
-    });
-    db.findBookingByEvent.mockResolvedValue({
-      ...row(),
-      booking_start: new Date(Date.now() + 100 * 3600000), // more than 48 hours out: free
-    });
-    await handleCalendarEvent({ trigger: 'event.updated', data: event({ status: 'cancelled' }) });
-    expect(integration.updateTransactionMetadata).toHaveBeenCalledWith(TX, {
-      cancelledBy: 'client',
-    });
+    advance(4);
+    const summary = await calendar.processDueEventCancellations();
+
+    expect(summary.checked).toBe(0);
+    expect(integration.applyTransition).not.toHaveBeenCalled();
+    expect(nylasRequest).not.toHaveBeenCalled();
   });
 });
 
-describe('events that are not Revie bookings', () => {
-  it('ignores an event whose ids we never stored, before doing any other work', async () => {
-    db.findBookingByEvent.mockResolvedValue(null);
-    const getEventStatus = jest.fn();
-    const result = await handleCalendarEvent({
-      trigger: 'event.deleted',
-      data: event({ id: 'a-coachs-own-meeting', title: 'Session with Sam' }),
-      getEventStatus,
-    });
+describe('the coach undoes the deletion', () => {
+  it('restored before the wait is up (Nylas says confirmed again): nothing is cancelled, and it is logged once', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
 
-    expect(result).toEqual({ handled: false, reason: 'not-a-revie-booking' });
+    eventStatus = 'confirmed'; // the coach pressed undo; no notice reaches us
+    advance(5);
+    const summary = await calendar.processDueEventCancellations();
+
+    expect(summary).toMatchObject({ checked: 1, cancelled: 0, restored: 1 });
     expect(integration.applyTransition).not.toHaveBeenCalled();
-    expect(integration.getTransactionBasics).not.toHaveBeenCalled();
-    expect(db.setStatus).not.toHaveBeenCalled();
-    expect(getEventStatus).not.toHaveBeenCalled();
+    expect(mockStore.bookings.get(BOOKING).status).toBe('created');
+    expect(mockStore.waits.get(BOOKING).status).toBe('restored');
+    const logged = console.log.mock.calls
+      .flat()
+      .filter(l => String(l).includes('is back after being deleted'));
+    expect(logged).toHaveLength(1);
+
+    // And it is not looked at again.
+    advance(5);
+    expect((await calendar.processDueEventCancellations()).checked).toBe(0);
   });
 
-  it('matches on ids alone: a title that looks like a Revie session counts for nothing', async () => {
-    db.findBookingByEvent.mockResolvedValue(null);
-    await handleCalendarEvent({
-      trigger: 'event.updated',
-      data: event({
-        id: 'other',
-        status: 'cancelled',
-        title: 'Find your focus with Coach',
-        when: { start_time: 1, end_time: 2 },
-      }),
-    });
-    expect(db.findBookingByEvent).toHaveBeenCalledWith(GRANT, 'other');
-    expect(integration.applyTransition).not.toHaveBeenCalled();
-  });
+  it('a notice that it is confirmed again ends the wait at once, and later nothing is read or cancelled', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
 
-  it('ignores a notification with no event or grant id', async () => {
-    expect(await handleCalendarEvent({ trigger: 'event.deleted', data: {} })).toEqual({
-      handled: false,
-      reason: 'no-event-id',
-    });
-    expect(db.findBookingByEvent).not.toHaveBeenCalled();
-  });
-});
-
-describe('a Revie event that changed but was not cancelled', () => {
-  it('does nothing: an edit, a move or our own description update is not a cancellation', async () => {
-    const result = await handleCalendarEvent({
+    const result = await calendar.handleCalendarEvent({
       trigger: 'event.updated',
       data: event({ status: 'confirmed' }),
     });
-    expect(result).toEqual({ handled: false, reason: 'event-not-cancelled' });
+    expect(result).toEqual({ handled: true, action: 'restored', via: 'calendar-event' });
+
+    advance(10);
+    expect((await calendar.processDueEventCancellations()).checked).toBe(0);
     expect(integration.applyTransition).not.toHaveBeenCalled();
+    expect(nylasRequest).not.toHaveBeenCalled();
   });
 
-  it('does nothing when Nylas says the event is still confirmed', async () => {
-    const result = await handleCalendarEvent({
+  it('a second deletion after a restore starts a fresh wait', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    await calendar.handleCalendarEvent({
       trigger: 'event.updated',
-      data: event(),
-      getEventStatus: async () => 'confirmed',
+      data: event({ status: 'confirmed' }),
     });
-    expect(result.reason).toBe('event-not-cancelled');
+
+    const again = await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    expect(again.action).toBe('cancellation-scheduled');
+
+    advance(5);
+    await calendar.processDueEventCancellations();
+    expect(refundCalls()).toHaveLength(1);
   });
 });
 
 describe('duplicate notifications', () => {
-  it('refund once: a notification for a booking already cancelled is dropped', async () => {
-    await handleCalendarEvent({ trigger: 'event.updated', data: event({ status: 'cancelled' }) });
-    expect(integration.applyTransition).toHaveBeenCalledTimes(1);
-
-    // The same notification again (Nylas delivers at least once), now that the row says cancelled.
-    db.findBookingByEvent.mockResolvedValue(row('cancelled'));
-    const again = await handleCalendarEvent({
+  it('start one wait, do not push its time back, and refund once', async () => {
+    const { calendar } = loadSync();
+    const first = await calendar.handleCalendarEvent({
       trigger: 'event.updated',
       data: event({ status: 'cancelled' }),
     });
+    advance(3);
+    const second = await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
 
-    expect(again).toEqual({ handled: false, reason: 'booking-not-active' });
-    expect(integration.applyTransition).toHaveBeenCalledTimes(1);
+    expect(first.action).toBe('cancellation-scheduled');
+    expect(second.action).toBe('cancellation-already-scheduled');
+
+    advance(2); // five minutes after the FIRST notice
+    await calendar.processDueEventCancellations();
+    advance(10);
+    await calendar.processDueEventCancellations();
+
+    expect(refundCalls()).toHaveLength(1);
   });
 
-  it('refund once even if two arrive at the same moment: Sharetribe refuses the second', async () => {
-    integration.applyTransition
-      .mockResolvedValueOnce({ ok: true })
-      .mockResolvedValueOnce({ ok: false, alreadyApplied: true });
+  it('two workers on the same tick cannot both act on one wait', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    advance(5);
 
-    const [first, second] = await Promise.all([
-      handleCalendarEvent({ trigger: 'event.updated', data: event({ status: 'cancelled' }) }),
-      handleCalendarEvent({ trigger: 'event.deleted', data: event() }),
+    const [a, b] = await Promise.all([
+      calendar.processDueEventCancellations(),
+      calendar.processDueEventCancellations(),
     ]);
+    expect(a.checked + b.checked).toBe(1);
+    expect(refundCalls()).toHaveLength(1);
+  });
+});
 
-    expect([first.action, second.action].sort()).toEqual(['already-cancelled', 'refunded']);
-    // Both asked; the state machine granted one refund.
-    expect(integration.applyTransition.mock.results.filter(r => r.type === 'return')).toHaveLength(
-      2
-    );
+describe('a restart during the wait', () => {
+  it('is still handled: the wait is in the database, not in a timer', async () => {
+    const before = loadSync();
+    await before.calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+
+    // The server restarts: a brand-new module instance, nothing in memory, the database as it was.
+    jest.resetModules();
+    jest.setSystemTime(Date.now() + 6 * MINUTE);
+    const after = loadSync();
+    const summary = await after.calendar.processDueEventCancellations();
+
+    expect(summary).toMatchObject({ checked: 1, cancelled: 1 });
+    expect(refundCalls()).toHaveLength(1);
   });
 
-  it('refund once when the Scheduler also reports booking.cancelled for the same booking', async () => {
-    const { handleBookingWebhook } = require('./bookingSync');
-    await handleCalendarEvent({ trigger: 'event.updated', data: event({ status: 'cancelled' }) });
+  it('and a restart that outlasts the wait just acts on the next tick, not twice', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    advance(60); // down for an hour
+    await calendar.processDueEventCancellations();
+    await calendar.processDueEventCancellations();
+    expect(refundCalls()).toHaveLength(1);
+  });
+});
 
-    // booking.cancelled arrives afterwards: the transaction is already cancelled, so Sharetribe
-    // refuses the transition, and the handler reports it as done.
-    db.findByBookingId.mockResolvedValue(row('cancelled'));
-    integration.applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
-    const result = await handleBookingWebhook({
+describe('guests and other calendars', () => {
+  it('a guest declining the invitation changes the guest list, not the event: ignored, nothing waits', async () => {
+    const { calendar } = loadSync();
+    const result = await calendar.handleCalendarEvent({
+      trigger: 'event.updated',
+      data: event({
+        status: 'confirmed',
+        participants: [{ email: 'client@example.com', status: 'no' }],
+      }),
+    });
+
+    expect(result).toEqual({ handled: false, reason: 'event-not-cancelled' });
+    expect(db.scheduleEventCancellation).not.toHaveBeenCalled();
+    advance(10);
+    expect((await calendar.processDueEventCancellations()).checked).toBe(0);
+    expect(integration.applyTransition).not.toHaveBeenCalled();
+  });
+
+  it("the client deleting the event from their own calendar is not something we are told about: another grant's copy never matches", async () => {
+    const { calendar } = loadSync();
+    const result = await calendar.handleCalendarEvent({
+      trigger: 'event.deleted',
+      data: { id: 'the-clients-copy', grant_id: 'clients-grant', calendar_id: 'their-cal' },
+    });
+    expect(result).toEqual({ handled: false, reason: 'not-a-revie-booking' });
+    expect(integration.applyTransition).not.toHaveBeenCalled();
+  });
+
+  it("the coach's own event id seen under someone else's grant does not match either", async () => {
+    const { calendar } = loadSync();
+    const result = await calendar.handleCalendarEvent({
+      trigger: 'event.deleted',
+      data: { ...event(), grant_id: 'clients-grant' },
+    });
+    expect(result.reason).toBe('not-a-revie-booking');
+  });
+
+  it('an event that is not a Revie booking is ignored before anything else', async () => {
+    const { calendar } = loadSync();
+    const result = await calendar.handleCalendarEvent({
+      trigger: 'event.deleted',
+      data: event({ id: 'a-coachs-own-meeting', title: 'Find your focus with Coach' }),
+    });
+    expect(result).toEqual({ handled: false, reason: 'not-a-revie-booking' });
+    expect(db.scheduleEventCancellation).not.toHaveBeenCalled();
+  });
+
+  it('ignores a notification with no event or grant id', async () => {
+    const { calendar } = loadSync();
+    expect(await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: {} })).toEqual({
+      handled: false,
+      reason: 'no-event-id',
+    });
+  });
+});
+
+describe('our own cancel button', () => {
+  it('still acts at once (booking.cancelled is not delayed), and the deletion it causes then waits for nothing', async () => {
+    const { calendar, booking } = loadSync();
+    mockStore.bookings.get(BOOKING).booking_start = new Date(Date.now() + 100 * 3600000);
+    mockTx.metadata = { cancelRequestedBy: 'customer' };
+
+    const now = await booking.handleBookingWebhook({
       trigger: 'booking.cancelled',
       grantId: GRANT,
       data: { booking_id: BOOKING },
     });
-    expect(result.action).toBe('already-cancelled');
+    expect(now.action).toBe('refunded');
+    expect(refundCalls()).toHaveLength(1);
+
+    // Deleting the event echoes back as a calendar notice; the booking is no longer active.
+    const echo = await calendar.handleCalendarEvent({
+      trigger: 'event.updated',
+      data: event({ status: 'cancelled' }),
+    });
+    expect(echo).toEqual({ handled: false, reason: 'booking-not-active' });
+    advance(10);
+    await calendar.processDueEventCancellations();
+    expect(refundCalls()).toHaveLength(1);
+  });
+
+  it('and if the echo slipped in first, the wait finds the booking already cancelled and does nothing', async () => {
+    const { calendar, booking } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    await booking.handleBookingWebhook({
+      trigger: 'booking.cancelled',
+      grantId: GRANT,
+      data: { booking_id: BOOKING },
+    });
+    expect(refundCalls()).toHaveLength(1);
+
+    advance(5);
+    const summary = await calendar.processDueEventCancellations();
+    expect(summary).toMatchObject({ checked: 1, ignored: 1, cancelled: 0 });
+    expect(refundCalls()).toHaveLength(1);
   });
 });
 
-describe('what it will not act on', () => {
-  it('leaves a booking that is not active alone (pending, or never confirmed)', async () => {
-    db.findBookingByEvent.mockResolvedValue(row('pending'));
-    const result = await handleCalendarEvent({
-      trigger: 'event.deleted',
-      data: event(),
+describe('when something goes wrong', () => {
+  it('a failed refund is reported, kept waiting and tried again later; it is not lost and not done twice', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    advance(5);
+
+    integration.applyTransition.mockResolvedValueOnce({
+      ok: false,
+      error: new Error('stripe down'),
     });
-    expect(result.reason).toBe('booking-not-active');
-    expect(integration.applyTransition).not.toHaveBeenCalled();
+    const first = await calendar.processDueEventCancellations();
+    expect(first).toMatchObject({ checked: 1, failed: 1, cancelled: 0 });
+    expect(log.error).toHaveBeenCalledWith(expect.any(Error), 'nylas-event-cancel-failed', {
+      bookingId: BOOKING,
+    });
+    expect(mockStore.waits.get(BOOKING).status).toBe('pending');
+    // The amount was written before the refund was tried, and stays right for the retry.
+    expect(mockTx.metadata).toMatchObject({ cancelledBy: 'provider', refundAmount: 50 });
+
+    // Not retried straight away...
+    expect((await calendar.processDueEventCancellations()).checked).toBe(0);
+    // ...but after the pause.
+    advance(6);
+    const second = await calendar.processDueEventCancellations();
+    expect(second).toMatchObject({ checked: 1, cancelled: 1 });
+    expect(mockStore.waits.get(BOOKING).status).toBe('done');
+    expect(mockTx.metadata.refundAmount).toBe(50);
   });
 
   it('does nothing without a database or Integration API credentials', async () => {
-    db.isAvailable.mockReturnValue(false);
-    expect((await handleCalendarEvent({ trigger: 'event.deleted', data: event() })).reason).toBe(
-      'no-database'
-    );
-
-    db.isAvailable.mockReturnValue(true);
+    const { calendar } = loadSync();
     integration.isConfigured.mockReturnValue(false);
-    expect((await handleCalendarEvent({ trigger: 'event.deleted', data: event() })).reason).toBe(
-      'no-integration-credentials'
-    );
+    expect((await calendar.processDueEventCancellations()).checked).toBe(0);
   });
 
-  it('lets a failure surface, so the webhook answers 500 and Nylas delivers it again', async () => {
-    integration.applyTransition.mockResolvedValue({ ok: false, error: new Error('stripe down') });
-    await expect(handleCalendarEvent({ trigger: 'event.deleted', data: event() })).rejects.toThrow(
-      'stripe down'
-    );
+  it('leaves a booking that is not active alone (pending, or never confirmed)', async () => {
+    const { calendar } = loadSync();
+    mockStore.bookings.get(BOOKING).status = 'pending';
+    const result = await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    expect(result.reason).toBe('booking-not-active');
+    expect(db.scheduleEventCancellation).not.toHaveBeenCalled();
   });
 });

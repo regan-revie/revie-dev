@@ -19,6 +19,27 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-12 (accidental deletions: wait before believing a calendar deletion)
+
+**Branch / PR:** `delayed-calendar-cancel`, one PR against `main`, not merged. Merged with `main` after the cancellation-emails PR (#25): the coach-cancel path that runs after the five-minute wait is the same `processBookingCancelled`, so it writes `cancelledBy: provider` and the refund amount before the refund, and the email shows the right amount (tested end to end in `calendarEventSync.test.js`).
+
+**What changed**
+1. **A calendar deletion now waits five minutes.** When Nylas reports a Revie booking's event as cancelled or deleted, nothing is cancelled: a row goes into Postgres (`nylas_event_cancellations`) due in five minutes. The sweeper's tick (every minute, in the web service) picks up due rows, reads the event again from Nylas, and only a still-cancelled or gone event runs the existing coach-cancel path (full refund, Sharetribe cancellation emails). If it is back (undo, restore) nothing happens and a log line says so once. A notice that the event is confirmed again ends the wait immediately. Restarting or deploying during the wait loses nothing, because the wait is in the database. A real `booking.cancelled` from our own cancel button is **not** delayed.
+2. **Found and fixed on the way:** a refund that failed would have left the booking marked cancelled but unrefunded and then been skipped on retry. The retry now looks at the transaction itself, so it is tried again (after five minutes, reported to Sentry as `nylas-event-cancel-failed`).
+3. **A client cannot cancel from their own calendar.** Only the coach's calendar is watched. A client declining the invite changes the guest list on the coach's event, whose status stays confirmed, so it is ignored (tested); a client deleting their own copy produces nothing we receive, and the same event id under any other grant never matches a booking (tested).
+4. **Client cancel button:** it already had a confirm step ("Cancel this session?" with "Yes, cancel my session" / "No, keep my session"). Inside 48 hours it said "It's less than 48 hours away, so you'll still be charged for it." Now it says "…so you'll still be charged in full and you won't get a refund.", the go-ahead button reads "Cancel and pay in full" (instead of the harmless-sounding "Yes"), and the cancelled message says "charged in full". If the server cannot say whether it is inside 48 hours, the generic text now mentions the charge too.
+
+**Retest, step by step**
+1. After deploy, book a session as a client, then as the coach delete its event from Google Calendar.
+2. Straight away: nothing changes in Revie (the booking is still accepted, no refund).
+3. Press undo in Google Calendar within five minutes. Five minutes later: still accepted. Render logs say the event was restored.
+4. Delete it again and leave it. About five to six minutes later: the booking is cancelled, the client is refunded in full and both get the cancellation email. Render shows `[jobs] calendar deletions {...cancelled: 1}`.
+5. As the client, decline the invitation in your own Google Calendar for another booking: nothing happens in Revie.
+6. As the client, press "Cancel session" inside 48 hours: the wording names the full charge, the button reads "Cancel and pay in full".
+
+**Not verified:** against live Nylas and Google. In particular what Nylas sends when the coach undoes a deletion (a `confirmed` update, or nothing: both are handled, because the event is read again at the end of the wait anyway), and that a restored Google event is returned by the event lookup.
+---
+
 ## HANDOFF — 2026-11-12 (cancellation emails: real refund amount, who cancelled, button colour)
 
 **Branch / PR:** `cancel-emails`, one PR against `main`, not merged. Separate from the accidental-deletion PR.

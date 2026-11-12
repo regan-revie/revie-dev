@@ -101,6 +101,22 @@ const initSchema = async () => {
     `CREATE INDEX IF NOT EXISTS nylas_booking_events_event_idx
        ON nylas_booking_events (nylas_grant_id, nylas_event_id)`
   );
+  // A calendar deletion waits here before it cancels anything (see calendarEventSync.js): in the
+  // database, not in a timer, so a restart or deploy during the wait loses nothing.
+  await query(`
+    CREATE TABLE IF NOT EXISTS nylas_event_cancellations (
+      nylas_booking_id text PRIMARY KEY,
+      nylas_event_id   text NOT NULL,
+      nylas_grant_id   text NOT NULL,
+      calendar_id      text,
+      status           text NOT NULL DEFAULT 'pending',
+      due_at           timestamptz NOT NULL,
+      locked_until     timestamptz NOT NULL DEFAULT now(),
+      attempts         integer NOT NULL DEFAULT 0,
+      created_at       timestamptz NOT NULL DEFAULT now(),
+      updated_at       timestamptz NOT NULL DEFAULT now()
+    )
+  `);
   return true;
 };
 
@@ -292,6 +308,93 @@ const setStatus = async (nylasBookingId, status) => {
 };
 
 /**
+ * Note that a booking's calendar event has been deleted, to be acted on after `delayMinutes`.
+ *
+ * A second notice for a booking that is already waiting does not move the time. One for a booking
+ * whose earlier wait ended (the coach restored the event, then deleted it again) starts a new wait.
+ *
+ * @returns {Promise<boolean>} true if a wait was started, false if one was already running
+ */
+const scheduleEventCancellation = async ({
+  nylasBookingId,
+  nylasEventId,
+  nylasGrantId,
+  calendarId,
+  delayMinutes,
+}) => {
+  const { rows } = await query(
+    `INSERT INTO nylas_event_cancellations
+       (nylas_booking_id, nylas_event_id, nylas_grant_id, calendar_id, due_at)
+     VALUES ($1, $2, $3, $4, now() + ($5 || ' minutes')::interval)
+     ON CONFLICT (nylas_booking_id) DO UPDATE
+       SET status = 'pending',
+           nylas_event_id = EXCLUDED.nylas_event_id,
+           nylas_grant_id = EXCLUDED.nylas_grant_id,
+           calendar_id = EXCLUDED.calendar_id,
+           due_at = EXCLUDED.due_at,
+           locked_until = now(),
+           attempts = 0,
+           updated_at = now()
+       WHERE nylas_event_cancellations.status <> 'pending'
+     RETURNING nylas_booking_id`,
+    [nylasBookingId, nylasEventId, nylasGrantId, calendarId || null, String(delayMinutes)]
+  );
+  return rows.length > 0;
+};
+
+/** The coach put the event back while the wait was running. @returns the waiting row, or null. */
+const markEventRestored = async nylasBookingId => {
+  const { rows } = await query(
+    `UPDATE nylas_event_cancellations SET status = 'restored', updated_at = now()
+      WHERE nylas_booking_id = $1 AND status = 'pending' RETURNING *`,
+    [nylasBookingId]
+  );
+  return rows[0] || null;
+};
+
+/**
+ * Take the waits whose time has come, locking them so two workers never act on the same one. A
+ * worker that dies leaves its lock to expire by itself.
+ */
+const claimDueEventCancellations = async (limit = 10, lockSeconds = 120) => {
+  const { rows } = await query(
+    `UPDATE nylas_event_cancellations
+        SET locked_until = now() + ($2 || ' seconds')::interval,
+            attempts = attempts + 1,
+            updated_at = now()
+      WHERE nylas_booking_id IN (
+        SELECT nylas_booking_id FROM nylas_event_cancellations
+         WHERE status = 'pending' AND due_at <= now() AND locked_until <= now()
+         ORDER BY due_at
+         LIMIT $1
+         FOR UPDATE SKIP LOCKED)
+      RETURNING *`,
+    [limit, String(lockSeconds)]
+  );
+  return rows;
+};
+
+/** End a wait: 'done' (cancelled), 'restored' (event was back) or 'ignored' (nothing left to do). */
+const finishEventCancellation = async (nylasBookingId, status) => {
+  const { rows } = await query(
+    `UPDATE nylas_event_cancellations SET status = $2, updated_at = now()
+      WHERE nylas_booking_id = $1 RETURNING *`,
+    [nylasBookingId, status]
+  );
+  return rows[0] || null;
+};
+
+/** Try again later (a failure), leaving the wait pending. */
+const retryEventCancellation = async (nylasBookingId, retryInSeconds) => {
+  await query(
+    `UPDATE nylas_event_cancellations
+        SET locked_until = now() + ($2 || ' seconds')::interval, updated_at = now()
+      WHERE nylas_booking_id = $1 AND status = 'pending'`,
+    [nylasBookingId, String(retryInSeconds)]
+  );
+};
+
+/**
  * Run `fn` only if nobody else holds the named lock, using a Postgres session advisory lock.
  *
  * Used to stop the reconcile loop, the Calendar page's sync and the Nylas callback from syncing the
@@ -345,6 +448,11 @@ module.exports = {
   findBookingByEvent,
   findBookingsMissingEvent,
   withAdvisoryLock,
+  scheduleEventCancellation,
+  markEventRestored,
+  claimDueEventCancellations,
+  finishEventCancellation,
+  retryEventCancellation,
   setStatus,
   claimBookingAttempt,
   getBookingAttempt,

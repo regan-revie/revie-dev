@@ -61,12 +61,40 @@ describe('ManageCalendarBooking', () => {
     expect(screen.queryByText('ManageCalendarBooking.cancelButton')).not.toBeInTheDocument();
   });
 
+  it('inside 48 hours the confirmation says they are charged in full, and the button says so too', async () => {
+    jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(12));
+    const cancel = jest.spyOn(api, 'nylasCancelBooking').mockResolvedValue({ ok: true });
+    renderPanel();
+    await userEvent.click(await screen.findByText('ManageCalendarBooking.cancelButton'));
+
+    // The step exists (nothing is cancelled by the first click), it names the charge, and the
+    // button that goes ahead does not read as a harmless "Yes".
+    expect(cancel).not.toHaveBeenCalled();
+    expect(screen.getByText('ManageCalendarBooking.confirmCancelTextCharged')).toBeInTheDocument();
+    expect(
+      screen.getByText('ManageCalendarBooking.confirmCancelButtonCharged')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('ManageCalendarBooking.confirmCancelButton')).not.toBeInTheDocument();
+    // And keeping the session is one click away.
+    expect(screen.getByText('ManageCalendarBooking.keepBookingButton')).toBeInTheDocument();
+  });
+
+  it('more than 48 hours out the button is the plain one', async () => {
+    jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+    renderPanel();
+    await userEvent.click(await screen.findByText('ManageCalendarBooking.cancelButton'));
+    expect(screen.getByText('ManageCalendarBooking.confirmCancelButton')).toBeInTheDocument();
+    expect(
+      screen.queryByText('ManageCalendarBooking.confirmCancelButtonCharged')
+    ).not.toBeInTheDocument();
+  });
+
   it('says it was charged when cancelled inside 48 hours', async () => {
     jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(12));
     jest.spyOn(api, 'nylasCancelBooking').mockResolvedValue({ ok: true });
     renderPanel();
     await userEvent.click(await screen.findByText('ManageCalendarBooking.cancelButton'));
-    await userEvent.click(screen.getByText('ManageCalendarBooking.confirmCancelButton'));
+    await userEvent.click(screen.getByText('ManageCalendarBooking.confirmCancelButtonCharged'));
     expect(await screen.findByText('ManageCalendarBooking.cancelledCharged')).toBeInTheDocument();
   });
 
