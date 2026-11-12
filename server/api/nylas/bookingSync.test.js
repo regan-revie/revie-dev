@@ -15,6 +15,11 @@ jest.mock('./integration', () => ({
   updateTransactionMetadata: jest.fn(async () => ({ ok: true })),
 }));
 
+jest.mock('./sessionEmails', () => ({
+  safeScheduleReminders: jest.fn(async () => ({})),
+  safeRescheduleEmails: jest.fn(async () => ({})),
+  safeCancelBookingEmails: jest.fn(async () => 0),
+}));
 jest.mock('./bookingRecovery', () => ({
   cancelIfDeclined: jest.fn(async () => false),
 }));
@@ -26,6 +31,11 @@ const {
   updateTransactionMetadata,
 } = require('./integration');
 const { cancelIfDeclined } = require('./bookingRecovery');
+const {
+  safeScheduleReminders,
+  safeRescheduleEmails,
+  safeCancelBookingEmails,
+} = require('./sessionEmails');
 const {
   TRANSACTION_FIELD,
   extractTransactionId,
@@ -478,5 +488,128 @@ describe('the calendar event id in a booking notice', () => {
     const result = await handleBookingWebhook(noticeWith('booking.created', 'ev-real'));
     expect(result.action).toBe('accepted');
     spy.mockRestore();
+  });
+});
+
+describe('session emails (Postmark)', () => {
+  const startSeconds = Math.floor(Date.parse('2026-12-01T15:00:00Z') / 1000);
+  const created = {
+    trigger: 'booking.created',
+    grantId: 'g1',
+    data: {
+      booking_id: BOOKING,
+      booking_info: {
+        start_time: startSeconds,
+        end_time: startSeconds + 3600,
+        additional_fields: { [TRANSACTION_FIELD]: TX },
+      },
+    },
+  };
+
+  it('queues the reminders once a booking is confirmed, from the real session time', async () => {
+    await handleBookingWebhook(created);
+    expect(safeScheduleReminders).toHaveBeenCalledTimes(1);
+    const { bookingId, sessionStart } = safeScheduleReminders.mock.calls[0][0];
+    expect(bookingId).toBe(BOOKING);
+    expect(new Date(sessionStart).toISOString()).toBe('2026-12-01T15:00:00.000Z');
+  });
+
+  it('asks again on a redelivery (the reminders are keyed, so this changes nothing) but not for an orphaned booking', async () => {
+    applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+    cancelIfDeclined.mockResolvedValue(false);
+    await handleBookingWebhook(created);
+    expect(safeScheduleReminders).toHaveBeenCalledTimes(1);
+
+    jest.clearAllMocks();
+    applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+    cancelIfDeclined.mockResolvedValue(true);
+    await handleBookingWebhook(created);
+    expect(safeScheduleReminders).not.toHaveBeenCalled();
+  });
+
+  it('queues nothing for a booking that is only pending, or that could not be confirmed', async () => {
+    await handleBookingWebhook({ ...created, trigger: 'booking.pending' });
+    expect(safeScheduleReminders).not.toHaveBeenCalled();
+
+    applyTransition.mockResolvedValue({ ok: false, error: new Error('stripe down') });
+    await expect(handleBookingWebhook(created)).rejects.toThrow('stripe down');
+    expect(safeScheduleReminders).not.toHaveBeenCalled();
+  });
+
+  describe('a reschedule', () => {
+    const oldStart = new Date('2026-12-01T15:00:00Z');
+    const newSeconds = Math.floor(Date.parse('2026-12-03T10:00:00Z') / 1000);
+    const rescheduled = {
+      trigger: 'booking.rescheduled',
+      grantId: 'g1',
+      data: {
+        booking_id: BOOKING,
+        booking_info: {
+          start_time: newSeconds,
+          end_time: newSeconds + 3600,
+          old_start_time: Math.floor(oldStart.getTime() / 1000),
+          old_end_time: Math.floor(oldStart.getTime() / 1000) + 3600,
+        },
+      },
+    };
+    const row = (status = 'created') => ({
+      sharetribe_transaction_id: TX,
+      nylas_grant_id: 'g1',
+      booking_start: oldStart,
+      booking_end: new Date(oldStart.getTime() + 3600000),
+      status,
+    });
+
+    it('moves the reminders and confirms the change, with the old time from the notice', async () => {
+      db.findByBookingId.mockResolvedValue(row());
+      const result = await handleBookingWebhook(rescheduled);
+
+      expect(result.action).toBe('rescheduled');
+      expect(safeRescheduleEmails).toHaveBeenCalledTimes(1);
+      const args = safeRescheduleEmails.mock.calls[0][0];
+      expect(args.bookingId).toBe(BOOKING);
+      expect(new Date(args.oldStart).toISOString()).toBe('2026-12-01T15:00:00.000Z');
+      expect(new Date(args.newStart).toISOString()).toBe('2026-12-03T10:00:00.000Z');
+      expect(new Date(args.newEnd).toISOString()).toBe('2026-12-03T11:00:00.000Z');
+    });
+
+    it('uses our own row for the old time when the notice does not say', async () => {
+      db.findByBookingId.mockResolvedValue(row());
+      const bare = {
+        ...rescheduled,
+        data: {
+          booking_id: BOOKING,
+          booking_info: { start_time: newSeconds, end_time: newSeconds + 3600 },
+        },
+      };
+      await handleBookingWebhook(bare);
+      expect(new Date(safeRescheduleEmails.mock.calls[0][0].oldStart).toISOString()).toBe(
+        '2026-12-01T15:00:00.000Z'
+      );
+    });
+
+    it('sends nothing for a booking that was cancelled in the meantime', async () => {
+      db.findByBookingId.mockResolvedValue(row('cancelled'));
+      await handleBookingWebhook(rescheduled);
+      expect(safeRescheduleEmails).not.toHaveBeenCalled();
+      expect(db.recordBooking).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'cancelled' })
+      );
+    });
+  });
+
+  describe('a cancellation', () => {
+    it('cancels the pending reminders, whichever way the booking was cancelled', async () => {
+      db.findByBookingId.mockResolvedValue({
+        sharetribe_transaction_id: TX,
+        booking_start: new Date(Date.now() + 72 * 3600000),
+      });
+      await handleBookingWebhook({
+        trigger: 'booking.cancelled',
+        grantId: 'g1',
+        data: { booking_id: BOOKING },
+      });
+      expect(safeCancelBookingEmails).toHaveBeenCalledWith(BOOKING);
+    });
   });
 });

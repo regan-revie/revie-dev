@@ -43,6 +43,42 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 **Not verified:** the cause itself (see above), and the new matching against live Nylas.
 
+**Merged with #28 (Postmark), 2026-11-13.** Both kept. One change beyond the merge: the Meet-link lookup for session emails (`sessionEmails.js`) now uses only a *verified* event id (`db.findVerifiedEventIdForBooking`). With none yet, it asks Nylas for the booking's event, stores that as verified, and reads the Meet link with it. It never uses the id remembered from the creation response.
+
+---
+
+## HANDOFF — 2026-11-13 (Postmark: session reminders and reschedule confirmations)
+
+**Branch / PR:** `postmark-emails`, one PR against `main`, not merged.
+
+**What it does**
+- **Reminder:** one email, 24 hours before each confirmed session, to the client and to the coach. Booked less than 24 hours ahead: none.
+- **Reschedule:** the old reminders are cancelled, new ones scheduled from the new time, and both people get "your session has moved" with the old and new time.
+- **Cancelled** (any way, including the coach deleting the event once its five-minute wait ends): the reminders are cancelled.
+- All of it is rows in Postgres picked up by the sweeper tick, each sent at most once (two workers or a restart cannot double one). A failed send is reported to Sentry as `postmark-send-failed` and tried again on the next tick, three tries in all.
+- Nothing sends until `POSTMARK_SENDING_ENABLED=true`. Scheduling goes on while it is off, so switching it on finds the reminders ready.
+- Times are in each person's timezone: the coach's working-hours zone; the client's from their browser at checkout (saved from now on). Existing bookings have no client timezone, so their email shows the coach's timezone and says so.
+- Everything else (booked, cancelled, late-cancelled, payouts, reviews) stays with Sharetribe.
+
+**One thing to check before you start:** `render.yaml` had no Postmark variable, so I added **`POSTMARK_SERVER_TOKEN`** (secret, no value in the repo) and **`POSTMARK_SENDING_ENABLED`** (`false`). If you stored the token in Render under a different name, either rename it to `POSTMARK_SERVER_TOKEN` or tell me the name and I will change the code.
+
+**Steps for you**
+1. Merge and wait for the Render deploy. Nothing is sent yet.
+2. In Render, check `POSTMARK_SERVER_TOKEN` exists on `revie-dev` (see above). Leave `POSTMARK_SENDING_ENABLED` as `false`.
+3. Create the templates in Postmark, from the repo root with the revie-dev server token (Postmark > Servers > revie-dev > API Tokens). First a check that makes no changes: `POSTMARK_SERVER_TOKEN=<token> node scripts/postmark-create-templates.js --dry-run`. It prints `valid` for each of four templates. Then without `--dry-run` to create them (`created` x4). Running it again later leaves templates you have edited alone; `--overwrite` replaces them with the repo wording. Edit the wording in Postmark afterwards if you like (Templates > the four `session-...` ones), keeping the `{{variables}}`.
+4. In Render, set `POSTMARK_SENDING_ENABLED` to `true` and let it redeploy. (If your Blueprint syncs, also change the value in `render.yaml` so a sync does not turn it off.)
+5. Retest:
+   a. Book a session about **25 hours from now** as the client. In Render's logs look for `[jobs] reminders queued` or nothing yet; in about an hour (24 hours before the session) both of you get a reminder, and Render logs `[postmark] sent reminder to client (...)` and the same for coach.
+   b. Book another **more than a day ahead** and **reschedule it** from the order page: within a minute both of you get "Your session has moved", and its old reminder never arrives.
+   c. Book a third, then **cancel it** (or delete its event and wait five minutes): no reminder arrives, only Sharetribe's cancellation email.
+   d. Book one **less than 24 hours ahead**: no reminder.
+   e. Check the emails: your name, the coach's name, the date and time in your own timezone (an old booking shows the coach's timezone with a sentence saying so), the Meet link, the "See your booking" button in maroon, and for the client the line about rescheduling and the 48-hour charge.
+   f. If anything fails, Sentry shows `postmark-send-failed` (ids and the recipient's domain only; no addresses).
+
+**Draft copy** (also in `server/email/templates.js`; the same in Postmark once created). Voice: warm, plain, short. Subjects: client reminder "Tomorrow: {{sessionName}} with {{coachName}}"; coach reminder "Tomorrow: {{sessionName}} with {{clientName}}"; client reschedule "Your session has moved to {{sessionDate}}"; coach reschedule "Your session with {{clientName}} has moved". Bodies are in the PR description.
+
+**Not verified:** a real send (I have no access to the Postmark token, so the templates were never run through Postmark's validator: step 3's `--dry-run` is where that happens, and it stops before creating anything if one is rejected), and that `old_start_time` arrives in a real reschedule notice (it is in Nylas's sample notice; our own row is the fallback).
+
 ---
 
 ## HANDOFF — 2026-11-12 (release-5 on Dev)

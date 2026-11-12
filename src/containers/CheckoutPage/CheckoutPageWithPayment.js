@@ -35,6 +35,7 @@ import {
   getFormattedTotalPrice,
   getShippingDetailsMaybe,
   getTransactionTypeData,
+  clientTimeZoneMaybe,
   hasDefaultPaymentMethod,
   hasPaymentExpired,
   hasTransactionPassedPendingPayment,
@@ -142,6 +143,7 @@ const getOrderParams = (
       ...priceVariantMaybe,
       ...transactionFieldProtectedData,
       ...customerDefaultMessageMaybe,
+      ...clientTimeZoneMaybe(pageData?.listing),
     },
   };
 

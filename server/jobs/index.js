@@ -10,6 +10,7 @@ const { runBookingSweep } = require('./bookingSweeper');
 const { runReconcile } = require('../api/nylas/reconcile');
 const { resolveMissingEventIds } = require('../api/nylas/eventIdBackfill');
 const { processDueEventCancellations } = require('../api/nylas/calendarEventSync');
+const { processDueSessionEmails, backfillReminders } = require('../api/nylas/sessionEmails');
 const log = require('../log');
 
 const SWEEP_EVERY_MS = 60 * 1000;
@@ -35,6 +36,16 @@ const start = () => {
       const deletions = await processDueEventCancellations();
       if (deletions.checked > 0) {
         console.log('[jobs] calendar deletions', JSON.stringify(deletions)); // eslint-disable-line no-console
+      }
+      // Session reminders and reschedule confirmations that are due (server/api/nylas/sessionEmails.js).
+      const sessionEmails = await processDueSessionEmails();
+      if (sessionEmails.checked > 0) {
+        console.log('[jobs] session emails', JSON.stringify(sessionEmails)); // eslint-disable-line no-console
+      }
+      // Confirmed upcoming sessions that never got reminders queued.
+      const reminders = await backfillReminders();
+      if (reminders.queued > 0) {
+        console.log('[jobs] reminders queued', JSON.stringify(reminders)); // eslint-disable-line no-console
       }
       // Bookings with no calendar event recorded yet, so the coach deleting one is recognised.
       const backfill = await resolveMissingEventIds();

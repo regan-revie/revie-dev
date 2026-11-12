@@ -31,6 +31,7 @@ jest.mock('./db', () => ({
       verified: Boolean(verified),
     });
   }),
+  cancelSessionEmails: jest.fn(async () => 2),
   findBookingByEvent: jest.fn(async (grant, event) => {
     const e = [...mockStore.events.values()].find(x => x.grant === grant && x.event === event);
     return e ? mockStore.bookings.get(e.booking) || null : null;
@@ -421,6 +422,27 @@ describe('when the stored event id is not the one Nylas uses (the failed retest)
         true
       );
     });
+  });
+});
+
+describe('session emails when the coach deletes the event', () => {
+  it('the pending reminders are cancelled when the wait ends in a cancellation, not when it starts', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    expect(db.cancelSessionEmails).not.toHaveBeenCalled(); // an accidental deletion keeps its reminders
+
+    advance(5);
+    await calendar.processDueEventCancellations();
+    expect(db.cancelSessionEmails).toHaveBeenCalledWith(BOOKING);
+  });
+
+  it('and are kept when the coach undoes the deletion', async () => {
+    const { calendar } = loadSync();
+    await calendar.handleCalendarEvent({ trigger: 'event.deleted', data: event() });
+    eventStatus = 'confirmed';
+    advance(5);
+    await calendar.processDueEventCancellations();
+    expect(db.cancelSessionEmails).not.toHaveBeenCalled();
   });
 });
 

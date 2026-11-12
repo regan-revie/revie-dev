@@ -24,6 +24,11 @@ const {
 } = require('./integration');
 const { isFreeCancellation, TRANSACTION_FIELD } = require('./scheduler');
 const { cancelIfDeclined } = require('./bookingRecovery');
+const {
+  safeScheduleReminders,
+  safeRescheduleEmails,
+  safeCancelBookingEmails,
+} = require('./sessionEmails');
 
 /**
  * Pull the Sharetribe transaction id out of a booking payload.
@@ -64,6 +69,15 @@ const extractBookingStart = data => {
   const parsed = new Date(raw);
   return Number.isFinite(parsed.getTime()) ? parsed : null;
 };
+
+/** Where a rescheduled session moved from, when the payload says (epoch seconds, like the rest). */
+const epochOrNull = raw => {
+  if (raw == null) return null;
+  const parsed = typeof raw === 'number' ? new Date(raw * 1000) : new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+};
+const extractOldStart = data => epochOrNull(data?.booking_info?.old_start_time);
+const extractOldEnd = data => epochOrNull(data?.booking_info?.old_end_time);
 
 /** Pull the session end time out of a booking payload. Same nesting and epoch-seconds caveat as
  * extractBookingStart above. */
@@ -174,6 +188,8 @@ const handleLateCancellation = async (transactionId, metadata) => {
  */
 const processBookingCancelled = async ({ bookingId, mapping, data }) => {
   await db.setStatus(bookingId, 'cancelled');
+  // Whatever way it was cancelled, no reminder or confirmation should still go out for it.
+  await safeCancelBookingEmails(bookingId);
 
   const transactionId = mapping.sharetribe_transaction_id;
   const { metadata, payinTotal } = await getTransactionBasics(transactionId);
@@ -268,9 +284,16 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
       // transaction while the booking was still in flight, leaving a real booking on the coach's
       // calendar for a session that will never happen. Cancel it if so.
       const orphanCancelled = await cancelIfDeclined({ transactionId, bookingId });
+      if (!orphanCancelled) {
+        // A redelivery: the reminders are keyed, so asking again changes nothing, and it mends the
+        // case where the first delivery died before queueing them.
+        await safeScheduleReminders({ bookingId, sessionStart: extractBookingStart(data) });
+      }
       return { handled: true, action: orphanCancelled ? 'orphan-cancelled' : 'already-accepted' };
     }
     if (!result.ok) throw result.error;
+    // Confirmed: queue the 24-hour reminders (none if the session is under 24 hours away).
+    await safeScheduleReminders({ bookingId, sessionStart: extractBookingStart(data) });
     return { handled: true, action: 'accepted' };
   }
 
@@ -293,15 +316,29 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
       return { handled: false, reason: 'unknown-booking' };
     }
 
+    const newStart = extractBookingStart(data) ?? mapping.booking_start;
+    const newEnd = extractBookingEnd(data) ?? mapping.booking_end;
+    // The payload says what it moved from; our own row (read before it is overwritten below) is the
+    // fallback.
+    const oldStart = extractOldStart(data) ?? mapping.booking_start;
+    const oldEnd = extractOldEnd(data) ?? mapping.booking_end;
+    const wasActive = mapping.status !== 'cancelled';
+
     await db.recordBooking({
       nylasBookingId: bookingId,
       sharetribeTransactionId: mapping.sharetribe_transaction_id,
       nylasGrantId: mapping.nylas_grant_id,
-      bookingStart: extractBookingStart(data) ?? mapping.booking_start,
-      bookingEnd: extractBookingEnd(data) ?? mapping.booking_end,
-      status: 'rescheduled',
+      bookingStart: newStart,
+      bookingEnd: newEnd,
+      status: wasActive ? 'rescheduled' : mapping.status,
     });
     await recordEventFromNotice({ data, bookingId, grantId: mapping.nylas_grant_id });
+
+    // Reminders follow the new time, and both people are told it moved. Nothing for a booking that
+    // has been cancelled in the meantime.
+    if (wasActive) {
+      await safeRescheduleEmails({ bookingId, oldStart, oldEnd, newStart, newEnd });
+    }
     return { handled: true, action: 'rescheduled' };
   }
 
