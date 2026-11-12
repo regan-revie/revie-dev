@@ -117,6 +117,32 @@ const initSchema = async () => {
       updated_at       timestamptz NOT NULL DEFAULT now()
     )
   `);
+  // Emails Postmark sends about a session (reminders, reschedule confirmations), waiting to go out.
+  // In Postgres, not in memory, so a restart or a second worker cannot lose or double one. See
+  // server/api/nylas/sessionEmails.js.
+  await query(`
+    CREATE TABLE IF NOT EXISTS session_emails (
+      dedupe_key       text PRIMARY KEY,
+      kind             text NOT NULL,
+      nylas_booking_id text NOT NULL,
+      recipient        text NOT NULL,
+      send_at          timestamptz NOT NULL,
+      session_start    timestamptz,
+      details          jsonb,
+      status           text NOT NULL DEFAULT 'pending',
+      attempts         integer NOT NULL DEFAULT 0,
+      last_error       text,
+      sent_at          timestamptz,
+      created_at       timestamptz NOT NULL DEFAULT now(),
+      updated_at       timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await query(
+    `CREATE INDEX IF NOT EXISTS session_emails_due_idx ON session_emails (status, send_at)`
+  );
+  await query(
+    `CREATE INDEX IF NOT EXISTS session_emails_booking_idx ON session_emails (nylas_booking_id)`
+  );
   return true;
 };
 
@@ -395,6 +421,121 @@ const retryEventCancellation = async (nylasBookingId, retryInSeconds) => {
 };
 
 /**
+ * Queue one email. The key says which email it is (kind, booking, recipient, and the session time it
+ * was for), so queueing the same one twice is harmless. A cancelled one with the same key (the
+ * session was moved away and back) is put back; one that was sent or is being sent is left alone.
+ *
+ * @returns {Promise<boolean>} true if a pending email now exists because of this call
+ */
+const queueSessionEmail = async ({
+  dedupeKey,
+  kind,
+  nylasBookingId,
+  recipient,
+  sendAt,
+  sessionStart,
+  details,
+}) => {
+  const { rows } = await query(
+    `INSERT INTO session_emails
+       (dedupe_key, kind, nylas_booking_id, recipient, send_at, session_start, details)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (dedupe_key) DO UPDATE
+       SET status = 'pending', send_at = EXCLUDED.send_at, attempts = 0, last_error = NULL,
+           updated_at = now()
+       WHERE session_emails.status = 'cancelled'
+     RETURNING dedupe_key`,
+    [
+      dedupeKey,
+      kind,
+      nylasBookingId,
+      recipient,
+      sendAt,
+      sessionStart || null,
+      details ? JSON.stringify(details) : null,
+    ]
+  );
+  return rows.length > 0;
+};
+
+/** Cancel a booking's emails that have not gone out (only pending ones; a sent one stays sent). */
+const cancelSessionEmails = async (nylasBookingId, kinds = ['reminder', 'rescheduled']) => {
+  const { rows } = await query(
+    `UPDATE session_emails SET status = 'cancelled', updated_at = now()
+      WHERE nylas_booking_id = $1 AND kind = ANY($2) AND status = 'pending'
+      RETURNING dedupe_key`,
+    [nylasBookingId, kinds]
+  );
+  return rows.length;
+};
+
+/**
+ * Take the emails whose time has come, marking them `sending` in the same statement so no other
+ * worker can take them. A worker that dies after this leaves them `sending`, which nothing picks up
+ * again: an email that might already have gone is never sent a second time.
+ */
+const claimDueSessionEmails = async (limit = 20) => {
+  const { rows } = await query(
+    `UPDATE session_emails
+        SET status = 'sending', attempts = attempts + 1, updated_at = now()
+      WHERE dedupe_key IN (
+        SELECT dedupe_key FROM session_emails
+         WHERE status = 'pending' AND send_at <= now()
+         ORDER BY send_at
+         LIMIT $1
+         FOR UPDATE SKIP LOCKED)
+      RETURNING *`,
+    [limit]
+  );
+  return rows;
+};
+
+/** End an email: 'sent', 'skipped' (no longer wanted) or 'failed' (gave up). */
+const finishSessionEmail = async (dedupeKey, status, lastError = null) => {
+  await query(
+    `UPDATE session_emails
+        SET status = $2, last_error = $3, updated_at = now(),
+            sent_at = CASE WHEN $2 = 'sent' THEN now() ELSE sent_at END
+      WHERE dedupe_key = $1`,
+    [dedupeKey, status, lastError]
+  );
+};
+
+/** Put a claimed email back to be tried on the next tick. */
+const retrySessionEmail = async (dedupeKey, lastError) => {
+  await query(
+    `UPDATE session_emails SET status = 'pending', last_error = $2, updated_at = now()
+      WHERE dedupe_key = $1 AND status = 'sending'`,
+    [dedupeKey, lastError]
+  );
+};
+
+/** Active upcoming bookings more than `leadHours` away that have never had a reminder queued. */
+const findBookingsMissingReminders = async (leadHours = 24, limit = 20) => {
+  const { rows } = await query(
+    `SELECT b.* FROM nylas_bookings b
+      WHERE b.status IN ('created', 'rescheduled')
+        AND b.booking_start > now() + ($1 || ' hours')::interval
+        AND NOT EXISTS (
+          SELECT 1 FROM session_emails e
+           WHERE e.nylas_booking_id = b.nylas_booking_id AND e.kind = 'reminder')
+      ORDER BY b.booking_start
+      LIMIT $2`,
+    [String(leadHours), limit]
+  );
+  return rows;
+};
+
+/** The calendar event id a booking created, if we have it. */
+const findEventIdForBooking = async nylasBookingId => {
+  const { rows } = await query(
+    `SELECT nylas_event_id FROM nylas_booking_events WHERE nylas_booking_id = $1`,
+    [nylasBookingId]
+  );
+  return rows[0] ? rows[0].nylas_event_id : null;
+};
+
+/**
  * Run `fn` only if nobody else holds the named lock, using a Postgres session advisory lock.
  *
  * Used to stop the reconcile loop, the Calendar page's sync and the Nylas callback from syncing the
@@ -448,6 +589,13 @@ module.exports = {
   findBookingByEvent,
   findBookingsMissingEvent,
   withAdvisoryLock,
+  queueSessionEmail,
+  cancelSessionEmails,
+  claimDueSessionEmails,
+  finishSessionEmail,
+  retrySessionEmail,
+  findBookingsMissingReminders,
+  findEventIdForBooking,
   scheduleEventCancellation,
   markEventRestored,
   claimDueEventCancellations,

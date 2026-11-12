@@ -249,3 +249,73 @@ describe('calendar deletion waits', () => {
     );
   });
 });
+
+describe('session emails queue', () => {
+  const email = {
+    dedupeKey: 'reminder:b1:client:2026-12-01T15:00:00.000Z',
+    kind: 'reminder',
+    nylasBookingId: 'b1',
+    recipient: 'client',
+    sendAt: new Date('2026-11-30T15:00:00Z'),
+    sessionStart: new Date('2026-12-01T15:00:00Z'),
+  };
+
+  it('queues by a key, does nothing if one is already there, and re-arms only a cancelled one', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ dedupe_key: email.dedupeKey }] });
+    const queued = await loadDb(URL).queueSessionEmail(email);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/INSERT INTO session_emails/);
+    expect(sql).toMatch(/ON CONFLICT \(dedupe_key\) DO UPDATE/);
+    expect(sql).toMatch(/WHERE session_emails\.status = 'cancelled'/);
+    expect(params[0]).toBe(email.dedupeKey);
+    expect(queued).toBe(true);
+
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    expect(await loadDb(URL).queueSessionEmail(email)).toBe(false);
+  });
+
+  it('cancels only pending emails of the given kinds for one booking', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ dedupe_key: 'a' }, { dedupe_key: 'b' }] });
+    const n = await loadDb(URL).cancelSessionEmails('b1', ['reminder']);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/status = 'cancelled'/);
+    expect(sql).toMatch(/status = 'pending'/);
+    expect(params).toEqual(['b1', ['reminder']]);
+    expect(n).toBe(2);
+  });
+
+  it('claims due emails atomically, marking them sending so no other worker can take them', async () => {
+    await loadDb(URL).claimDueSessionEmails(20);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/SET status = 'sending', attempts = attempts \+ 1/);
+    expect(sql).toMatch(/status = 'pending' AND send_at <= now\(\)/);
+    expect(sql).toMatch(/FOR UPDATE SKIP LOCKED/);
+    expect(params).toEqual([20]);
+  });
+
+  it('puts a failed one back to pending only while it is still sending, and finishes others with a status', async () => {
+    const db = loadDb(URL);
+    await db.retrySessionEmail('k', 'boom');
+    expect(mockQuery.mock.calls[0][0]).toMatch(/status = 'pending'[\s\S]*status = 'sending'/);
+
+    await db.finishSessionEmail('k', 'sent');
+    expect(mockQuery.mock.calls[1][1]).toEqual(['k', 'sent', null]);
+    expect(mockQuery.mock.calls[1][0]).toMatch(/sent_at = CASE WHEN \$2 = 'sent'/);
+  });
+
+  it('finds confirmed upcoming bookings that have never had a reminder', async () => {
+    await loadDb(URL).findBookingsMissingReminders(24, 5);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/NOT EXISTS/);
+    expect(sql).toMatch(/e\.kind = 'reminder'/);
+    expect(sql).toMatch(/status IN \('created', 'rescheduled'\)/);
+    expect(params).toEqual(['24', 5]);
+  });
+
+  it('creates its table and indexes with the rest of the schema', async () => {
+    await loadDb(URL).initSchema();
+    const all = mockQuery.mock.calls.map(c => c[0]).join('\n');
+    expect(all).toMatch(/CREATE TABLE IF NOT EXISTS session_emails/);
+    expect(all).toMatch(/session_emails_due_idx/);
+  });
+});
