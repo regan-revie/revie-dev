@@ -86,17 +86,49 @@ const extractBookingId = data => data?.booking_id ?? data?.bookingId ?? data?.id
 const LATE_CANCEL_TRANSITIONS = ['transition/late-cancel', 'transition/complete-late-cancelled'];
 
 /**
- * Write who cancelled (and, for a late cancellation, when) onto the transaction's metadata, which
- * Console shows and both parties receive. The first write wins, so a redelivered webhook never moves
- * the time. Throws on failure so the webhook answers 500 and Nylas delivers it again.
+ * The refund the customer is about to get, as the cancellation email shows it: the decimal amount
+ * (50, not 5000) and its currency, from what they are paying right now. Null when there is nothing
+ * to refund (a redelivered notification arrives after the refund, when the total is already zero).
+ *
+ * Why this has to be written down at all: the cancel transition refunds in full and Sharetribe then
+ * reports the customer's total as 0, and the email is rendered after that. Reading the total in the
+ * template made every cancellation email say "Your refund of 0.00 USD".
  */
-const recordCancellation = async (transactionId, metadata, { cancelledBy, late }) => {
-  if (metadata.cancelledBy && (!late || metadata.lateCancelledAt)) return;
+const refundFields = payinTotal => {
+  if (!payinTotal || !(payinTotal.amount > 0) || !payinTotal.currency) return {};
+  let digits = 2;
+  try {
+    digits = new Intl.NumberFormat('en', {
+      style: 'currency',
+      currency: payinTotal.currency,
+    }).resolvedOptions().maximumFractionDigits;
+  } catch (e) {
+    // An unknown currency code keeps two digits; the amount is still shown with its currency code.
+  }
+  return {
+    refundAmount: payinTotal.amount / 10 ** digits,
+    refundCurrency: payinTotal.currency,
+  };
+};
 
-  const result = await updateTransactionMetadata(transactionId, {
-    cancelledBy,
+/**
+ * Write who cancelled (and, for a late cancellation, when; for a refund, how much) onto the
+ * transaction's metadata, which Console shows, both parties receive and the cancellation emails
+ * read. Each value is written once: a redelivered webhook never moves the time or the amount. Throws
+ * on failure so the webhook answers 500 and Nylas delivers it again.
+ *
+ * For a refund this must happen *before* the cancel transition, since its emails are rendered when
+ * the transition runs.
+ */
+const recordCancellation = async (transactionId, metadata, { cancelledBy, late, refund = {} }) => {
+  const fields = {
+    ...(metadata.cancelledBy ? {} : { cancelledBy }),
     ...(late && !metadata.lateCancelledAt ? { lateCancelledAt: new Date().toISOString() } : {}),
-  });
+    ...(metadata.refundAmount === undefined ? refund : {}),
+  };
+  if (Object.keys(fields).length === 0) return;
+
+  const result = await updateTransactionMetadata(transactionId, fields);
   if (!result.ok) throw result.error;
 };
 
@@ -144,7 +176,7 @@ const processBookingCancelled = async ({ bookingId, mapping, data }) => {
   await db.setStatus(bookingId, 'cancelled');
 
   const transactionId = mapping.sharetribe_transaction_id;
-  const { metadata } = await getTransactionBasics(transactionId);
+  const { metadata, payinTotal } = await getTransactionBasics(transactionId);
 
   // Who cancelled. The client's cancel button leaves `cancelRequestedBy: customer` before it asks
   // Nylas (cancelBookingEndpoint.js); a cancellation without that note can only have come from
@@ -168,12 +200,15 @@ const processBookingCancelled = async ({ bookingId, mapping, data }) => {
     return { handled: true, action: 'charged-late-cancellation' };
   }
 
-  const result = await applyTransition(transactionId, 'transition/cancel');
-  if (!result.ok && !result.alreadyApplied) throw result.error;
+  // Metadata first (who cancelled, how much comes back), then the refund: the emails the cancel
+  // transition sends are rendered at that moment and read both.
   await recordCancellation(transactionId, metadata, {
     cancelledBy: byClient ? 'client' : 'provider',
     late: false,
+    refund: refundFields(payinTotal),
   });
+  const result = await applyTransition(transactionId, 'transition/cancel');
+  if (!result.ok && !result.alreadyApplied) throw result.error;
   return { handled: true, action: result.alreadyApplied ? 'already-cancelled' : 'refunded' };
 };
 

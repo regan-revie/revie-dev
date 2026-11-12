@@ -1,1 +1,1 @@
-{{set-translations (asset "content/email-texts.json")}}{{t "BookingCanceledToCustomer.Subject" "Your session is cancelled." }}
+{{set-translations (asset "content/email-texts.json")}}{{#with transaction}}{{#eq "provider" metadata.cancelledBy}}{{t "BookingCanceledToCustomer.SubjectByProvider" "Your session was cancelled."}}{{else}}{{t "BookingCanceledToCustomer.Subject" "Your session is cancelled." }}{{/eq}}{{/with}}
