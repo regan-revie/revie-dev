@@ -7,6 +7,7 @@ jest.mock('./integration', () => ({
   loadTransactionAsOperator: jest.fn(),
 }));
 jest.mock('./client', () => ({ nylasRequest: jest.fn() }));
+jest.mock('./eventIdBackfill', () => ({ lookupEventId: jest.fn() }));
 
 const mockStore = { rows: new Map(), bookings: new Map(), eventIds: new Map() };
 jest.mock('./db', () => ({
@@ -69,7 +70,11 @@ jest.mock('./db', () => ({
       .slice(0, limit);
   }),
   findByBookingId: jest.fn(async id => mockStore.bookings.get(id) || null),
-  findEventIdForBooking: jest.fn(async id => mockStore.eventIds.get(id) || null),
+  // Only ids Nylas itself has given us (verified) are ever returned.
+  findVerifiedEventIdForBooking: jest.fn(async id => mockStore.eventIds.get(id) || null),
+  recordBookingEvent: jest.fn(async ({ nylasBookingId, nylasEventId }) => {
+    mockStore.eventIds.set(nylasBookingId, nylasEventId);
+  }),
 }));
 
 const HOUR = 3600000;
@@ -78,6 +83,7 @@ const TX = 'tx-1';
 
 let log;
 let integration;
+let lookupEventId;
 let nylasRequest;
 let db;
 let emails;
@@ -89,6 +95,7 @@ const load = () => {
   log = require('../../log');
   integration = require('./integration');
   ({ nylasRequest } = require('./client'));
+  ({ lookupEventId } = require('./eventIdBackfill'));
   db = require('./db');
 
   db.isAvailable.mockReturnValue(true);
@@ -407,6 +414,47 @@ describe('sending', () => {
     const summary = await emails.processDueSessionEmails({ send });
     expect(summary.sent).toBe(2);
     expect(sent[0].model.hasMeetLink).toBe(false);
+  });
+
+  describe('the Meet link and the event id it is read with', () => {
+    const sendReminders = async () => {
+      const start = makeBooking(72);
+      await emails.scheduleReminders({ bookingId: BOOKING, sessionStart: start });
+      advance(48);
+      return emails.processDueSessionEmails({ send });
+    };
+
+    it('reads the event by the verified id', async () => {
+      mockStore.eventIds.set(BOOKING, 'ev-verified');
+      await sendReminders();
+      expect(nylasRequest.mock.calls[0][0]).toContain('/events/ev-verified?');
+      expect(lookupEventId).not.toHaveBeenCalled();
+    });
+
+    it('with no verified id yet, asks Nylas for the real one, keeps it as verified, and uses it (never the creation-time id)', async () => {
+      lookupEventId.mockResolvedValue('ev-from-nylas');
+      await sendReminders();
+      expect(lookupEventId).toHaveBeenCalledWith({
+        nylas_booking_id: BOOKING,
+        sharetribe_transaction_id: TX,
+      });
+      expect(db.recordBookingEvent).toHaveBeenCalledWith({
+        nylasBookingId: BOOKING,
+        nylasEventId: 'ev-from-nylas',
+        nylasGrantId: 'g1',
+        verified: true,
+      });
+      expect(nylasRequest.mock.calls[0][0]).toContain('/events/ev-from-nylas?');
+      expect(sent[0].model.meetLink).toBe('https://meet.google.com/abc-defg');
+    });
+
+    it('sends without a link when Nylas cannot name the event either', async () => {
+      lookupEventId.mockRejectedValue(new Error('the booking has no event id'));
+      const summary = await sendReminders();
+      expect(summary.sent).toBe(2);
+      expect(sent[0].model.hasMeetLink).toBe(false);
+      expect(nylasRequest).not.toHaveBeenCalled();
+    });
   });
 
   it('sends nothing before the reminder is due', async () => {

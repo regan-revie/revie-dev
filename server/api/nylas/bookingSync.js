@@ -228,6 +228,26 @@ const processBookingCancelled = async ({ bookingId, mapping, data }) => {
   return { handled: true, action: result.alreadyApplied ? 'already-cancelled' : 'refunded' };
 };
 
+/**
+ * Nylas names the calendar event in its own booking notifications (`booking_info.event_id`). That is
+ * the id the event notifications later use, so it is stored, marked verified, straight away. Best
+ * effort: matching has other ways to find the event.
+ */
+const recordEventFromNotice = async ({ data, bookingId, grantId }) => {
+  const eventId = data?.booking_info?.event_id;
+  if (!eventId || !grantId) return;
+  try {
+    await db.recordBookingEvent({
+      nylasBookingId: bookingId,
+      nylasEventId: eventId,
+      nylasGrantId: grantId,
+      verified: true,
+    });
+  } catch (e) {
+    console.error(`[nylas] Could not store the calendar event id from the notice: ${e.message}`);
+  }
+};
+
 const handleBookingWebhook = async ({ trigger, data, grantId }) => {
   const bookingId = extractBookingId(data);
   if (!bookingId) return { handled: false, reason: 'no-booking-id' };
@@ -253,6 +273,8 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
       bookingEnd: extractBookingEnd(data),
       status: trigger === 'booking.created' ? 'created' : 'pending',
     });
+
+    await recordEventFromNotice({ data, bookingId, grantId });
 
     if (trigger === 'booking.pending') return { handled: true, action: 'recorded' };
 
@@ -310,6 +332,7 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
       bookingEnd: newEnd,
       status: wasActive ? 'rescheduled' : mapping.status,
     });
+    await recordEventFromNotice({ data, bookingId, grantId: mapping.nylas_grant_id });
 
     // Reminders follow the new time, and both people are told it moved. Nothing for a booking that
     // has been cancelled in the meantime.

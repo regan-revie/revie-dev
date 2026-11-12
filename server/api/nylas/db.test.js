@@ -141,13 +141,23 @@ describe('lookups', () => {
 });
 
 describe('calendar event ids', () => {
-  it('records an event against a booking, replacing an older one', async () => {
+  it('records an event against a booking, never letting an unconfirmed id replace a confirmed one', async () => {
     const db = loadDb(URL);
-    await db.recordBookingEvent({ nylasBookingId: 'b1', nylasEventId: 'e1', nylasGrantId: 'g1' });
+    await db.recordBookingEvent({
+      nylasBookingId: 'b1',
+      nylasEventId: 'e1',
+      nylasGrantId: 'g1',
+      verified: true,
+    });
     const [sql, params] = mockQuery.mock.calls[0];
     expect(sql).toMatch(/INSERT INTO nylas_booking_events/);
     expect(sql).toMatch(/ON CONFLICT \(nylas_booking_id\) DO UPDATE/);
-    expect(params).toEqual(['b1', 'e1', 'g1']);
+    // A write that is not confirmed by Nylas does not replace a row that is.
+    expect(sql).toMatch(/WHERE EXCLUDED\.verified OR NOT nylas_booking_events\.verified/);
+    expect(params).toEqual(['b1', 'e1', 'g1', true]);
+
+    await db.recordBookingEvent({ nylasBookingId: 'b2', nylasEventId: 'e2', nylasGrantId: 'g1' });
+    expect(mockQuery.mock.calls[1][1]).toEqual(['b2', 'e2', 'g1', false]);
   });
 
   it('finds a booking by grant id and event id together, and nothing else', async () => {
@@ -164,21 +174,36 @@ describe('calendar event ids', () => {
     expect(await loadDb(URL).findBookingByEvent('g1', 'someone-elses-meeting')).toBeNull();
   });
 
-  it('lists only active upcoming bookings that have no event recorded', async () => {
-    await loadDb(URL).findBookingsMissingEvent(5);
+  it('lists active upcoming bookings whose id is missing or unconfirmed, skipping given-up and recently tried ones', async () => {
+    await loadDb(URL).findBookingsNeedingEventCheck(5, 5, 3);
     const [sql, params] = mockQuery.mock.calls[0];
-    expect(sql).toMatch(/LEFT JOIN nylas_booking_events/);
-    expect(sql).toMatch(/e\.nylas_booking_id IS NULL/);
+    expect(sql).toMatch(/e\.nylas_booking_id IS NULL OR e\.verified = false/);
     expect(sql).toMatch(/status IN \('created', 'rescheduled'\)/);
     expect(sql).toMatch(/booking_start > now\(\)/);
-    expect(params).toEqual([5]);
+    expect(sql).toMatch(/COALESCE\(f\.attempts, 0\) < \$3/);
+    expect(sql).toMatch(/f\.last_attempt_at < now\(\) - \(\$2 \|\| ' minutes'\)::interval/);
+    expect(params).toEqual([5, '5', 3]);
   });
 
-  it('creates its table and lookup index with the rest of the schema', async () => {
+  it('counts a failed lookup in the database and says how many so far', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ attempts: 2 }] });
+    expect(await loadDb(URL).recordEventLookupFailure('b1')).toBe(2);
+    expect(mockQuery.mock.calls[0][0]).toMatch(/attempts = nylas_event_lookups\.attempts \+ 1/);
+  });
+
+  it("looks only at one grant's bookings when asked about a grant (never other coaches')", async () => {
+    await loadDb(URL).findActiveBookingsByGrant('g1', 20);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/WHERE nylas_grant_id = \$1/);
+    expect(params).toEqual(['g1', 20]);
+  });
+
+  it('creates its tables and the confirmed-id column with the rest of the schema', async () => {
     await loadDb(URL).initSchema();
     const all = mockQuery.mock.calls.map(c => c[0]).join('\n');
     expect(all).toMatch(/CREATE TABLE IF NOT EXISTS nylas_booking_events/);
-    expect(all).toMatch(/nylas_booking_events_event_idx/);
+    expect(all).toMatch(/ADD COLUMN IF NOT EXISTS verified boolean/);
+    expect(all).toMatch(/CREATE TABLE IF NOT EXISTS nylas_event_lookups/);
   });
 });
 

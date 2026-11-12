@@ -27,6 +27,7 @@ const log = require('../../log');
 const db = require('./db');
 const integration = require('./integration');
 const { nylasRequest } = require('./client');
+const { lookupEventId } = require('./eventIdBackfill');
 const postmark = require('../../email/postmark');
 const { buildSessionEmailModel } = require('./sessionEmailModel');
 const { TEMPLATE_ALIASES } = require('../../email/templates');
@@ -149,9 +150,23 @@ const backfillReminders = async ({ limit = 20, now = Date.now() } = {}) => {
 // --- sending -----------------------------------------------------------------------------------
 
 /** The Google Meet link of the session's calendar event, or '' if there is none or it cannot be read. */
-const meetLinkFor = async ({ bookingId, grantId, calendarId }) => {
+const meetLinkFor = async ({ bookingId, transactionId, grantId, calendarId }) => {
   try {
-    const eventId = await db.findEventIdForBooking(bookingId);
+    // Only an id Nylas itself has given us is trusted. If there is none yet (the backfill has not
+    // reached this booking), ask Nylas now and keep the answer, so the link does not depend on timing.
+    let eventId = await db.findVerifiedEventIdForBooking(bookingId);
+    if (!eventId && grantId) {
+      eventId = await lookupEventId({
+        nylas_booking_id: bookingId,
+        sharetribe_transaction_id: transactionId,
+      });
+      await db.recordBookingEvent({
+        nylasBookingId: bookingId,
+        nylasEventId: eventId,
+        nylasGrantId: grantId,
+        verified: true,
+      });
+    }
     if (!eventId || !grantId || !calendarId) return '';
     const event = await nylasRequest(
       `/v3/grants/${encodeURIComponent(grantId)}/events/${encodeURIComponent(
@@ -188,6 +203,7 @@ const loadEmailContext = async ({ row, mapping, now }) => {
   const recipientUser = row.recipient === 'coach' ? provider : customer;
   const meetLink = await meetLinkFor({
     bookingId: mapping.nylas_booking_id,
+    transactionId: mapping.sharetribe_transaction_id,
     grantId: mapping.nylas_grant_id,
     calendarId: publicData.nylasCalendarId,
   });
