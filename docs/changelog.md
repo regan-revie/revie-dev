@@ -21,7 +21,7 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ## HANDOFF — 2026-11-12 (accidental deletions: wait before believing a calendar deletion)
 
-**Branch / PR:** `delayed-calendar-cancel`, one PR against `main`, not merged. Independent of the cancellation-emails PR.
+**Branch / PR:** `delayed-calendar-cancel`, one PR against `main`, not merged. Merged with `main` after the cancellation-emails PR (#25): the coach-cancel path that runs after the five-minute wait is the same `processBookingCancelled`, so it writes `cancelledBy: provider` and the refund amount before the refund, and the email shows the right amount (tested end to end in `calendarEventSync.test.js`).
 
 **What changed**
 1. **A calendar deletion now waits five minutes.** When Nylas reports a Revie booking's event as cancelled or deleted, nothing is cancelled: a row goes into Postgres (`nylas_event_cancellations`) due in five minutes. The sweeper's tick (every minute, in the web service) picks up due rows, reads the event again from Nylas, and only a still-cancelled or gone event runs the existing coach-cancel path (full refund, Sharetribe cancellation emails). If it is back (undo, restore) nothing happens and a log line says so once. A notice that the event is confirmed again ends the wait immediately. Restarting or deploying during the wait loses nothing, because the wait is in the database. A real `booking.cancelled` from our own cancel button is **not** delayed.
@@ -38,6 +38,30 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 6. As the client, press "Cancel session" inside 48 hours: the wording names the full charge, the button reads "Cancel and pay in full".
 
 **Not verified:** against live Nylas and Google. In particular what Nylas sends when the coach undoes a deletion (a `confirmed` update, or nothing: both are handled, because the event is read again at the end of the wait anyway), and that a restored Google event is returned by the event lookup.
+---
+
+## HANDOFF — 2026-11-12 (cancellation emails: real refund amount, who cancelled, button colour)
+
+**Branch / PR:** `cancel-emails`, one PR against `main`, not merged. Separate from the accidental-deletion PR.
+
+**Causes**
+1. **"Your refund of 0.00 USD":** the cancel transition refunds in full, Sharetribe then reports the customer's total (`payin-total`) as 0, and the email is rendered after that. Checked on two real cancelled Dev transactions: `payinTotal` 0, with the original and the reversal line items both listed. The email template has no way to tell the original item from its reversal (documented line-item fields have no reversal flag, and only `eq` exists as a comparison), so it cannot work the amount out itself.
+2. **Orange button:** every Sharetribe template reads the colour from Console's branding (`marketplaceColors.notificationPrimaryButton`), which on Dev is `#ff9352`. Not a template or shared-style problem.
+
+**What changed**
+- The server now writes `cancelledBy`, `refundAmount` and `refundCurrency` to the transaction metadata **before** it runs the refunding cancel (`bookingSync.js`). Written once, never overwritten by a redelivery, in the currency's own decimals, and not written when there is nothing to refund. This works for every cancellation path (client button, coach deleting the event).
+- `booking-canceled-to-customer` (release-5 template): client cancelled keeps "Session cancelled." / "Pick another time" and now shows the real refund; coach cancelled (including deleting the calendar event) gets "Your session was cancelled" / "{coach} cancelled your {session} session. You'll get a full refund of {amount}; it can take 5 to 10 days to reach your card." / "Find another time" linking to the session. If there is no amount (an operator cancelling from Console) it says "Your refund is on its way", never 0.00. The subject follows the same split.
+- Late-cancel emails: the client's now says what they were charged, the coach's what they will be paid (both correct there, nothing is refunded). The coach's cancellation email has no amount, so nothing to fix.
+- Rendered all of them with Sharetribe's own preview (`flex-cli notifications preview`) against sample data, including the coach-cancelled variant forced on.
+
+**You need to do**
+1. **Console, Dev:** Design → Branding → the email button colour (`notificationPrimaryButton`, now `#ff9352`) → set `#310416`. The templates already use white text. This fixes every Sharetribe email. Test and Live at cutover (logged in `docs/go-live-plan.md`).
+2. **Email texts:** the new keys are in `docs/email-texts-release-5-paste-into-dev.json` (8 keys). They all have identical in-template defaults, so pasting is optional (it only makes them editable). `BookingCanceledToCustomer.Content`, already in your Console, needs no change: it still says "Your refund of {amount} {currency}", and it now receives the refunded amount. The exact keys: `BookingCanceledToCustomer.SubjectByProvider`, `.TitleByProvider`, `.ContentByProvider`, `.ContentByProviderNoAmount`, `.CtaByProvider`, `.ContentNoAmount`, `BookingLateCancelledToCustomer.ContentWithAmount`, `BookingLateCancelledToProvider.ContentWithAmount`. Old keys that are now unused and can stay or go: `BookingLateCancelledToCustomer.Content`, `BookingLateCancelledToProvider.Content`.
+3. **Push release-5 (not done by me):** template changes only reach a process by a push, and only new transactions use it. From the repo root: `npx flex-cli process push --path ext/transaction-processes/default-booking --process default-booking -m revie1-dev`, then `npx flex-cli process create-alias --process default-booking --version 5 --alias release-5 -m revie1-dev` (same for `revie1-test` if you want it there), then move the Test Session listing (`node scripts/dev-listing-test-helper.js use-release-5 --listing <id> --yes`, through `op run --env-file=.env --`) and set `BOOKING_PROCESS_ALIAS=default-booking/release-5` on Render. Tell me and I will do the push and the listing move.
+
+**Retest:** after 1 to 3, book a session and (a) cancel it as the client more than 48 hours ahead; (b) book another and delete its event from Google Calendar; (c) book a third inside 48 hours and cancel. Expected: (a) "Your refund of 50.00 USD", orange gone; (b) "Your session was cancelled" with the coach's name and "Find another time"; (c) "you've still been charged 50.00 USD".
+
+**Not verified:** a real send of the new templates (the preview uses Sharetribe's sample transaction, so `metadata.refundAmount` itself was checked only through the server tests and the documented `metadata` field; the first real cancellation after the push is the proof).
 
 ---
 

@@ -1,3 +1,14 @@
+;; Revie changes (release-5, emails only; the process graph is unchanged from release-4):
+;; - booking-canceled-to-customer showed "Your refund of 0.00 USD": the cancel transition refunds in
+;;   full and the email is rendered afterwards, when payin-total is already zero. It now reads the
+;;   amount the server wrote to transaction metadata (refundAmount, refundCurrency) before the
+;;   refund ran, and says "Your refund is on its way" if there is none (e.g. an operator cancelling
+;;   from Console).
+;; - The same email now reads by who cancelled (metadata.cancelledBy): a client cancelling keeps
+;;   "Session cancelled." / "Pick another time"; the coach cancelling (or deleting the calendar
+;;   event) gets "Your session was cancelled", the coach's name, the full refund, and "Find another
+;;   time" linking to the session.
+;; - The late-cancel emails state what the client was charged and what the coach will be paid.
 ;; Revie changes (release-4, see docs/decisions.md "Late cancellations have their own state (release-4)"):
 ;; - A client cancelling inside 48 hours runs :transition/late-cancel (operator, from accepted) into
 ;;   :state/late-cancelled. The client keeps the charge (no refund action), and the coach is paid by

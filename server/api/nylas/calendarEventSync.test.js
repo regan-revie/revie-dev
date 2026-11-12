@@ -94,7 +94,11 @@ const loadSync = () => {
     mockTx.refunds += 1;
     return { ok: true };
   });
-  integration.updateTransactionMetadata.mockResolvedValue({ ok: true });
+  // Metadata behaves like Sharetribe's: keys written are kept and merged.
+  integration.updateTransactionMetadata.mockImplementation(async (id, fields) => {
+    mockTx.metadata = { ...mockTx.metadata, ...fields };
+    return { ok: true };
+  });
   integration.getTransactionBasics.mockImplementation(async () => ({
     metadata: mockTx.metadata,
     lastTransition: mockTx.cancelled ? 'transition/cancel' : 'transition/operator-accept',
@@ -185,10 +189,17 @@ describe("the coach deletes a Revie session's event", () => {
     expect(summary).toMatchObject({ checked: 1, cancelled: 1, restored: 0, failed: 0 });
     expect(refundCalls()).toHaveLength(1);
     expect(integration.applyTransition).not.toHaveBeenCalledWith(TX, 'transition/late-cancel');
-    // Recorded as the coach's cancellation.
+    // The cancellation emails read these, so they are written BEFORE the refund runs: the coach's
+    // cancellation, and the amount that is about to go back (50.00, not the 0 left afterwards).
     expect(integration.updateTransactionMetadata).toHaveBeenCalledWith(TX, {
       cancelledBy: 'provider',
+      refundAmount: 50,
+      refundCurrency: 'USD',
     });
+    expect(integration.updateTransactionMetadata.mock.invocationCallOrder[0]).toBeLessThan(
+      integration.applyTransition.mock.invocationCallOrder[0]
+    );
+    expect(mockTx.metadata).toMatchObject({ cancelledBy: 'provider', refundAmount: 50 });
     expect(mockStore.waits.get(BOOKING).status).toBe('done');
     expect(mockStore.bookings.get(BOOKING).status).toBe('cancelled');
   });
@@ -458,6 +469,8 @@ describe('when something goes wrong', () => {
       bookingId: BOOKING,
     });
     expect(mockStore.waits.get(BOOKING).status).toBe('pending');
+    // The amount was written before the refund was tried, and stays right for the retry.
+    expect(mockTx.metadata).toMatchObject({ cancelledBy: 'provider', refundAmount: 50 });
 
     // Not retried straight away...
     expect((await calendar.processDueEventCancellations()).checked).toBe(0);
@@ -466,6 +479,7 @@ describe('when something goes wrong', () => {
     const second = await calendar.processDueEventCancellations();
     expect(second).toMatchObject({ checked: 1, cancelled: 1 });
     expect(mockStore.waits.get(BOOKING).status).toBe('done');
+    expect(mockTx.metadata.refundAmount).toBe(50);
   });
 
   it('does nothing without a database or Integration API credentials', async () => {

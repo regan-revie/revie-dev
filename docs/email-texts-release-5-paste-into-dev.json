@@ -1,0 +1,10 @@
+{
+  "BookingCanceledToCustomer.SubjectByProvider": "Your session was cancelled.",
+  "BookingCanceledToCustomer.TitleByProvider": "Your session was cancelled",
+  "BookingCanceledToCustomer.ContentByProvider": "{providerDisplayName} cancelled your {listingTitle} session. You'll get a full refund of {amount,number,::.00} {currency}; it can take 5 to 10 days to reach your card.",
+  "BookingCanceledToCustomer.ContentByProviderNoAmount": "{providerDisplayName} cancelled your {listingTitle} session. You'll get a full refund; it can take 5 to 10 days to reach your card.",
+  "BookingCanceledToCustomer.CtaByProvider": "Find another time",
+  "BookingCanceledToCustomer.ContentNoAmount": "Your {listingTitle} session with {providerDisplayName} is cancelled. Your refund is on its way and can take 5 to 10 days to reach your card.",
+  "BookingLateCancelledToCustomer.ContentWithAmount": "It was less than 48 hours away, so you've still been charged {amount,number,::.00} {currency}. Your {listingTitle} session with {providerDisplayName} is off the calendar. Questions? Write to hello@heyrevie.com.",
+  "BookingLateCancelledToProvider.ContentWithAmount": "You'll still be paid {amount,number,::.00} {currency} for {listingTitle}. The payment is released two days after the session time, as usual. Questions? Write to hello@heyrevie.com."
+}

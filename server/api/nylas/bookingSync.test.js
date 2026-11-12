@@ -184,6 +184,77 @@ describe('booking.cancelled', () => {
   const tx = (metadata, lastTransition = 'transition/operator-accept') =>
     getTransactionBasics.mockResolvedValue({ metadata, lastTransition });
   const clientNote = { cancelRequestedBy: 'customer' };
+  const paid = (amount, currency = 'USD') => ({ amount, currency });
+
+  describe('the amount the cancellation email shows', () => {
+    const basics = (metadata, payinTotal) =>
+      getTransactionBasics.mockResolvedValue({
+        metadata,
+        lastTransition: 'transition/operator-accept',
+        payinTotal,
+      });
+
+    it('is written, in major units, with who cancelled, BEFORE the refund runs (the email is rendered by the transition)', async () => {
+      mapping(72);
+      basics({}, paid(5000));
+      await handleBookingWebhook(cancelled);
+
+      expect(updateTransactionMetadata).toHaveBeenCalledWith(TX, {
+        cancelledBy: 'provider',
+        refundAmount: 50,
+        refundCurrency: 'USD',
+      });
+      expect(updateTransactionMetadata.mock.invocationCallOrder[0]).toBeLessThan(
+        applyTransition.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('is the same for a client cancelling more than 48 hours ahead', async () => {
+      mapping(72);
+      basics(clientNote, paid(5000));
+      await handleBookingWebhook(cancelled);
+      expect(updateTransactionMetadata).toHaveBeenCalledWith(TX, {
+        cancelledBy: 'client',
+        refundAmount: 50,
+        refundCurrency: 'USD',
+      });
+    });
+
+    it("uses the currency's own decimals (a zero-decimal currency is not divided by 100)", async () => {
+      mapping(72);
+      basics({}, paid(5000, 'JPY'));
+      await handleBookingWebhook(cancelled);
+      expect(updateTransactionMetadata).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ refundAmount: 5000, refundCurrency: 'JPY' })
+      );
+    });
+
+    it('is not overwritten by a redelivery that arrives after the refund, when the total reads zero', async () => {
+      mapping(72);
+      basics({ cancelledBy: 'provider', refundAmount: 50, refundCurrency: 'USD' }, paid(0));
+      applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+      const result = await handleBookingWebhook(cancelled);
+
+      expect(updateTransactionMetadata).not.toHaveBeenCalled();
+      expect(result.action).toBe('already-cancelled');
+    });
+
+    it('writes no amount when there is nothing to refund, rather than a zero', async () => {
+      mapping(72);
+      basics({}, paid(0));
+      await handleBookingWebhook(cancelled);
+      expect(updateTransactionMetadata).toHaveBeenCalledWith(TX, { cancelledBy: 'provider' });
+    });
+
+    it('is not written for a late cancellation, which is not refunded', async () => {
+      mapping(12);
+      basics(clientNote, paid(5000));
+      await handleBookingWebhook(cancelled);
+      const written = updateTransactionMetadata.mock.calls.map(c => c[1]);
+      written.forEach(fields => expect(fields.refundAmount).toBeUndefined());
+    });
+  });
 
   describe('by the coach (no client note)', () => {
     it('refunds the client more than 48 hours out and records the coach as the canceller', async () => {

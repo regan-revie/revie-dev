@@ -99,7 +99,7 @@ const updateTransactionMetadata = async (transactionId, metadata) => {
 };
 
 /**
- * A transaction's `metadata` and `lastTransition`, read as the operator. Metadata is an empty object
+ * A transaction's `metadata`, `lastTransition` and `payinTotal`, read as the operator. Metadata is an empty object
  * when there is none.
  */
 const getTransactionBasics = async transactionId => {
@@ -107,7 +107,12 @@ const getTransactionBasics = async transactionId => {
   if (!sdk) throw new Error('Integration API credentials are not configured');
   const response = await sdk.transactions.show({ id: transactionId });
   const attributes = response.data.data.attributes || {};
-  return { metadata: attributes.metadata || {}, lastTransition: attributes.lastTransition };
+  return {
+    metadata: attributes.metadata || {},
+    lastTransition: attributes.lastTransition,
+    // What the customer is currently paying: the full amount until a refund, and zero afterwards.
+    payinTotal: attributes.payinTotal || null,
+  };
 };
 
 /**

@@ -14,7 +14,7 @@
             <tr style="width:100%">
               <td>
                 <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingLateCancelledToProvider.Title" "{customerDisplayName} cancelled late." customerDisplayName=customer.display-name}}</h1>
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingLateCancelledToProvider.Content" "You'll still be paid for {listingTitle}. The payment is released two days after the session time, as usual. Questions? Write to hello@heyrevie.com." listingTitle=listing.title}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingLateCancelledToProvider.ContentWithAmount" "You'll still be paid {amount,number,::.00} {currency} for {listingTitle}. The payment is released two days after the session time, as usual. Questions? Write to hello@heyrevie.com." amount=payout-total.amount currency=payout-total.currency listingTitle=listing.title}}</p>
                 <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
                     <tr>
