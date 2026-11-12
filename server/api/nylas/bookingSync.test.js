@@ -490,11 +490,19 @@ describe('booking.cancelled', () => {
     });
   });
 
-  it('throws rather than guessing when a client cancelled and there is no start time', async () => {
-    // Without it there is no way to tell a free cancellation from a chargeable one.
+  it('refunds, and reports to Sentry, when a client cancelled and there is no start time: never charged on a guess', async () => {
     db.findByBookingId.mockResolvedValue({ sharetribe_transaction_id: TX, booking_start: null });
     tx(clientNote);
-    await expect(handleBookingWebhook(cancelled)).rejects.toThrow(/no booking start time/);
+    const result = await handleBookingWebhook(cancelled);
+
+    expect(result.action).toBe('refunded');
+    expect(applyTransition).toHaveBeenCalledWith(TX, 'transition/cancel');
+    expect(applyTransition).not.toHaveBeenCalledWith(TX, 'transition/late-cancel');
+    expect(log.error).toHaveBeenCalledTimes(1);
+    const [error, code, data] = log.error.mock.calls[0];
+    expect(code).toBe('nylas-cancel-start-missing');
+    expect(error.message).toMatch(/no start time/);
+    expect(data).toEqual({ bookingId: BOOKING, transactionId: TX });
   });
 
   it('refunds a coach cancellation even with no start time on record: it never needs one', async () => {

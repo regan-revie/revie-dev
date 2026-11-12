@@ -240,11 +240,17 @@ const processBookingCancelled = async ({ bookingId, mapping, data }) => {
   if (byClient) {
     const bookingStart = mapping.booking_start ?? (data && extractBookingStart(data));
     if (!bookingStart) {
-      // Refusing to guess: without a start time there is no way to tell a free cancellation from a
-      // chargeable one, and picking either silently is a billing dispute nobody notices.
-      throw new Error(`Cannot decide refund for booking ${bookingId}: no booking start time`);
+      // Nothing says whether this was inside 48 hours. The client is not charged on a guess: report
+      // it (the booking and transaction are in the alert) and refund as for a free cancellation.
+      log.error(
+        new Error(
+          `Booking ${bookingId} was cancelled by the client but has no start time; treating it as a free cancellation`
+        ),
+        'nylas-cancel-start-missing',
+        { bookingId, transactionId }
+      );
     }
-    late = !isFreeCancellation({ bookingStart, cancelledAt: new Date() });
+    late = bookingStart ? !isFreeCancellation({ bookingStart, cancelledAt: new Date() }) : false;
   }
 
   if (late) {

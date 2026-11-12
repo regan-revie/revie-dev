@@ -6,6 +6,7 @@
  * coach's Nylas account when they opt in. Coaches never author event types themselves.
  */
 
+const log = require('../../log');
 const { nylasRequest } = require('./client');
 
 /**
@@ -287,8 +288,10 @@ const syncConfiguration = async ({
 /**
  * Does a cancellation fall inside the free-cancellation window?
  *
- * This decides money, so it refuses to guess: unparseable or missing times throw rather than
- * defaulting one way. A webhook that throws is retried and surfaced; a webhook that silently picks
+ * This decides money, so it refuses to guess: an unparseable start, or a missing cancellation time,
+ * throws rather than defaulting one way. The one exception is a start time that is absent altogether:
+ * that is reported to Sentry (`nylas-cancel-start-missing`) and treated as free, because the client
+ * must never be charged for our missing data. A webhook that throws is retried and surfaced; a webhook that silently picks
  * a refund policy is a billing dispute nobody notices.
  *
  * The boundary is inclusive — cancelling at exactly 48 hours is free — because the generous side of
@@ -299,6 +302,18 @@ const syncConfiguration = async ({
  * @returns {boolean} true when the client should be refunded
  */
 const isFreeCancellation = ({ bookingStart, cancelledAt }) => {
+  // No start time at all (new Date(null) would read as 1970 and call every cancellation late). The
+  // client is never charged on a guess: it is reported to Sentry and treated as free, so a data
+  // problem on our side costs us a refund and not them the session's price.
+  if (bookingStart === null || bookingStart === undefined || bookingStart === '') {
+    log.error(
+      new Error('isFreeCancellation was called without a start time; treating it as free'),
+      'nylas-cancel-start-missing',
+      {}
+    );
+    return true;
+  }
+
   const start = new Date(bookingStart).getTime();
   const cancelled = new Date(cancelledAt).getTime();
 

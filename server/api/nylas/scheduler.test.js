@@ -1,3 +1,4 @@
+jest.mock('../../log', () => ({ error: jest.fn() }));
 jest.mock('./client', () => ({ nylasRequest: jest.fn() }));
 const { nylasRequest } = require('./client');
 const {
@@ -347,10 +348,29 @@ describe('isFreeCancellation()', () => {
     ).toBe(true);
   });
 
-  it('throws rather than guessing when a time is missing or unparseable', () => {
+  it('throws rather than guessing when a time is unparseable or the cancellation time is missing', () => {
     // Silently defaulting either way is a billing dispute nobody notices.
     expect(() => isFreeCancellation({ bookingStart: START })).toThrow(/valid bookingStart/);
     expect(() => isFreeCancellation({ bookingStart: 'nonsense', cancelledAt: START })).toThrow();
+  });
+
+  it.each([[null], [undefined], ['']])(
+    'never charges when the start time is missing (%p): reports it to Sentry and calls it free',
+    missing => {
+      const log = require('../../log');
+      log.error.mockClear();
+      // new Date(null) is 1970, which used to read as "session long past" and charge the client.
+      expect(isFreeCancellation({ bookingStart: missing, cancelledAt: START })).toBe(true);
+      expect(log.error).toHaveBeenCalledTimes(1);
+      expect(log.error.mock.calls[0][1]).toBe('nylas-cancel-start-missing');
+    }
+  );
+
+  it('does not report anything for an ordinary cancellation', () => {
+    const log = require('../../log');
+    log.error.mockClear();
+    isFreeCancellation({ bookingStart: START, cancelledAt: hoursBefore(72) });
+    expect(log.error).not.toHaveBeenCalled();
   });
 
   it('no longer blocks late cancellation in Nylas', () => {

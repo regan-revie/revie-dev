@@ -28,6 +28,8 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 - A client can no longer reschedule inside 48 hours of the session's real start (our database's time): rejected by the server (409 `reschedule-too-late`) and the Reschedule button is disabled with: "This session is less than 48 hours away, so it can't be moved. You can still cancel (charged in full), or message {coach first name} to ask." The new time must still have the listing's normal booking notice (24 hours by default), now checked on the server too. Coaches moving the event in their calendar are not limited.
 - A cancel refused by Sharetribe (409) when the transaction is not actually cancelled is reported to Sentry as `nylas-cancel-refused` instead of "already cancelled".
 
+- A missing session start time can no longer charge a client: `isFreeCancellation()` (and the cancel handler) report `nylas-cancel-start-missing` to Sentry and treat it as free; before, it read as 1970 and charged.
+
 **Tests:** 49 hours allowed / 47 hours rejected on the server and disabled in the UI; coach reschedule inside 48 hours still applied; banner, feed lines, notice, loud 409.
 
 **Not verified:** none of this has run against Dev with a real reschedule yet. Try: book, reschedule from 3+ days out (banner appears, Activity list shows the move), then check a session under 48 hours away shows the locked card.
