@@ -19,6 +19,27 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-12 (release-6: Sharetribe's booking follows a reschedule)
+
+**Branch / PR:** `release-6-update-booking`, one PR against `main`, not merged. Independent of the reschedule-confirmation PR (already merged).
+
+**The experiment (Step B) and its result:** a throwaway version of the process on Dev (alias `timer-spike`, payout timer = booking end + 5 minutes) with `transition/update-booking`. One real booking, moved by the Integration API to end ~21:40 UTC. **The payout fired at 21:45:50 UTC, from the new end.** So the time-triggered payout follows `update-booking`; the sweeper-driven fallback was not needed and not built.
+
+**What changed**
+- **Process release-6** (`ext/transaction-processes/default-booking/process.edn`): `transition/update-booking` (operator, accepted → accepted, `:action/update-booking {:type :time}`, no notification). **Pushed to Dev only** as version 7, alias `release-6`. No Dev listing has been moved to it.
+- **Server:** `bookingTimeSync.js`. The `booking.rescheduled` handler updates Sharetribe's booking last, after our row, the Activity note and the emails; a failure answers 500 so Nylas redelivers. Sentry tags: `nylas-update-booking-unavailable` (Sharetribe says the new time is taken), `nylas-update-booking-refused` (a release-5-or-earlier transaction, or a wrong state, while the session is still to come), `nylas-booking-time-sync-failed`. A backstop on the sweeper tick re-checks bookings moved in the last 3 days.
+- **Client:** the booking graph knows `transition/update-booking` (accepted → accepted). Without that, a transaction whose last transition is update-booking would have an unknown state. It is not listed in the Activity feed (the move already has its own line).
+- `integration.applyTransition` now returns the error on a 409 (callers that only read `alreadyApplied` are unaffected). `scripts/dev-listing-test-helper.js` gained `use-release-6`.
+
+**For Regan**
+1. To try it on Dev: `op run --env-file=.env -- node scripts/dev-listing-test-helper.js use-release-6 --listing <listing id> --yes` for a test listing, book it, reschedule it (3+ days out), and check the order page breakdown shows the new time. (I did not move any listing.)
+2. The timer-test booking (Test Session 1, now `delivered`) still has a Google Calendar event for Nov 17. Delete it from the calendar when convenient: deleting it will fire the loud `nylas-cancel-refused` alert, which is expected for a transaction that has already paid out.
+3. At cutover Live must start on release-6: `docs/go-live-plan.md` has the item.
+
+**Not verified:** a real reschedule on a release-6 transaction through the whole path (the experiment used the Integration API directly). Release-5 and earlier bookings are unchanged and report `nylas-update-booking-refused` once when moved.
+
+---
+
 ## HANDOFF — 2026-11-13 (reschedule confirmation, Activity entry, 48-hour limit, loud 409)
 
 **Branch / PR:** `reschedule-confirmation`, one PR against `main`, not merged. Independent of the release-6 work (a separate PR).
