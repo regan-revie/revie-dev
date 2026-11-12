@@ -68,11 +68,11 @@ services:
 
       # The transaction process every calendar listing is put on when a coach enables booking.
       # Console cannot pin a listing type to a process version, so enableListing writes this onto
-      # the listing instead, and refuses to enable booking if it is missing. Dev is on release-4
-      # (release-3 plus a late-cancel state for client cancellations inside 48 hours). Set the production service's own value at cutover, after
+      # the listing instead, and refuses to enable booking if it is missing. Dev is on release-5
+      # (release-4's late-cancel state, plus corrected cancellation emails). Set the production service's own value at cutover, after
       # that process is pushed to Live - never copy this line across before then.
       - key: BOOKING_PROCESS_ALIAS
-        value: default-booking/release-4
+        value: default-booking/release-5
 
       # Set in the Render dashboard after the first deploy, to the service's own
       # public URL (https://<service>.onrender.com), with no trailing slash.

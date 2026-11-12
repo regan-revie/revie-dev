@@ -13,6 +13,7 @@
  *   use-release-1   set it back to default-booking/release-1
  *   use-release-3   set it to default-booking/release-3
  *   use-release-4   set it to default-booking/release-4 (late cancellations get their own state)
+ *   use-release-5   set it to default-booking/release-5 (corrected cancellation emails)
  *
  * Every command except `status` changes the listing and needs --yes. It reads the Integration API
  * credentials from the environment (via `op run`) and never prints them. Whatever environment
@@ -49,10 +50,11 @@ if (
     'use-release-2',
     'use-release-3',
     'use-release-4',
+    'use-release-5',
   ].includes(command)
 ) {
   fail(
-    'Usage: node scripts/dev-listing-test-helper.js <status|break|restore|use-release-1|use-release-2|use-release-3|use-release-4> --listing <id> [--yes]'
+    'Usage: node scripts/dev-listing-test-helper.js <status|break|restore|use-release-1|use-release-2|use-release-3|use-release-4|use-release-5> --listing <id> [--yes]'
   );
 }
 if (!listingId) fail('--listing <id> is required');

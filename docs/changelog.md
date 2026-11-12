@@ -19,6 +19,20 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-12 (release-5 on Dev)
+
+**Branch / PR:** `release-5-dev-rollout`, one PR against `main`, not merged. The Sharetribe changes below are already done on Dev.
+
+**Done on Dev (not Test, not Live):** `default-booking` version 5 pushed to `revie1-dev` with alias `release-5` (release-4's process plus the corrected cancellation emails). All three enabled calendar listings moved from release-4 to release-5: **Test Session** (`6aa17447…`), **Test Session 1** (`6af4acb6…`) and **Test 2** (`6af4daab…`), all published. For each the sync signature was re-stamped in the same step (only `nylasSyncSignature` was written; nothing in Nylas was touched), and a dry run of the reconcile loop now reports all three `unchanged` with no writes. The loop cannot move one back: an enabled listing keeps its own alias whatever `BOOKING_PROCESS_ALIAS` says. The fourth published listing is not a calendar listing (no calendar, release-1) and was left alone. Test's process list is unchanged.
+
+**You need to do:** set `BOOKING_PROCESS_ALIAS` on the Render service `revie-dev` to exactly **`default-booking/release-5`** (the Blueprint in `render.yaml` now carries it; set it by hand if the Blueprint does not re-sync). This only affects listings enabled from now on; the three above are already on release-5. Also still yours: Console → Design → Branding email button colour `#310416` on Dev, and the optional email text keys in `docs/email-texts-release-5-paste-into-dev.json`.
+
+**Cutover (logged in `docs/go-live-plan.md`):** Test and Live still need release-5 pushed and their email button colour set.
+
+**Retest:** book a session on any of the three listings, cancel it, and check the email shows the refunded amount (not 0.00) and, for a coach cancellation, the new wording.
+
+---
+
 ## HANDOFF — 2026-11-12 (accidental deletions: wait before believing a calendar deletion)
 
 **Branch / PR:** `delayed-calendar-cancel`, one PR against `main`, not merged. Merged with `main` after the cancellation-emails PR (#25): the coach-cancel path that runs after the five-minute wait is the same `processBookingCancelled`, so it writes `cancelledBy: provider` and the refund amount before the refund, and the email shows the right amount (tested end to end in `calendarEventSync.test.js`).
