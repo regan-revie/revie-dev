@@ -233,7 +233,9 @@ describe('POST /api/nylas/reschedule-booking: a coach-deleted booking in its fiv
     const res = await reschedule({ sessionHours: 100, newHours: 200 });
     expect(res.statusCode).toBe(409);
     expect(res.body.code).toBe('being-cancelled-by-coach');
-    expect(res.body.error).toMatch(/being cancelled by the coach/);
+    expect(res.body.error).toBe(
+      "This session is being cancelled by the coach. You'll get a full refund."
+    );
     expect(rescheduleBooking).not.toHaveBeenCalled();
   });
 });

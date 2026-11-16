@@ -32,7 +32,7 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 **For Regan:** the test transaction `6afb4b88…` is now at Thu Nov 26, 17:00 UTC; the two failures in the log were its second requests. Please retest after the deploy: one click should show "Moved to …" and no error. If an error still appears, the Sentry event `nylas-reschedule-failed` now says why.
 
-**Not done:** the client cancel endpoint does not yet refuse while the coach's deletion is in its wait (only the page hides the button).
+**Also:** `POST /api/nylas/cancel-booking` refuses while the coach's deletion is in its wait (409 `being-cancelled-by-coach`: "This session is being cancelled by the coach. You'll get a full refund."), before the `cancelRequestedBy: customer` note is written, so it can never reach the late-cancel path. The page shows the same sentence if it gets that answer.
 
 ---
 

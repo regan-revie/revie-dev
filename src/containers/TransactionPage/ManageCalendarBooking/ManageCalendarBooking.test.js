@@ -288,6 +288,24 @@ describe('ManageCalendarBooking', () => {
     });
   });
 
+  it('shows that the coach is cancelling, instead of an error, when the server refuses a cancel for that reason', async () => {
+    const status = jest.spyOn(api, 'nylasBookingStatus');
+    status.mockResolvedValueOnce(active(72));
+    status.mockResolvedValue(active(72, { cancellationPending: true }));
+    jest
+      .spyOn(api, 'nylasCancelBooking')
+      .mockRejectedValue(Object.assign(new Error(), { code: 'being-cancelled-by-coach' }));
+    renderPanel();
+    await userEvent.click(await screen.findByText('ManageCalendarBooking.cancelButton'));
+    await userEvent.click(screen.getByText('ManageCalendarBooking.confirmCancelButton'));
+
+    expect(
+      await screen.findByText('ManageCalendarBooking.beingCancelledByCoach')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('ManageCalendarBooking.genericError')).not.toBeInTheDocument();
+    expect(screen.queryByText('ManageCalendarBooking.cancelButton')).not.toBeInTheDocument();
+  });
+
   describe("while the coach's deletion of the event is in its five-minute wait", () => {
     it('hides Reschedule (and Cancel) and says the coach is cancelling the session', async () => {
       jest

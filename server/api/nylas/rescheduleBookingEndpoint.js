@@ -17,6 +17,7 @@ const { rescheduleBooking } = require('./availability');
 const { isConfigured } = require('./config');
 const { loadCalendarBookingTransaction } = require('./manageBookingShared');
 const db = require('./db');
+const { COACH_CANCELLING } = require('./coachCancelling');
 const { canClientReschedule, resolveMinBookingNotice } = require('./scheduler');
 
 const sameTime = (a, b) => Math.abs(new Date(a).getTime() - new Date(b).getTime()) < 1000;
@@ -144,10 +145,7 @@ module.exports = async (req, res) => {
     // The coach has deleted the event and the five-minute wait has not ended: the session is about
     // to be cancelled by the coach, so it is not moved.
     if (await db.hasPendingEventCancellation(active.nylas_booking_id)) {
-      res.status(409).json({
-        code: 'being-cancelled-by-coach',
-        error: 'This session is being cancelled by the coach.',
-      });
+      res.status(409).json(COACH_CANCELLING);
       return;
     }
 

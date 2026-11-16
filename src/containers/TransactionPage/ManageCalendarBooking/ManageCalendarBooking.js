@@ -145,6 +145,13 @@ const ManageCalendarBooking = ({
       })
       .catch(e => {
         setActionInProgress(false);
+        if (e && e.code === 'being-cancelled-by-coach') {
+          // The coach got there first: the page says so itself once it has re-read the session.
+          setActionError(null);
+          setMode('idle');
+          loadStatus();
+          return;
+        }
         setActionError(e);
       });
   };
