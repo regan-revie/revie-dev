@@ -66,6 +66,9 @@ module.exports = async (req, res) => {
           // Whether the client may still move the session (the same 48 hours; the server enforces
           // it in rescheduleBookingEndpoint.js, this only lets the page say so first).
           rescheduleAllowed: movableAt(active.booking_start, new Date()),
+          // The coach has deleted the event and the five-minute wait is running: the session is about
+          // to be cancelled (and the client refunded in full), so the page offers no changes.
+          cancellationPending: await db.hasPendingEventCancellation(active.nylas_booking_id),
         });
         return;
       }

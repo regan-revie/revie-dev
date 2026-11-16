@@ -19,6 +19,23 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-16 (reschedule showed "Something went wrong" although it worked)
+
+**Branch / PR:** `reschedule-400-fix`, one PR against `main`, not merged.
+
+**Cause (from Render's request log and Sharetribe, not a guess):** the 400 was not a bad request. Each click on a new time reached the server **twice**, ~2.3 s apart. The first `POST /reschedule-booking` returned 200 and **moved the booking** (the transaction shows two `update-booking` transitions and two entries in `metadata.reschedules`, the booking is on the last time tried). The second asked Nylas for the same slot and was refused with `invalid_request_error: The selected timeslot is unavailable` (the first had just taken it); that error is what the page showed. So the booking, the Nylas event and release-6's Sharetribe update all worked; only the message was wrong. Nylas's own error body was in the log already (it prints `nylasError`), but not in Sentry. **Not established:** what sends the second request. A single click calls the handler once, and the delay is a constant 2.27 s from the first request's start, which looks like a resend rather than a person.
+
+**What changed**
+- Server: a repeat of a move is a success (`alreadyMoved`, checked before the 48-hour rule), and the Nylas call is shared per transaction and time; Nylas failures go to Sentry as `nylas-reschedule-failed` with Nylas's error type and message and come back as codes.
+- Page: one reschedule at a time ("Moving your session…" replaces the picker); messages: "That time isn't available any more. Please pick another." (and the free times load again), "This session has been cancelled.", "This session is being cancelled by the coach. You'll get a full refund." while a coach deletion is in its five-minute wait (Reschedule and Cancel hidden; `booking-status` gains `cancellationPending`).
+- Tests for each message, the duplicate handling, the coach wait and the Sentry fields.
+
+**For Regan:** the test transaction `6afb4b88…` is now at Thu Nov 26, 17:00 UTC; the two failures in the log were its second requests. Please retest after the deploy: one click should show "Moved to …" and no error. If an error still appears, the Sentry event `nylas-reschedule-failed` now says why.
+
+**Not done:** the client cancel endpoint does not yet refuse while the coach's deletion is in its wait (only the page hides the button).
+
+---
+
 ## HANDOFF — 2026-11-16 (guest-copy guard; Dev listings on release-6)
 
 **Branch / PR:** `guest-copy-guard`, one PR against `main`, not merged.

@@ -471,6 +471,19 @@ const scheduleEventCancellation = async ({
   return rows.length > 0;
 };
 
+/**
+ * Is the coach's deletion of this booking's calendar event still in its five-minute wait? While it
+ * is, the session is about to be cancelled by the coach and must not be moved or cancelled again.
+ */
+const hasPendingEventCancellation = async nylasBookingId => {
+  const { rows } = await query(
+    `SELECT 1 FROM nylas_event_cancellations
+      WHERE nylas_booking_id = $1 AND status = 'pending' LIMIT 1`,
+    [nylasBookingId]
+  );
+  return rows.length > 0;
+};
+
 /** The coach put the event back while the wait was running. @returns the waiting row, or null. */
 const markEventRestored = async nylasBookingId => {
   const { rows } = await query(
@@ -707,6 +720,7 @@ module.exports = {
   findBookingsMissingReminders,
   findVerifiedEventIdForBooking,
   scheduleEventCancellation,
+  hasPendingEventCancellation,
   markEventRestored,
   claimDueEventCancellations,
   finishEventCancellation,
