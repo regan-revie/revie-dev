@@ -351,6 +351,23 @@ const findBookingsNeedingEventCheck = async (
   return rows;
 };
 
+/**
+ * Upcoming bookings moved by a reschedule in the last few days: the ones whose Sharetribe booking may
+ * not have caught up yet (server/api/nylas/bookingTimeSync.js checks).
+ */
+const findRecentlyRescheduled = async (limit = 20, days = 3) => {
+  const { rows } = await query(
+    `SELECT * FROM nylas_bookings
+      WHERE status = 'rescheduled'
+        AND booking_start > now()
+        AND updated_at > now() - ($2 || ' days')::interval
+      ORDER BY updated_at DESC
+      LIMIT $1`,
+    [limit, String(days)]
+  );
+  return rows;
+};
+
 /** Count one more failed attempt to find a booking's event. @returns the attempts so far. */
 const recordEventLookupFailure = async nylasBookingId => {
   const { rows } = await query(
@@ -661,6 +678,7 @@ module.exports = {
   findBookingsNeedingEventCheck,
   recordEventLookupFailure,
   findActiveBookingsByGrant,
+  findRecentlyRescheduled,
   withAdvisoryLock,
   queueSessionEmail,
   cancelSessionEmails,

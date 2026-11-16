@@ -53,6 +53,11 @@ export const transitions = {
   LATE_CANCEL: 'transition/late-cancel',
   COMPLETE_LATE_CANCELLED: 'transition/complete-late-cancelled',
 
+  // Revie, release-6: the server moves Sharetribe's booking to the new time after a reschedule. The
+  // transaction stays accepted (it is a self-transition), but it becomes the last transition, so
+  // the graph has to know it or the page cannot tell what state the transaction is in.
+  UPDATE_BOOKING: 'transition/update-booking',
+
   // The backend will mark the transaction completed.
   COMPLETE: 'transition/complete',
   OPERATOR_COMPLETE: 'transition/operator-complete',
@@ -152,6 +157,7 @@ export const graph = {
       on: {
         [transitions.CANCEL]: states.CANCELED,
         [transitions.LATE_CANCEL]: states.LATE_CANCELLED,
+        [transitions.UPDATE_BOOKING]: states.ACCEPTED,
         [transitions.COMPLETE]: states.DELIVERED,
         [transitions.OPERATOR_COMPLETE]: states.DELIVERED,
       },

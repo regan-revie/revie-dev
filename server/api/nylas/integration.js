@@ -71,7 +71,9 @@ const applyTransition = async (transactionId, transition, params = {}) => {
     // 409 is Sharetribe refusing a transition that is not valid from the current state - normally
     // because this webhook has already been processed. Not an error worth alerting on.
     if (status === 409) {
-      return { ok: false, alreadyApplied: true };
+      // The error is kept for the few callers that need to tell "already made" from another kind of
+      // conflict (update-booking: the new time is not available).
+      return { ok: false, alreadyApplied: true, error: e };
     }
     return { ok: false, error: e };
   }

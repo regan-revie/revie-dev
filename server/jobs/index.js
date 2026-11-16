@@ -11,6 +11,7 @@ const { runReconcile } = require('../api/nylas/reconcile');
 const { resolveMissingEventIds } = require('../api/nylas/eventIdBackfill');
 const { processDueEventCancellations } = require('../api/nylas/calendarEventSync');
 const { processDueSessionEmails, backfillReminders } = require('../api/nylas/sessionEmails');
+const { reconcileBookingTimes } = require('../api/nylas/bookingTimeSync');
 const log = require('../log');
 
 const SWEEP_EVERY_MS = 60 * 1000;
@@ -46,6 +47,12 @@ const start = () => {
       const reminders = await backfillReminders();
       if (reminders.queued > 0) {
         console.log('[jobs] reminders queued', JSON.stringify(reminders)); // eslint-disable-line no-console
+      }
+      // Sharetribe's booking follows a reschedule (release-6): catches a move whose update did not go
+      // through when the notice arrived (server/api/nylas/bookingTimeSync.js).
+      const bookingTimes = await reconcileBookingTimes();
+      if (bookingTimes.updated > 0 || bookingTimes.failed > 0) {
+        console.log('[jobs] booking times', JSON.stringify(bookingTimes)); // eslint-disable-line no-console
       }
       // Bookings with no calendar event recorded yet, so the coach deleting one is recognised.
       const backfill = await resolveMissingEventIds();
