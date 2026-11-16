@@ -44,7 +44,6 @@ const ERROR_MESSAGE_IDS = {
 const ManageCalendarBooking = ({
   transactionId: transactionIdMaybe,
   listingId: listingIdMaybe,
-  coachFirstName,
   onCancelled,
 }) => {
   // Callers pass the SDK entities' own .id (transaction.id, listing.id), which may be a UUID
@@ -233,27 +232,25 @@ const ManageCalendarBooking = ({
   }
 
   const timeZone = getDefaultTimeZoneOnBrowser();
+  // "Fri, Nov 20, 2:30 – 3:30 PM", in the client's own timezone.
   const formatSession = (start, end) =>
-    `${intl.formatDate(new Date(start), {
+    intl.formatDateTimeRange(new Date(start), new Date(end), {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
-    })}, ${intl.formatTime(new Date(start))} – ${intl.formatTime(new Date(end))}`;
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  // The same, with the zone named the way people say it: "... (Pacific Time)".
+  const formatSessionWithZone = (start, end) =>
+    `${formatSession(start, end)} (${formatTimeZoneName(timeZone, start, intl.locale)})`;
 
   // Until the status endpoint has caught up with a reschedule, show the time just chosen.
   const showingChosen = justRescheduled && !justRescheduled.settled;
   const sessionStart = showingChosen ? justRescheduled.start : status.bookingStart;
   const sessionEnd = showingChosen ? justRescheduled.end : status.bookingEnd;
-  const formattedTime = sessionStart && sessionEnd ? formatSession(sessionStart, sessionEnd) : null;
-  // "Fri, Nov 20, 11:30 AM": the confirmation names the start, which is what people look for.
-  const rescheduledTo = justRescheduled
-    ? `${intl.formatDate(new Date(justRescheduled.start), {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      })}, ${intl.formatTime(new Date(justRescheduled.start))}`
-    : null;
-
+  const formattedTime =
+    sessionStart && sessionEnd ? formatSessionWithZone(sessionStart, sessionEnd) : null;
   // Moving a session is allowed while cancelling it is still free; the server decides and enforces
   // it (rescheduleBookingEndpoint.js). Only a definite "no" disables the button.
   const rescheduleLocked = status.rescheduleAllowed === false;
@@ -268,7 +265,6 @@ const ManageCalendarBooking = ({
   const errorLine = actionError ? (
     <FormattedMessage
       id={ERROR_MESSAGE_IDS[actionError.code] || 'ManageCalendarBooking.genericError'}
-      values={{ coachFirstName: coachFirstName || 'your coach' }}
     />
   ) : null;
 
@@ -314,11 +310,10 @@ const ManageCalendarBooking = ({
       {formattedTime ? <p className={css.time}>{formattedTime}</p> : null}
 
       {justRescheduled ? (
-        <p className={css.rescheduledMessage} role="status">
-          <FormattedMessage
-            id="ManageCalendarBooking.rescheduled"
-            values={{ time: rescheduledTo }}
-          />
+        // Only after a reschedule in this visit: on reload it is gone, and the Activity list keeps
+        // the record.
+        <p className={css.rescheduledNote} role="status">
+          <FormattedMessage id="ManageCalendarBooking.rescheduledNote" />
         </p>
       ) : null}
 
@@ -332,10 +327,7 @@ const ManageCalendarBooking = ({
 
       {rescheduleLocked && !coachCancelling && mode === 'idle' ? (
         <p className={css.lockedNote}>
-          <FormattedMessage
-            id="ManageCalendarBooking.rescheduleLocked"
-            values={{ coachFirstName: coachFirstName || 'your coach' }}
-          />
+          <FormattedMessage id="ManageCalendarBooking.rescheduleLocked" />
         </p>
       ) : null}
 

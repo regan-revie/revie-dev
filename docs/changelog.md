@@ -19,6 +19,21 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-17 (copy on the "Your session" card)
+
+**Branch / PR:** `session-card-copy`, one PR against `main`, not merged.
+
+**What changed**
+1. After a reschedule the "Moved to {time}" line is gone. A success note sits under the session time: "✓ Moved. We've emailed you both and updated your calendars." (Forest, body size). Only right after a reschedule in this visit; gone on reload.
+2. The card's time now names the timezone: "Fri, Nov 20, 2:30 – 3:30 PM (Pacific Time)", same naming as the confirm panel (and the confirm panel's From/To use the same compact time range).
+3. The 48-hour lock message: "This session is less than 48 hours away, so it can't be moved. You can still cancel, but you'll be charged in full." No mention of messaging the coach (the `coachFirstName` prop is gone). **Other client copy checked:** the only other suggestion of the kind was in the 24-hour reminder email, which said "Need to move it? Open your booking and choose Reschedule", wrong inside 48 hours; it now says the session can't be moved and cancelling is charged in full.
+
+**For Regan:** the reminder email lives in Postmark, so run `op run --env-file=.env -- node scripts/postmark-create-templates.js --overwrite` (Dev) to publish the new wording; without it the old sentence keeps going out. (`--overwrite` replaces any template you edited by hand in Postmark.)
+
+**Tests:** the success note appears only after a reschedule and not on a fresh visit, no "Moved to" line, the zone on the card, the exact strings (no coach, no "message"), the reminder email text. Client 1252 and server 736 passing.
+
+---
+
 ## HANDOFF — 2026-11-17 (confirm step on the reschedule picker)
 
 **Branch / PR:** `reschedule-confirm-step`, one PR against `main`, not merged. Client side only.

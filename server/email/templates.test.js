@@ -56,11 +56,15 @@ describe('Postmark templates', () => {
     }
   );
 
-  it('the client reminder says how to reschedule or cancel and that cancelling inside 48 hours is charged in full', () => {
-    const text = TEMPLATES['session-reminder-client'].text;
-    expect(text).toMatch(/Reschedule/);
-    expect(text).toMatch(/charged in full/);
-    expect(text).toMatch(/48 hours/);
+  it("the client reminder says the session can't be moved (it is inside 48 hours) and that cancelling is charged in full, and suggests nothing else", () => {
+    const { text, html } = TEMPLATES['session-reminder-client'];
+    [text, html].forEach(body => {
+      expect(body).toMatch(/less than 48 hours away, so it can't be moved/);
+      expect(body).toMatch(/charged in full/);
+      // Reschedule is not available at this point, and nobody is told to message the coach.
+      expect(body).not.toMatch(/choose Reschedule/);
+      expect(body).not.toMatch(/message (your|the) coach|message \{\{coachName\}\}/i);
+    });
   });
 
   it('reschedule confirmations show the old and the new time', () => {

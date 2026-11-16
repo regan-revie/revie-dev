@@ -3,6 +3,7 @@ import '@testing-library/jest-dom';
 
 import { renderWithProviders as render, testingLibrary } from '../../../util/testHelpers';
 import * as api from '../../../util/api';
+import en from '../../../translations/en.json';
 import { getDefaultTimeZoneOnBrowser } from '../../../util/dates';
 import {
   dayKeyOf,
@@ -203,7 +204,7 @@ describe('ManageCalendarBooking', () => {
         end: '2026-11-20T20:30:00.000Z',
       });
       const banner = await screen.findByRole('status');
-      expect(banner).toHaveTextContent('ManageCalendarBooking.rescheduled');
+      expect(banner).toHaveTextContent('ManageCalendarBooking.rescheduledNote');
       // The status endpoint still says the old time; the panel does not go back to it.
       expect(status).toHaveBeenCalledTimes(1);
       expect(screen.getByText('ManageCalendarBooking.rescheduleButton')).toBeInTheDocument();
@@ -281,7 +282,7 @@ describe('ManageCalendarBooking', () => {
         start: '2026-11-20T19:30:00.000Z',
         end: '2026-11-20T20:30:00.000Z',
       });
-      expect(await screen.findByText('ManageCalendarBooking.rescheduled')).toBeInTheDocument();
+      expect(await screen.findByText('ManageCalendarBooking.rescheduledNote')).toBeInTheDocument();
     });
 
     it("'Pick a different time' goes back to the picker, on the same day, and sends nothing", async () => {
@@ -460,9 +461,66 @@ describe('ManageCalendarBooking', () => {
     expect(reschedule).toHaveBeenCalledTimes(1);
     expect(screen.getByText('ManageCalendarBooking.reschedulingInProgress')).toBeInTheDocument();
     finish();
-    expect(await screen.findByText('ManageCalendarBooking.rescheduled')).toBeInTheDocument();
+    expect(await screen.findByText('ManageCalendarBooking.rescheduledNote')).toBeInTheDocument();
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'ManageCalendarBooking.rescheduled'
+      'ManageCalendarBooking.rescheduledNote'
     );
+  });
+
+  describe('the copy on the card', () => {
+    it('names the timezone after the session time, the way the confirm panel does', async () => {
+      const start = hoursFromNow(72);
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72, { bookingStart: start }));
+      renderPanel();
+      const zone = formatTimeZoneName(getDefaultTimeZoneOnBrowser(), start, 'en');
+      const time = await screen.findByText(
+        (content, node) => node?.tagName === 'P' && content.endsWith(`(${zone})`)
+      );
+      expect(time).toBeInTheDocument();
+    });
+
+    it('shows no "moved" note on a fresh visit (the Activity list keeps the record)', async () => {
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+      renderPanel();
+      await screen.findByText('ManageCalendarBooking.rescheduleButton');
+      expect(screen.queryByText('ManageCalendarBooking.rescheduledNote')).not.toBeInTheDocument();
+    });
+
+    it('right after a reschedule shows the success note under the time, and no "Moved to {time}" line', async () => {
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+      jest.spyOn(api, 'nylasRescheduleBooking').mockResolvedValue({ ok: true });
+      renderPanel();
+      await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
+      await userEvent.click(await screen.findByText('pick a slot'));
+      await confirmMove();
+
+      const note = await screen.findByText('ManageCalendarBooking.rescheduledNote');
+      expect(note.closest('p')).toHaveAttribute(
+        'class',
+        expect.stringContaining('rescheduledNote')
+      );
+      expect(screen.queryByText('ManageCalendarBooking.rescheduled')).not.toBeInTheDocument();
+      // Under the session time, which is shown once.
+      const time = screen.getByText(/\(.+\)$/, { selector: 'p' });
+      expect(
+        time.compareDocumentPosition(note.closest('p')) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+
+    it("the locked message says it can't be moved and cancelling is charged in full, and does not send the client to the coach", () => {
+      const text = en['ManageCalendarBooking.rescheduleLocked'];
+      expect(text).toBe(
+        "This session is less than 48 hours away, so it can't be moved. You can still cancel, but you'll be charged in full."
+      );
+      expect(text).not.toMatch(/message|coach|\{/i);
+    });
+
+    it('the success note says what happened, once, with a tick', () => {
+      expect(en['ManageCalendarBooking.rescheduledNote']).toBe(
+        "✓ Moved. We've emailed you both and updated your calendars."
+      );
+      expect(en['ManageCalendarBooking.rescheduled']).toBeUndefined();
+    });
   });
 });
