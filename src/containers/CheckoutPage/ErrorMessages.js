@@ -18,13 +18,27 @@ import {
 import css from './CheckoutPage.module.css';
 
 // Collect error message checks to a single function.
+/**
+ * The time the client chose is no longer free in Sharetribe: its own "booking time not available" code,
+ * or a plain 409 from the initiate calls (the Sentry issue REVIE-PLATFORM-8 was a 409 on the price
+ * check). A conflict of another kind that has its own message (a provider without payouts, stock)
+ * keeps it.
+ */
+export const isSlotTakenError = error =>
+  isTransactionInitiateBookingTimeNotAvailableError(error) ||
+  (!!error &&
+    error.status === 409 &&
+    !isTransactionInitiateListingInsufficientStockError(error) &&
+    !isTransactionInitiateMissingStripeAccountError(error));
+
 export const getErrorMessages = (
   listingNotFound,
   initiateOrderError,
   isPaymentExpired,
   retrievePaymentIntentError,
   speculateTransactionError,
-  listingLink
+  listingLink,
+  pickAnotherTimeLink
 ) => {
   let listingNotFoundErrorMessage = null;
   let initiateOrderErrorMessage = null;
@@ -39,10 +53,15 @@ export const getErrorMessages = (
     listingNotFoundErrorMessage = <FormattedMessage id="CheckoutPage.listingNotFoundError" />;
   } else if (isAmountTooLowError) {
     initiateOrderErrorMessage = <FormattedMessage id="CheckoutPage.initiateOrderAmountTooLow" />;
-  } else if (isTransactionInitiateBookingTimeNotAvailableError(initiateOrderError)) {
-    // If bookings are used, there could be error related to those
+  } else if (isSlotTakenError(initiateOrderError)) {
+    // If bookings are used, there could be error related to those. Revie: Sharetribe can still hold
+    // a slot Nylas shows as free (another client is checking out, or a late-cancelled session keeps
+    // its slot), so this is a normal thing to meet at checkout: say so and offer fresh times.
     initiateOrderErrorMessage = (
-      <FormattedMessage id="CheckoutPage.bookingTimeNotAvailableMessage" />
+      <FormattedMessage
+        id="CheckoutPage.bookingTimeJustTaken"
+        values={{ pickAnotherTimeLink: pickAnotherTimeLink || listingLink }}
+      />
     );
   } else if (isTransitionQuantityInfoMissingError(initiateOrderError)) {
     initiateOrderErrorMessage = (
@@ -94,8 +113,13 @@ export const getErrorMessages = (
     speculateErrorMessage = (
       <FormattedMessage id="CheckoutPage.providerStripeAccountMissingError" />
     );
-  } else if (isTransactionInitiateBookingTimeNotAvailableError(speculateTransactionError)) {
-    speculateErrorMessage = <FormattedMessage id="CheckoutPage.bookingTimeNotAvailableMessage" />;
+  } else if (isSlotTakenError(speculateTransactionError)) {
+    speculateErrorMessage = (
+      <FormattedMessage
+        id="CheckoutPage.bookingTimeJustTaken"
+        values={{ pickAnotherTimeLink: pickAnotherTimeLink || listingLink }}
+      />
+    );
   } else if (isTransactionInitiateListingInsufficientStockError(speculateTransactionError)) {
     speculateErrorMessage = <FormattedMessage id="CheckoutPage.notEnoughStockMessage" />;
   } else if (isTransactionZeroPaymentError(speculateTransactionError)) {
@@ -126,7 +150,10 @@ export const getErrorMessages = (
   ) : null;
   const speculateTransactionErrorMessageParagraph =
     speculateTransactionError &&
-    !isTransactionInitiateMissingStripeAccountError(speculateTransactionError) ? (
+    !isTransactionInitiateMissingStripeAccountError(speculateTransactionError) &&
+    // The slot message above already says what is wrong; "Failed to fetch breakdown information"
+    // beside it only adds noise.
+    !isSlotTakenError(speculateTransactionError) ? (
       <p className={css.speculateError}>
         <FormattedMessage id="CheckoutPage.speculateTransactionError" />
       </p>

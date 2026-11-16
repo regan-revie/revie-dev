@@ -19,6 +19,20 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-17 (Sentry triage: REVIE-PLATFORM-6 and -8)
+
+**Branch / PR:** `sentry-triage-429-409`, one PR against `main`, not merged.
+
+**REVIE-PLATFORM-6 (429 on the event update after a booking).** Cause: right after a booking is made we update the calendar event with the client's name and their session link (Nylas cannot take either per booking: its configuration is shared and has no templating). That update hit a rate limit (429) four times, and it is also the call that made Google send each client a duplicate "Updated invitation". The booking was never affected (the failure was caught and reported). Fixed: the update is silent (`notify_participants=false`), sends only the description, and retries a 429 twice (0.8 s, 2 s); a failure is still reported and never breaks the booking. A real reschedule still notifies the guest once.
+
+**REVIE-PLATFORM-8 (409 on the checkout price check, Test Session 1, Nov 12 20:09:39 UTC).** What the data shows: that listing's transactions at the time were few, and the successful booking a minute later (20:09:59) was on a *different* listing (Test Session), so the "a minute before a successful booking" link is a coincidence. Test Session 1 still holds an accepted booking for **Nov 17, 17:30-18:00** from Nov 11 (transaction `6af4b535`). If its calendar event was deleted before the matching fix, Nylas shows that slot free while Sharetribe refuses it: consistent with a 409, not proven (the slot tried is not in the log, and I cannot read the bookings table). Other causes of the same mismatch are listed in `docs/tech-constraints.md` (late-cancelled sessions keep their slot held by design; the five-minute wait; two clients at once; old release-5 reschedules). Fixed on the page: any 409 on the price check or the real request now says "That time was just taken. Please pick another." with a link to the listing page, which loads the times afresh with nothing picked; the extra "Failed to fetch breakdown information" line is gone for this case.
+
+**Not done, worth deciding:** leaving out of the availability endpoint any slot Sharetribe still holds (would remove the whole class). **For Regan:** if `6af4b535` is a leftover test booking whose event is gone, cancel it in Console to free Nov 17 17:30.
+
+**Tests:** one silent description-only update per booking; 429 retried and never breaks the booking (also when it keeps failing); a real reschedule's call carries no notification override; checkout 409 shows the message and link (and not the generic line); the booking form refetches times on every open and starts with none picked.
+
+---
+
 ## HANDOFF — 2026-11-17 (reschedule confirm step is now a pop-up)
 
 **Branch / PR:** `reschedule-confirm-modal`, one PR against `main`, not merged. Client side only.

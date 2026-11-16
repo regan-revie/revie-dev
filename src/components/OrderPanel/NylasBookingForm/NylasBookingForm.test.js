@@ -85,6 +85,23 @@ describe('NylasBookingForm', () => {
     expect(select).toHaveValue(Intl.DateTimeFormat().resolvedOptions().timeZone);
   });
 
+  it('asks the server for the times every time it opens, and starts with none picked (where checkout sends a client whose time was just taken)', async () => {
+    const availability = jest.spyOn(api, 'nylasAvailability').mockResolvedValue({
+      slots: [slot('2026-09-11T22:30:00Z')],
+      connected: true,
+    });
+    const first = render(<NylasBookingForm {...baseProps} />);
+    await waitFor(() => expect(screen.getByText('15:30')).toBeInTheDocument());
+    await userEvent.click(screen.getByText('15:30'));
+    first.unmount();
+
+    // Opened again, as after the "pick another" link: a new request, and nothing picked.
+    render(<NylasBookingForm {...baseProps} />);
+    await waitFor(() => expect(screen.getByText('15:30')).toBeInTheDocument());
+    expect(availability).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: /NylasBookingForm.bookButton/i })).toBeDisabled();
+  });
+
   it('cannot be submitted until a slot is chosen', async () => {
     jest.spyOn(api, 'nylasAvailability').mockResolvedValue({
       slots: [slot('2026-09-11T22:30:00Z')],
