@@ -68,11 +68,11 @@ services:
 
       # The transaction process every calendar listing is put on when a coach enables booking.
       # Console cannot pin a listing type to a process version, so enableListing writes this onto
-      # the listing instead, and refuses to enable booking if it is missing. Dev is on release-5
-      # (release-4's late-cancel state, plus corrected cancellation emails). Set the production service's own value at cutover, after
+      # the listing instead, and refuses to enable booking if it is missing. Dev is on release-6
+      # (release-5's graph plus update-booking, so Sharetribe's booking follows a reschedule). Set the production service's own value at cutover, after
       # that process is pushed to Live - never copy this line across before then.
       - key: BOOKING_PROCESS_ALIAS
-        value: default-booking/release-5
+        value: default-booking/release-6
 
       # Postmark sends the session reminders and reschedule confirmations (server/email/postmark.js);
       # everything else is Sharetribe's. Nothing is sent unless this is exactly "true", so it stays off
