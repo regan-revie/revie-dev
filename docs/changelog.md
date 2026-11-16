@@ -19,6 +19,21 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-16 (reported: the reschedule confirm step never appears on revie-dev)
+
+**Branch / PR:** `order-page-reschedule-test`, one PR against `main`, not merged. Adds a test; no product code changed, because none was wrong.
+
+**What was checked (nothing here depends on a guess)**
+1. **The live bundle has it.** `revie-dev.onrender.com` serves the confirm step: the strings ("Move your session?", "Confirm new time", "Pick a different time") are in the main bundle, and the component code is in the shared chunk `1841.*.chunk.js` (the TransactionPage chunk itself does not hold it). Reading the minified chunk: clicking a time runs `setPendingSlot(slot)` and nothing else; only the confirm button's `onClick` calls the reschedule request. Deploy for #34 went live at 19:45:07 UTC (new instance started 19:45:00); #35 is live now.
+2. **There is only one reschedule UI.** `ManageCalendarBooking` is the only caller of `nylasRescheduleBooking`; the order page (`TransactionPage.js`) renders it once; there is no second component, no Nylas-hosted flow (those links are dead ends for our private configuration) and no older-booking code path.
+3. **The real order page does it right.** New test `TransactionPage.reschedule.test.js` renders the real `TransactionPage` as the customer of an accepted calendar booking with the real card and the real slot picker (only the server calls are replaced): clicking a time opens "Move your session?" and sends nothing; the confirm button sends exactly one request; "Pick a different time" returns to the picker.
+
+**What the logs can and cannot say.** After the deploy the client loaded the card (availability, booking-status) and posted a reschedule 4-8 seconds later (19:45:59, 19:46:50 UTC). That is long enough for time click + confirm click, so the log cannot show whether the panel appeared. The duplicate POST seen earlier is gone (fix #33 working).
+
+**Not explained.** Why the confirm panel did not appear for Regan. Open possibilities, none proven: a tab or bundle from before 19:45 UTC (a hard refresh should fix that; a private window should too), or the panel appearing and the second click landing on "Confirm new time" at once (a double click). If it happens again: note the time and booking so it can be matched to the log, and check in DevTools → Network that `1841.d0aabb92...chunk.js` (or the current hash for the latest deploy) is the chunk loaded.
+
+---
+
 ## HANDOFF — 2026-11-17 (copy on the "Your session" card)
 
 **Branch / PR:** `session-card-copy`, one PR against `main`, not merged.
