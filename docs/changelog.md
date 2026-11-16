@@ -19,6 +19,18 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-17 (reschedule confirm step is now a pop-up)
+
+**Branch / PR:** `reschedule-confirm-modal`, one PR against `main`, not merged. Client side only.
+
+**What changed:** the confirm step is a modal dialog (the template's `Modal`) over the picker instead of a panel that replaces it. Heading "Move your session?", "From: …", "To: … (Pacific Time)", "Confirm new time", and "Cancel", which closes the dialog and leaves the picker as it was. If the new time is under 48 hours away the dialog adds "This new time is less than 48 hours away. Once it's moved, you won't be able to move it again, and cancelling will be charged in full." Clicks on "Confirm new time" are ignored for the first 500 ms after the dialog opens. Kept: one request per confirm, "Moving your session…" (now inside the dialog), the "✓ Moved" note on the card, and every error message (inside the dialog). Removed: "Pick a different time" and the picker's `initialDayKey` (the picker is no longer taken away, so it needs neither).
+
+**Tests:** dialog opens on a time click and sends nothing; only confirm sends, once; Cancel closes it and leaves the picker; the 48-hour line only for a new time under 48 hours (test times are relative to now); the click guard (ignored at once, accepted after 500 ms, restarted each time it opens); every error inside the dialog; the same flow through the real order page.
+
+**Not verified:** how the dialog looks in a browser (it reuses the template's modal styles, the same as the review dialog).
+
+---
+
 ## HANDOFF — 2026-11-16 (reported: the reschedule confirm step never appears on revie-dev)
 
 **Branch / PR:** `order-page-reschedule-test`, one PR against `main`, not merged. Adds a test; no product code changed, because none was wrong.

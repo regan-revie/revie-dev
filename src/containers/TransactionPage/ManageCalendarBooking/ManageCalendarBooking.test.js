@@ -5,27 +5,23 @@ import { renderWithProviders as render, testingLibrary } from '../../../util/tes
 import * as api from '../../../util/api';
 import en from '../../../translations/en.json';
 import { getDefaultTimeZoneOnBrowser } from '../../../util/dates';
-import {
-  dayKeyOf,
-  formatTimeZoneName,
-} from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
+import { formatTimeZoneName } from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
 import ManageCalendarBooking from './ManageCalendarBooking';
 
-// The real picker is a calendar plus a list of times; what matters here is what the panel does once
-// a slot is chosen, so it is replaced by one button that chooses one.
-// Slots carry millisecond timestamps, as the availability endpoint returns them.
-const mockChosenSlot = {
-  start: Date.parse('2026-11-20T19:30:00.000Z'),
-  end: Date.parse('2026-11-20T20:30:00.000Z'),
+// The real picker is a calendar plus a list of times; what matters here is what the card does once
+// a slot is chosen, so it is replaced by one button that chooses one. Slots carry millisecond
+// timestamps, as the availability endpoint returns them, and are relative to now so that the 48-hour
+// line (which depends on how far away the new time is) means the same on any day the tests run.
+const HOUR_MS = 3600000;
+const slotAt = hoursAway => {
+  const start = Math.ceil((Date.now() + hoursAway * HOUR_MS) / HOUR_MS) * HOUR_MS;
+  return { start, end: start + HOUR_MS };
 };
+const mockPick = { slot: null };
 jest.mock('../../../components/OrderPanel/NylasBookingForm/NylasSlotPicker', () => {
   const React = require('react');
-  return ({ onSelectSlot, initialDayKey }) =>
-    React.createElement(
-      'button',
-      { onClick: () => onSelectSlot(mockChosenSlot), 'data-initial-day': initialDayKey || '' },
-      'pick a slot'
-    );
+  return ({ onSelectSlot }) =>
+    React.createElement('button', { onClick: () => onSelectSlot(mockPick.slot) }, 'pick a slot');
 });
 
 const { screen, waitFor, userEvent } = testingLibrary;
@@ -46,9 +42,30 @@ const active = (hoursAway, overrides = {}) => ({
 const renderPanel = () =>
   render(<ManageCalendarBooking transactionId="tx-1" listingId="listing-1" />);
 
-// Clicking a time only asks to confirm it; this is the second click that actually moves the session.
-const confirmMove = async () =>
-  userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveButton'));
+// Clicking a time only opens the confirm dialog; this is the click that actually moves the session. The
+// dialog ignores clicks for its first half second (a double-click on a time), so the clock is moved on.
+const confirmMove = async () => {
+  const button = await screen.findByText('ManageCalendarBooking.confirmMoveButton');
+  const realNow = Date.now;
+  const spy = jest.spyOn(Date, 'now').mockImplementation(() => realNow() + 1000);
+  try {
+    await userEvent.click(button);
+  } finally {
+    spy.mockRestore();
+  }
+};
+
+// The app's page has a #portal-root (public/index.html) that the Modal renders into.
+beforeEach(() => {
+  document.body.insertAdjacentHTML('beforeend', '<div id="portal-root"></div>');
+});
+afterEach(() => {
+  document.getElementById('portal-root')?.remove();
+});
+
+beforeEach(() => {
+  mockPick.slot = slotAt(100);
+});
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -191,7 +208,7 @@ describe('ManageCalendarBooking', () => {
 
     it('confirms the move straight away with the new time, without waiting for the webhook', async () => {
       const status = jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
-      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockPick.slot] });
       const reschedule = jest.spyOn(api, 'nylasRescheduleBooking').mockResolvedValue({ ok: true });
       renderPanel();
       await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
@@ -200,8 +217,8 @@ describe('ManageCalendarBooking', () => {
 
       expect(reschedule).toHaveBeenCalledWith({
         transactionId: 'tx-1',
-        start: '2026-11-20T19:30:00.000Z',
-        end: '2026-11-20T20:30:00.000Z',
+        start: new Date(mockPick.slot.start).toISOString(),
+        end: new Date(mockPick.slot.end).toISOString(),
       });
       const banner = await screen.findByRole('status');
       expect(banner).toHaveTextContent('ManageCalendarBooking.rescheduledNote');
@@ -214,7 +231,7 @@ describe('ManageCalendarBooking', () => {
       const status = jest.spyOn(api, 'nylasBookingStatus');
       status.mockResolvedValueOnce(active(49));
       status.mockResolvedValue(active(47));
-      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockPick.slot] });
       jest
         .spyOn(api, 'nylasRescheduleBooking')
         .mockRejectedValue(Object.assign(new Error(), { code: 'reschedule-too-late' }));
@@ -228,7 +245,7 @@ describe('ManageCalendarBooking', () => {
 
     it('asks for a later time when the server says the new time is too soon', async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
-      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockPick.slot] });
       jest
         .spyOn(api, 'nylasRescheduleBooking')
         .mockRejectedValue(Object.assign(new Error(), { code: 'reschedule-too-soon' }));
@@ -237,26 +254,30 @@ describe('ManageCalendarBooking', () => {
       await userEvent.click(await screen.findByText('pick a slot'));
       await confirmMove();
 
-      // On the confirm panel, which still offers the confirm button and a different time.
+      // In the dialog, which still offers the confirm button and Cancel.
       expect(
         await screen.findByText('ManageCalendarBooking.rescheduleTooSoon')
       ).toBeInTheDocument();
-      expect(screen.getByText('ManageCalendarBooking.pickDifferentTime')).toBeInTheDocument();
+      expect(screen.getByText('ManageCalendarBooking.confirmMoveButton')).toBeInTheDocument();
+      expect(screen.getByText('ManageCalendarBooking.confirmMoveCancel')).toBeInTheDocument();
     });
   });
 
-  describe('the confirm step', () => {
+  describe('the confirm dialog', () => {
     const openPicker = async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
-      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockPick.slot] });
       const reschedule = jest.spyOn(api, 'nylasRescheduleBooking').mockResolvedValue({ ok: true });
       renderPanel();
       await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
       return reschedule;
     };
 
-    it("clicking a time sends nothing: it shows 'Move your session?' with where from and to", async () => {
+    it('opens over the picker when a time is clicked, with where from and to, and sends nothing', async () => {
       const reschedule = await openPicker();
+      expect(
+        screen.queryByText('ManageCalendarBooking.confirmMoveHeading')
+      ).not.toBeInTheDocument();
       await userEvent.click(await screen.findByText('pick a slot'));
 
       expect(
@@ -265,8 +286,9 @@ describe('ManageCalendarBooking', () => {
       expect(screen.getByText('ManageCalendarBooking.confirmMoveFrom')).toBeInTheDocument();
       expect(screen.getByText('ManageCalendarBooking.confirmMoveTo')).toBeInTheDocument();
       expect(screen.getByText('ManageCalendarBooking.confirmMoveButton')).toBeInTheDocument();
-      // The picker is replaced, not shown beside it.
-      expect(screen.queryByText('pick a slot')).not.toBeInTheDocument();
+      expect(screen.getByText('ManageCalendarBooking.confirmMoveCancel')).toBeInTheDocument();
+      // A dialog over the picker, not a panel in its place: the picker is still there.
+      expect(screen.getByText('pick a slot')).toBeInTheDocument();
       expect(reschedule).not.toHaveBeenCalled();
     });
 
@@ -279,25 +301,104 @@ describe('ManageCalendarBooking', () => {
       expect(reschedule).toHaveBeenCalledTimes(1);
       expect(reschedule).toHaveBeenCalledWith({
         transactionId: 'tx-1',
-        start: '2026-11-20T19:30:00.000Z',
-        end: '2026-11-20T20:30:00.000Z',
+        start: new Date(mockPick.slot.start).toISOString(),
+        end: new Date(mockPick.slot.end).toISOString(),
       });
       expect(await screen.findByText('ManageCalendarBooking.rescheduledNote')).toBeInTheDocument();
-    });
-
-    it("'Pick a different time' goes back to the picker, on the same day, and sends nothing", async () => {
-      const reschedule = await openPicker();
-      await userEvent.click(await screen.findByText('pick a slot'));
-      await userEvent.click(await screen.findByText('ManageCalendarBooking.pickDifferentTime'));
-
-      const picker = await screen.findByText('pick a slot');
+      // The dialog has closed.
       expect(
         screen.queryByText('ManageCalendarBooking.confirmMoveHeading')
       ).not.toBeInTheDocument();
-      // The day of the time that was clicked, in the viewer's zone.
-      const expectedDay = dayKeyOf(mockChosenSlot.start, getDefaultTimeZoneOnBrowser());
-      expect(picker).toHaveAttribute('data-initial-day', expectedDay);
+    });
+
+    it('shows "Moving your session…" inside the dialog while the request is out', async () => {
+      const reschedule = await openPicker();
+      let finish;
+      reschedule.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            finish = () => resolve({ ok: true });
+          })
+      );
+      await userEvent.click(await screen.findByText('pick a slot'));
+      await confirmMove();
+
+      expect(screen.getByText('ManageCalendarBooking.reschedulingInProgress')).toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.confirmMoveButton')).not.toBeInTheDocument();
+      finish();
+      expect(await screen.findByText('ManageCalendarBooking.rescheduledNote')).toBeInTheDocument();
+    });
+
+    it('Cancel closes it and leaves the picker as it was, sending nothing', async () => {
+      const reschedule = await openPicker();
+      await userEvent.click(await screen.findByText('pick a slot'));
+      await userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveCancel'));
+
+      expect(
+        screen.queryByText('ManageCalendarBooking.confirmMoveHeading')
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('pick a slot')).toBeInTheDocument();
       expect(reschedule).not.toHaveBeenCalled();
+      // And a time can be clicked again.
+      await userEvent.click(screen.getByText('pick a slot'));
+      expect(
+        await screen.findByText('ManageCalendarBooking.confirmMoveHeading')
+      ).toBeInTheDocument();
+    });
+
+    describe('the 48-hour line', () => {
+      const line = 'ManageCalendarBooking.confirmMoveInsideLockWindow';
+
+      it('is there when the new time is less than 48 hours away', async () => {
+        mockPick.slot = slotAt(30);
+        await openPicker();
+        await userEvent.click(await screen.findByText('pick a slot'));
+        expect(await screen.findByText(line)).toBeInTheDocument();
+      });
+
+      it('is not there when the new time is 48 hours or more away', async () => {
+        mockPick.slot = slotAt(100);
+        await openPicker();
+        await userEvent.click(await screen.findByText('pick a slot'));
+        await screen.findByText('ManageCalendarBooking.confirmMoveHeading');
+        expect(screen.queryByText(line)).not.toBeInTheDocument();
+      });
+
+      it('says what it means, in full', () => {
+        expect(en[line]).toBe(
+          "This new time is less than 48 hours away. Once it's moved, you won't be able to move it again, and cancelling will be charged in full."
+        );
+      });
+    });
+
+    describe('the click guard', () => {
+      it('ignores a click on Confirm in the first half second (a double-click on a time)', async () => {
+        const reschedule = await openPicker();
+        await userEvent.click(await screen.findByText('pick a slot'));
+        // Straight away, as the second click of a double-click would arrive.
+        await userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveButton'));
+        expect(reschedule).not.toHaveBeenCalled();
+        expect(screen.getByText('ManageCalendarBooking.confirmMoveHeading')).toBeInTheDocument();
+      });
+
+      it('accepts it once half a second has passed', async () => {
+        const reschedule = await openPicker();
+        await userEvent.click(await screen.findByText('pick a slot'));
+        await userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveButton'));
+        expect(reschedule).not.toHaveBeenCalled();
+
+        await confirmMove(); // the same click, 1 second later
+        expect(reschedule).toHaveBeenCalledTimes(1);
+      });
+
+      it('starts again from the moment the dialog is opened again', async () => {
+        const reschedule = await openPicker();
+        await userEvent.click(await screen.findByText('pick a slot'));
+        await userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveCancel'));
+        await userEvent.click(screen.getByText('pick a slot'));
+        await userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveButton'));
+        expect(reschedule).not.toHaveBeenCalled();
+      });
     });
 
     it("names the new time's timezone the way people say it, not as a zone id", async () => {
@@ -325,10 +426,10 @@ describe('ManageCalendarBooking', () => {
         .mockRejectedValue(Object.assign(new Error(), { code }));
 
     beforeEach(() => {
-      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockPick.slot] });
     });
 
-    it("says the time isn't available any more on the confirm panel, and 'Pick a different time' shows the free times", async () => {
+    it("says the time isn't available any more in the dialog, and Cancel returns to freshly loaded times", async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
       failWith('reschedule-slot-unavailable');
       renderPanel();
@@ -337,18 +438,21 @@ describe('ManageCalendarBooking', () => {
       expect(
         await screen.findByText('ManageCalendarBooking.rescheduleSlotUnavailable')
       ).toBeInTheDocument();
-      // Still on the panel, which offers no way to repeat the refused time.
+      // Still in the dialog, which offers no way to repeat the refused time.
       expect(screen.getByText('ManageCalendarBooking.confirmMoveHeading')).toBeInTheDocument();
       expect(screen.queryByText('ManageCalendarBooking.confirmMoveButton')).not.toBeInTheDocument();
       expect(screen.queryByText('ManageCalendarBooking.genericError')).not.toBeInTheDocument();
 
-      await userEvent.click(screen.getByText('ManageCalendarBooking.pickDifferentTime'));
+      await userEvent.click(screen.getByText('ManageCalendarBooking.confirmMoveCancel'));
+      expect(
+        screen.queryByText('ManageCalendarBooking.confirmMoveHeading')
+      ).not.toBeInTheDocument();
       expect(await screen.findByText('pick a slot')).toBeInTheDocument();
       // The free times were fetched again after the refusal.
       expect(api.nylasAvailability).toHaveBeenCalledTimes(2);
     });
 
-    it('says the 48-hour rule on the confirm panel when the session has just moved inside it', async () => {
+    it('says the 48-hour rule in the dialog when the session has just moved inside it', async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
       failWith('reschedule-too-late');
       renderPanel();
@@ -357,8 +461,8 @@ describe('ManageCalendarBooking', () => {
       expect(await screen.findByText('ManageCalendarBooking.rescheduleLocked')).toBeInTheDocument();
       expect(screen.getByText('ManageCalendarBooking.confirmMoveHeading')).toBeInTheDocument();
       expect(screen.queryByText('ManageCalendarBooking.confirmMoveButton')).not.toBeInTheDocument();
-      // The way out is Back, to the card, where Reschedule is now disabled.
-      await userEvent.click(screen.getByText('ManageCalendarBooking.cancelRescheduleButton'));
+      // The way out is Cancel, back to the card, where Reschedule is now disabled.
+      await userEvent.click(screen.getByText('ManageCalendarBooking.confirmMoveCancel'));
       expect(
         (await screen.findByText('ManageCalendarBooking.rescheduleButton')).closest('button')
       ).toBeDisabled();
@@ -443,7 +547,7 @@ describe('ManageCalendarBooking', () => {
 
   it('sends one reschedule however many times the time is clicked while it is being made', async () => {
     jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
-    jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+    jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockPick.slot] });
     let finish;
     const reschedule = jest.spyOn(api, 'nylasRescheduleBooking').mockImplementation(
       () =>
@@ -455,8 +559,11 @@ describe('ManageCalendarBooking', () => {
     await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
     await userEvent.click(await screen.findByText('pick a slot'));
     const confirm = await screen.findByText('ManageCalendarBooking.confirmMoveButton');
+    const realNow = Date.now;
+    const spy = jest.spyOn(Date, 'now').mockImplementation(() => realNow() + 1000);
     await userEvent.click(confirm);
     await userEvent.click(confirm).catch(() => {});
+    spy.mockRestore();
 
     expect(reschedule).toHaveBeenCalledTimes(1);
     expect(screen.getByText('ManageCalendarBooking.reschedulingInProgress')).toBeInTheDocument();
@@ -468,7 +575,7 @@ describe('ManageCalendarBooking', () => {
   });
 
   describe('the copy on the card', () => {
-    it('names the timezone after the session time, the way the confirm panel does', async () => {
+    it('names the timezone after the session time, the way the confirm dialog does', async () => {
       const start = hoursFromNow(72);
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72, { bookingStart: start }));
       renderPanel();
@@ -488,7 +595,7 @@ describe('ManageCalendarBooking', () => {
 
     it('right after a reschedule shows the success note under the time, and no "Moved to {time}" line', async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
-      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockPick.slot] });
       jest.spyOn(api, 'nylasRescheduleBooking').mockResolvedValue({ ok: true });
       renderPanel();
       await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));

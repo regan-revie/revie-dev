@@ -29,22 +29,12 @@ import css from './NylasSlotPicker.module.css';
  * @param {string} props.timeZone IANA zone to display in
  * @param {{start: number}} [props.selectedSlot] highlights the matching slot button
  * @param {(slot: {start: number, end: number}) => void} props.onSelectSlot
- * @param {string} [props.initialDayKey] the day (YYYY-MM-DD in `timeZone`) to open on, for a caller
- *   that takes the picker away and puts it back (the reschedule panel's confirm step) and wants the
- *   client returned to the day they were looking at
  * @param {() => void} [props.onDayChange] called when the calendar's active day changes, so a
  *   caller holding its own "selected slot" state can clear a pick that no longer applies
  */
-const NylasSlotPicker = ({
-  slots,
-  timeZone,
-  selectedSlot,
-  onSelectSlot,
-  onDayChange,
-  initialDayKey,
-}) => {
+const NylasSlotPicker = ({ slots, timeZone, selectedSlot, onSelectSlot, onDayChange }) => {
   const intl = useIntl();
-  const [selectedDayKey, setSelectedDayKey] = useState(initialDayKey || null);
+  const [selectedDayKey, setSelectedDayKey] = useState(null);
 
   const days = groupSlotsByDay(slots, timeZone);
   const availableDayKeys = new Set(days.map(d => d.dayKey));

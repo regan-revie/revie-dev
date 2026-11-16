@@ -1057,6 +1057,7 @@ export const TransactionPageComponent = props => {
               transactionId={transaction?.id}
               listingId={listing?.id}
               onCancelled={onTransactionCancelledOnCalendar}
+              onManageDisableScrolling={onManageDisableScrolling}
             />
           ) : null}
         </div>

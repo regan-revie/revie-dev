@@ -59,17 +59,24 @@
   color: var(--colorGrey700);
 }
 
-/* The confirm step that replaces the time picker after a time is clicked. */
-.confirmMove {
-  margin-bottom: 16px;
+/* The confirm dialog that opens over the picker when a time is clicked. */
+.modalRoot {
+  composes: marketplaceModalBaseStyles from global;
+  padding-top: 70px;
+
+  @media (--viewportMedium) {
+    flex-basis: 567px;
+  }
 }
 
-.confirmHeading {
-  margin-top: 0;
-  margin-bottom: 12px;
+.modalContent {
+  flex-grow: 1;
 }
 
-.confirmLine {
-  margin: 0 0 8px;
-  color: var(--colorGrey700);
+.modalTitle {
+  composes: marketplaceModalTitleStyles from global;
+}
+
+.modalMessage {
+  composes: marketplaceModalParagraphStyles from global;
 }
