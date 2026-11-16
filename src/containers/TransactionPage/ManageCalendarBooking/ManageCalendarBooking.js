@@ -9,6 +9,10 @@ import {
   nylasRescheduleBooking,
 } from '../../../util/api';
 import NylasSlotPicker from '../../../components/OrderPanel/NylasBookingForm/NylasSlotPicker';
+import {
+  dayKeyOf,
+  formatTimeZoneName,
+} from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
 
 import { H4, PrimaryButton, SecondaryButton, InlineTextButton } from '../../../components';
 
@@ -30,6 +34,7 @@ import css from './ManageCalendarBooking.module.css';
  */
 // What the server's error codes (rescheduleBookingEndpoint.js) say to the client.
 const ERROR_MESSAGE_IDS = {
+  'reschedule-too-late': 'ManageCalendarBooking.rescheduleLocked',
   'reschedule-too-soon': 'ManageCalendarBooking.rescheduleTooSoon',
   'reschedule-slot-unavailable': 'ManageCalendarBooking.rescheduleSlotUnavailable',
   'booking-cancelled': 'ManageCalendarBooking.sessionCancelled',
@@ -63,6 +68,10 @@ const ManageCalendarBooking = ({
   // One reschedule at a time. State updates are not instant, so a second click (or a second call of
   // the handler) before the first has answered could still get through; a ref cannot be late.
   const rescheduleInFlight = useRef(false);
+  // The time the client has clicked and not yet confirmed (nothing is sent until they do), and the
+  // day the picker should reopen on if they decide to pick a different one.
+  const [pendingSlot, setPendingSlot] = useState(null);
+  const [pickerDayKey, setPickerDayKey] = useState(null);
 
   const loadStatus = () => {
     setStatus({ state: 'loading' });
@@ -115,8 +124,22 @@ const ManageCalendarBooking = ({
       ? Math.round((new Date(status.bookingEnd) - new Date(status.bookingStart)) / 60000)
       : null;
 
+  // A click on a time only asks to confirm it: the request is sent by the confirm button.
+  const chooseSlot = slot => {
+    setActionError(null);
+    setPickerDayKey(dayKeyOf(slot.start, getDefaultTimeZoneOnBrowser()));
+    setPendingSlot(slot);
+  };
+
+  const pickDifferentTime = () => {
+    setActionError(null);
+    setPendingSlot(null);
+  };
+
   const startReschedule = () => {
     setMode('reschedule');
+    setPendingSlot(null);
+    setPickerDayKey(null);
     setActionError(null);
     setAvailability({ state: 'loading', slots: [] });
     // The booked length picks the Nylas configuration, so only slots of that length come back.
@@ -169,6 +192,7 @@ const ManageCalendarBooking = ({
       .then(() => {
         rescheduleInFlight.current = false;
         setActionInProgress(false);
+        setPendingSlot(null);
         setMode('idle');
         setJustRescheduled({ start: slot.start, end: slot.end, settled: false });
       })
@@ -176,19 +200,28 @@ const ManageCalendarBooking = ({
         rescheduleInFlight.current = false;
         setActionInProgress(false);
         const code = e && e.code;
-        // These two are said by the page itself once it has re-read the session (the locked note,
-        // the coach-is-cancelling note), so no error line as well.
-        setActionError(
-          ['reschedule-too-late', 'being-cancelled-by-coach'].includes(code) ? null : e
-        );
+        setActionError(e);
         if (code === 'reschedule-slot-unavailable') {
-          // Someone else took that time (or Nylas no longer offers it): show what is free now, and say so.
-          startReschedule();
-          setActionError(e);
-        } else if (
-          ['reschedule-too-late', 'booking-cancelled', 'being-cancelled-by-coach'].includes(code)
-        ) {
+          // Someone else took that time (or Nylas no longer offers it). The message stays on the
+          // confirm panel; the free times are fetched again quietly, ready for "Pick a different time".
+          nylasAvailability({
+            listingId,
+            ...(durationMinutes ? { lengthMinutes: durationMinutes } : {}),
+          })
+            .then(data => {
+              const slots = (data.slots || []).filter(
+                s => !durationMinutes || Math.round((s.end - s.start) / 60000) === durationMinutes
+              );
+              setAvailability({ state: 'loaded', slots });
+            })
+            .catch(() => {});
+        } else if (code === 'reschedule-too-late') {
+          // Inside the 48 hours now: said on the panel, and the card behind it is brought up to date.
+          setStatus(current => ({ ...current, rescheduleAllowed: false }));
+        } else if (['booking-cancelled', 'being-cancelled-by-coach'].includes(code)) {
           // The session is not what the page thought: say so and show it as it really is.
+          setPendingSlot(null);
+          if (code === 'being-cancelled-by-coach') setActionError(null);
           setMode('idle');
           loadStatus();
         }
@@ -229,6 +262,15 @@ const ManageCalendarBooking = ({
   // buttons return on their own. Cancel is hidden too: a client cancelling inside 48 hours would be
   // charged for something the coach did.
   const coachCancelling = status.cancellationPending === true;
+
+  // What the server's refusal says, in words; shown above the buttons, or on the confirm panel when
+  // that is where the client is.
+  const errorLine = actionError ? (
+    <FormattedMessage
+      id={ERROR_MESSAGE_IDS[actionError.code] || 'ManageCalendarBooking.genericError'}
+      values={{ coachFirstName: coachFirstName || 'your coach' }}
+    />
+  ) : null;
 
   const cancelledState = justCancelled
     ? justCancelled.free
@@ -280,13 +322,7 @@ const ManageCalendarBooking = ({
         </p>
       ) : null}
 
-      {actionError ? (
-        <p className={css.error}>
-          <FormattedMessage
-            id={ERROR_MESSAGE_IDS[actionError.code] || 'ManageCalendarBooking.genericError'}
-          />
-        </p>
-      ) : null}
+      {actionError && !pendingSlot ? <p className={css.error}>{errorLine}</p> : null}
 
       {coachCancelling ? (
         <p className={css.lockedNote} role="status">
@@ -352,7 +388,62 @@ const ManageCalendarBooking = ({
 
       {mode === 'reschedule' ? (
         <div className={css.reschedule}>
-          {availability.state === 'loading' ? (
+          {actionInProgress ? (
+            <p role="status">
+              <FormattedMessage id="ManageCalendarBooking.reschedulingInProgress" />
+            </p>
+          ) : pendingSlot ? (
+            // Clicking a time only brings us here; the request is sent by "Confirm new time".
+            <div className={css.confirmMove}>
+              <H4 as="h3" className={css.confirmHeading}>
+                <FormattedMessage id="ManageCalendarBooking.confirmMoveHeading" />
+              </H4>
+              <p className={css.confirmLine}>
+                <FormattedMessage
+                  id="ManageCalendarBooking.confirmMoveFrom"
+                  values={{ time: formatSession(sessionStart, sessionEnd) }}
+                />
+              </p>
+              <p className={css.confirmLine}>
+                <FormattedMessage
+                  id="ManageCalendarBooking.confirmMoveTo"
+                  values={{
+                    time: formatSession(pendingSlot.start, pendingSlot.end),
+                    timeZone: formatTimeZoneName(timeZone, pendingSlot.start, intl.locale),
+                  }}
+                />
+              </p>
+              {actionError ? (
+                <p className={css.error} role="alert">
+                  {errorLine}
+                </p>
+              ) : null}
+              <div className={css.actions}>
+                {!['reschedule-slot-unavailable', 'reschedule-too-late'].includes(
+                  actionError?.code
+                ) ? (
+                  <PrimaryButton onClick={() => handleReschedule(pendingSlot)}>
+                    <FormattedMessage id="ManageCalendarBooking.confirmMoveButton" />
+                  </PrimaryButton>
+                ) : null}
+                {actionError?.code === 'reschedule-too-late' ? (
+                  <SecondaryButton
+                    onClick={() => {
+                      setPendingSlot(null);
+                      setActionError(null);
+                      setMode('idle');
+                    }}
+                  >
+                    <FormattedMessage id="ManageCalendarBooking.cancelRescheduleButton" />
+                  </SecondaryButton>
+                ) : (
+                  <InlineTextButton className={css.cancelLink} onClick={pickDifferentTime}>
+                    <FormattedMessage id="ManageCalendarBooking.pickDifferentTime" />
+                  </InlineTextButton>
+                )}
+              </div>
+            </div>
+          ) : availability.state === 'loading' ? (
             <p>
               <FormattedMessage id="ManageCalendarBooking.loadingSlots" />
             </p>
@@ -360,22 +451,21 @@ const ManageCalendarBooking = ({
             <p className={css.error}>
               <FormattedMessage id="ManageCalendarBooking.noSlots" />
             </p>
-          ) : actionInProgress ? (
-            <p role="status">
-              <FormattedMessage id="ManageCalendarBooking.reschedulingInProgress" />
-            </p>
           ) : (
             // Same calendar + time-list picker as the original booking flow (NylasBookingForm),
             // so a client picks a new time the same way they picked the first one.
             <NylasSlotPicker
               slots={availability.slots}
               timeZone={timeZone}
-              onSelectSlot={handleReschedule}
+              initialDayKey={pickerDayKey}
+              onSelectSlot={chooseSlot}
             />
           )}
-          <SecondaryButton disabled={actionInProgress} onClick={() => setMode('idle')}>
-            <FormattedMessage id="ManageCalendarBooking.cancelRescheduleButton" />
-          </SecondaryButton>
+          {!pendingSlot ? (
+            <SecondaryButton disabled={actionInProgress} onClick={() => setMode('idle')}>
+              <FormattedMessage id="ManageCalendarBooking.cancelRescheduleButton" />
+            </SecondaryButton>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -3,6 +3,11 @@ import '@testing-library/jest-dom';
 
 import { renderWithProviders as render, testingLibrary } from '../../../util/testHelpers';
 import * as api from '../../../util/api';
+import { getDefaultTimeZoneOnBrowser } from '../../../util/dates';
+import {
+  dayKeyOf,
+  formatTimeZoneName,
+} from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
 import ManageCalendarBooking from './ManageCalendarBooking';
 
 // The real picker is a calendar plus a list of times; what matters here is what the panel does once
@@ -14,8 +19,12 @@ const mockChosenSlot = {
 };
 jest.mock('../../../components/OrderPanel/NylasBookingForm/NylasSlotPicker', () => {
   const React = require('react');
-  return ({ onSelectSlot }) =>
-    React.createElement('button', { onClick: () => onSelectSlot(mockChosenSlot) }, 'pick a slot');
+  return ({ onSelectSlot, initialDayKey }) =>
+    React.createElement(
+      'button',
+      { onClick: () => onSelectSlot(mockChosenSlot), 'data-initial-day': initialDayKey || '' },
+      'pick a slot'
+    );
 });
 
 const { screen, waitFor, userEvent } = testingLibrary;
@@ -35,6 +44,10 @@ const active = (hoursAway, overrides = {}) => ({
 
 const renderPanel = () =>
   render(<ManageCalendarBooking transactionId="tx-1" listingId="listing-1" />);
+
+// Clicking a time only asks to confirm it; this is the second click that actually moves the session.
+const confirmMove = async () =>
+  userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveButton'));
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -182,6 +195,7 @@ describe('ManageCalendarBooking', () => {
       renderPanel();
       await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
       await userEvent.click(await screen.findByText('pick a slot'));
+      await confirmMove();
 
       expect(reschedule).toHaveBeenCalledWith({
         transactionId: 'tx-1',
@@ -206,6 +220,7 @@ describe('ManageCalendarBooking', () => {
       renderPanel();
       await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
       await userEvent.click(await screen.findByText('pick a slot'));
+      await confirmMove();
 
       expect(await screen.findByText('ManageCalendarBooking.rescheduleLocked')).toBeInTheDocument();
     });
@@ -219,10 +234,81 @@ describe('ManageCalendarBooking', () => {
       renderPanel();
       await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
       await userEvent.click(await screen.findByText('pick a slot'));
+      await confirmMove();
 
+      // On the confirm panel, which still offers the confirm button and a different time.
       expect(
         await screen.findByText('ManageCalendarBooking.rescheduleTooSoon')
       ).toBeInTheDocument();
+      expect(screen.getByText('ManageCalendarBooking.pickDifferentTime')).toBeInTheDocument();
+    });
+  });
+
+  describe('the confirm step', () => {
+    const openPicker = async () => {
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+      const reschedule = jest.spyOn(api, 'nylasRescheduleBooking').mockResolvedValue({ ok: true });
+      renderPanel();
+      await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
+      return reschedule;
+    };
+
+    it("clicking a time sends nothing: it shows 'Move your session?' with where from and to", async () => {
+      const reschedule = await openPicker();
+      await userEvent.click(await screen.findByText('pick a slot'));
+
+      expect(
+        await screen.findByText('ManageCalendarBooking.confirmMoveHeading')
+      ).toBeInTheDocument();
+      expect(screen.getByText('ManageCalendarBooking.confirmMoveFrom')).toBeInTheDocument();
+      expect(screen.getByText('ManageCalendarBooking.confirmMoveTo')).toBeInTheDocument();
+      expect(screen.getByText('ManageCalendarBooking.confirmMoveButton')).toBeInTheDocument();
+      // The picker is replaced, not shown beside it.
+      expect(screen.queryByText('pick a slot')).not.toBeInTheDocument();
+      expect(reschedule).not.toHaveBeenCalled();
+    });
+
+    it('only the confirm button sends the request, exactly once', async () => {
+      const reschedule = await openPicker();
+      await userEvent.click(await screen.findByText('pick a slot'));
+      expect(reschedule).not.toHaveBeenCalled();
+
+      await confirmMove();
+      expect(reschedule).toHaveBeenCalledTimes(1);
+      expect(reschedule).toHaveBeenCalledWith({
+        transactionId: 'tx-1',
+        start: '2026-11-20T19:30:00.000Z',
+        end: '2026-11-20T20:30:00.000Z',
+      });
+      expect(await screen.findByText('ManageCalendarBooking.rescheduled')).toBeInTheDocument();
+    });
+
+    it("'Pick a different time' goes back to the picker, on the same day, and sends nothing", async () => {
+      const reschedule = await openPicker();
+      await userEvent.click(await screen.findByText('pick a slot'));
+      await userEvent.click(await screen.findByText('ManageCalendarBooking.pickDifferentTime'));
+
+      const picker = await screen.findByText('pick a slot');
+      expect(
+        screen.queryByText('ManageCalendarBooking.confirmMoveHeading')
+      ).not.toBeInTheDocument();
+      // The day of the time that was clicked, in the viewer's zone.
+      const expectedDay = dayKeyOf(mockChosenSlot.start, getDefaultTimeZoneOnBrowser());
+      expect(picker).toHaveAttribute('data-initial-day', expectedDay);
+      expect(reschedule).not.toHaveBeenCalled();
+    });
+
+    it("names the new time's timezone the way people say it, not as a zone id", async () => {
+      expect(formatTimeZoneName('America/Los_Angeles', new Date('2026-11-20T19:30:00Z'))).toBe(
+        'Pacific Time'
+      );
+      expect(formatTimeZoneName('America/Los_Angeles', new Date('2026-07-20T19:30:00Z'))).toBe(
+        'Pacific Time'
+      );
+      expect(formatTimeZoneName('Europe/London', new Date('2026-11-20T19:30:00Z'))).toMatch(
+        /United Kingdom|Greenwich|British/
+      );
     });
   });
 
@@ -230,6 +316,7 @@ describe('ManageCalendarBooking', () => {
     const pickASlot = async () => {
       await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
       await userEvent.click(await screen.findByText('pick a slot'));
+      await confirmMove();
     };
     const failWith = code =>
       jest
@@ -240,7 +327,7 @@ describe('ManageCalendarBooking', () => {
       jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
     });
 
-    it("says the time isn't available any more, and shows the times that are free now", async () => {
+    it("says the time isn't available any more on the confirm panel, and 'Pick a different time' shows the free times", async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
       failWith('reschedule-slot-unavailable');
       renderPanel();
@@ -249,10 +336,31 @@ describe('ManageCalendarBooking', () => {
       expect(
         await screen.findByText('ManageCalendarBooking.rescheduleSlotUnavailable')
       ).toBeInTheDocument();
-      // Back on the picker, with the availability asked for again.
-      expect(await screen.findByText('pick a slot')).toBeInTheDocument();
-      expect(api.nylasAvailability).toHaveBeenCalledTimes(2);
+      // Still on the panel, which offers no way to repeat the refused time.
+      expect(screen.getByText('ManageCalendarBooking.confirmMoveHeading')).toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.confirmMoveButton')).not.toBeInTheDocument();
       expect(screen.queryByText('ManageCalendarBooking.genericError')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByText('ManageCalendarBooking.pickDifferentTime'));
+      expect(await screen.findByText('pick a slot')).toBeInTheDocument();
+      // The free times were fetched again after the refusal.
+      expect(api.nylasAvailability).toHaveBeenCalledTimes(2);
+    });
+
+    it('says the 48-hour rule on the confirm panel when the session has just moved inside it', async () => {
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+      failWith('reschedule-too-late');
+      renderPanel();
+      await pickASlot();
+
+      expect(await screen.findByText('ManageCalendarBooking.rescheduleLocked')).toBeInTheDocument();
+      expect(screen.getByText('ManageCalendarBooking.confirmMoveHeading')).toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.confirmMoveButton')).not.toBeInTheDocument();
+      // The way out is Back, to the card, where Reschedule is now disabled.
+      await userEvent.click(screen.getByText('ManageCalendarBooking.cancelRescheduleButton'));
+      expect(
+        (await screen.findByText('ManageCalendarBooking.rescheduleButton')).closest('button')
+      ).toBeDisabled();
     });
 
     it('says the session has been cancelled when the server says so', async () => {
@@ -344,9 +452,10 @@ describe('ManageCalendarBooking', () => {
     );
     renderPanel();
     await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
-    const pick = await screen.findByText('pick a slot');
-    await userEvent.click(pick);
-    await userEvent.click(pick).catch(() => {});
+    await userEvent.click(await screen.findByText('pick a slot'));
+    const confirm = await screen.findByText('ManageCalendarBooking.confirmMoveButton');
+    await userEvent.click(confirm);
+    await userEvent.click(confirm).catch(() => {});
 
     expect(reschedule).toHaveBeenCalledTimes(1);
     expect(screen.getByText('ManageCalendarBooking.reschedulingInProgress')).toBeInTheDocument();

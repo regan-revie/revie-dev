@@ -59,3 +59,18 @@
   margin: 0 0 16px;
   color: var(--colorGrey700);
 }
+
+/* The confirm step that replaces the time picker after a time is clicked. */
+.confirmMove {
+  margin-bottom: 16px;
+}
+
+.confirmHeading {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.confirmLine {
+  margin: 0 0 8px;
+  color: var(--colorGrey700);
+}
