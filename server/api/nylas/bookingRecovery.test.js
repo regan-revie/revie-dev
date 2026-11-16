@@ -18,11 +18,13 @@ jest.mock('./availability', () => ({
   cancelBooking: jest.fn(async () => {}),
 }));
 jest.mock('../../log', () => ({ error: jest.fn() }));
+jest.mock('./client', () => ({ nylasRequest: jest.fn() }));
 
 const db = require('./db');
 const integration = require('./integration');
 const { createBooking, cancelBooking } = require('./availability');
 const log = require('../../log');
+const { nylasRequest } = require('./client');
 const { ensureBooking, cancelIfDeclined, isTransient, settings } = require('./bookingRecovery');
 
 const TX = 'tx-1';
@@ -115,6 +117,85 @@ describe('ensureBooking()', () => {
 
     expect(result.outcome).toBe('booked');
     spy.mockRestore();
+  });
+
+  describe('the invitation the client is sent', () => {
+    const withEventDetails = () => {
+      process.env.REACT_APP_MARKETPLACE_ROOT_URL = 'https://revie.example';
+      integration.loadTransactionAsOperator.mockResolvedValue(
+        resources({
+          listing: {
+            attributes: {
+              publicData: {
+                calendarBookingEnabled: true,
+                nylasConfigurationId: 'cfg-1',
+                nylasCalendarId: 'cal-1',
+              },
+            },
+          },
+          provider: { attributes: { profile: { privateData: { nylasGrantId: 'grant-9' } } } },
+        })
+      );
+      createBooking.mockResolvedValue({ booking_id: 'bk-1', event_id: 'ev-1' });
+    };
+
+    it('is not followed by an update that notifies the guest: one silent update, description only', async () => {
+      withEventDetails();
+      nylasRequest.mockResolvedValue({});
+      const result = await ensureBooking({ transactionId: TX, source: 'browser' });
+
+      expect(result.outcome).toBe('booked');
+      // The only thing sent to the event is the one description update, and it does not notify.
+      expect(nylasRequest).toHaveBeenCalledTimes(1);
+      const [path, options] = nylasRequest.mock.calls[0];
+      expect(path).toContain('/v3/grants/grant-9/events/ev-1');
+      expect(path).toContain('notify_participants=false');
+      expect(options.method).toBe('PUT');
+      expect(Object.keys(options.body)).toEqual(['description']);
+    });
+
+    it('survives a rate limit (429) on the update: retried, the booking is still made, nothing reported when it works', async () => {
+      withEventDetails();
+      jest.useFakeTimers();
+      try {
+        nylasRequest.mockRejectedValueOnce(httpError(429)).mockResolvedValueOnce({});
+        const pending = ensureBooking({ transactionId: TX, source: 'browser' });
+        await jest.advanceTimersByTimeAsync(5000);
+        const result = await pending;
+
+        expect(result.outcome).toBe('booked');
+        expect(nylasRequest).toHaveBeenCalledTimes(2);
+        expect(integration.applyTransition).not.toHaveBeenCalled(); // never declined
+        expect(log.error).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('never breaks the booking when the update keeps failing: reported, not declined, not retried forever', async () => {
+      withEventDetails();
+      jest.useFakeTimers();
+      try {
+        nylasRequest.mockRejectedValue(httpError(429));
+        const pending = ensureBooking({ transactionId: TX, source: 'browser' });
+        await jest.advanceTimersByTimeAsync(10000);
+        const result = await pending;
+
+        expect(result.outcome).toBe('booked');
+        expect(db.finishBookingAttempt).toHaveBeenCalledWith(TX, 'booked');
+        expect(integration.applyTransition).not.toHaveBeenCalled();
+        expect(nylasRequest).toHaveBeenCalledTimes(3);
+        expect(log.error).toHaveBeenCalledWith(
+          expect.any(Error),
+          'nylas-event-description-failed',
+          {
+            transactionId: TX,
+          }
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   it('creates the booking on the first attempt and does not decline', async () => {

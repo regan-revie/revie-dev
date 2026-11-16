@@ -63,7 +63,7 @@ describe('toUnixSeconds()', () => {
 
 jest.mock('./client', () => ({ nylasRequest: jest.fn() }));
 const { nylasRequest } = require('./client');
-const { createSession, SESSION_TTL_MINUTES } = require('./availability');
+const { createSession, rescheduleBooking, SESSION_TTL_MINUTES } = require('./availability');
 
 describe('createSession()', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -88,6 +88,38 @@ describe('createSession()', () => {
     // now 404s in a way that looks like a missing configuration rather than a missing session.
     nylasRequest.mockResolvedValueOnce({});
     await expect(createSession('cfg-1')).rejects.toThrow(/no session_id/);
+  });
+});
+
+describe('rescheduleBooking(): a real reschedule still tells the guest once', () => {
+  afterEach(() => {
+    delete global.fetch;
+  });
+
+  it("is the Scheduler's own move (PATCH), with no override of its notifications", async () => {
+    nylasRequest.mockResolvedValueOnce({ session_id: 'sess-1' });
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { event_id: 'ev-1' } }),
+    }));
+
+    await rescheduleBooking({
+      configurationId: 'cfg-1',
+      bookingId: 'bk-1',
+      start: new Date('2026-12-01T15:00:00Z'),
+      end: new Date('2026-12-01T16:00:00Z'),
+    });
+
+    // One call, to the Scheduler's booking endpoint (which is what notifies the guest), carrying
+    // the new times and nothing that switches that off. The silent update made right after a
+    // booking (eventDescription.js) is a different call and does not apply here.
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toMatch(/\/v3\/scheduling\/bookings\/bk-1$/);
+    expect(url).not.toMatch(/notify_participants/);
+    expect(options.method).toBe('PATCH');
+    expect(Object.keys(JSON.parse(options.body)).sort()).toEqual(['end_time', 'start_time']);
   });
 });
 

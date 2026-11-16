@@ -561,13 +561,26 @@ export const CheckoutPageWithPayment = props => {
     </NamedLink>
   );
 
+  // Revie: where a client goes when the time they chose has just been taken. The listing page loads
+  // the available times afresh when it opens (NylasBookingForm asks the server on mount) and starts
+  // with no time picked, so this is also how the times are refreshed.
+  const pickAnotherTimeLink = (
+    <NamedLink
+      name="ListingPage"
+      params={{ id: listing?.id?.uuid, slug: createSlug(listingTitle) }}
+    >
+      <FormattedMessage id="CheckoutPage.pickAnotherTimeLinkText" />
+    </NamedLink>
+  );
+
   const errorMessages = getErrorMessages(
     listingNotFound,
     initiateOrderError,
     isPaymentExpired,
     retrievePaymentIntentError,
     speculateTransactionError,
-    listingLink
+    listingLink,
+    pickAnotherTimeLink
   );
 
   const isBooking = processName === BOOKING_PROCESS_NAME;
