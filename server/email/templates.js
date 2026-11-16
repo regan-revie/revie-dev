@@ -62,7 +62,7 @@ const TEMPLATES = {
         meetButton(),
         button('{{manageUrl}}', 'See your booking'),
         p(
-          "Need to move it? Open your booking and choose Reschedule. Cancelling now means you're charged in full, because it's inside 48 hours."
+          "This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full."
         ),
       ].join('\n')
     ),
@@ -78,7 +78,7 @@ Join on Google Meet: {{meetLink}}
 {{/hasMeetLink}}
 See your booking: {{manageUrl}}
 
-Need to move it? Open your booking and choose Reschedule. Cancelling now means you're charged in full, because it's inside 48 hours.
+This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full.
 
 Questions? Reply to this email or write to hello@heyrevie.com.
 
