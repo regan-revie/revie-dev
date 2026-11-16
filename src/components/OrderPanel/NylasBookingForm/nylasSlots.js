@@ -78,3 +78,27 @@ export const slotMatchesVariant = (slot, priceVariant) => {
   if (!wanted) return true;
   return (slot.end - slot.start) / 60000 === wanted;
 };
+
+/**
+ * A friendly name for a timezone, as people say it: "Pacific Time", not "America/Los_Angeles" and
+ * not "Pacific Standard Time" (which would be wrong half the year if the date were not considered).
+ * `longGeneric` is exactly that form. Falls back to the long name, then to the zone id, on an
+ * environment that cannot produce it.
+ */
+export const formatTimeZoneName = (timeZone, date = new Date(), locale = 'en-US') => {
+  const nameOf = timeZoneName => {
+    const part = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName })
+      .formatToParts(new Date(date))
+      .find(p => p.type === 'timeZoneName');
+    return part && part.value;
+  };
+  try {
+    return nameOf('longGeneric') || nameOf('long') || timeZone;
+  } catch (e) {
+    try {
+      return nameOf('long') || timeZone;
+    } catch (e2) {
+      return timeZone;
+    }
+  }
+};

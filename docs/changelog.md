@@ -19,6 +19,18 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-17 (confirm step on the reschedule picker)
+
+**Branch / PR:** `reschedule-confirm-step`, one PR against `main`, not merged. Client side only.
+
+**What changed:** clicking a time no longer reschedules. The picker is replaced by a panel, "Move your session?", with *From: {current date, start–end}* and *To: {new date, start–end} ({timezone name, e.g. Pacific Time})*, a primary "Confirm new time" and a link "Pick a different time" (back to the picker on the same day). Only the confirm button sends the request, then the existing "Moving your session…" and "Moved to …". Refusals (time gone, 48-hour rule, too soon) show on the panel with the existing messages. Copy in `en.json`; existing Revie components and tokens only.
+
+**Tests:** clicking a time sends no request; confirm sends exactly one; "Pick a different time" goes back to the picker on the same day; each refusal on the panel; timezone naming; all earlier reschedule tests now confirm first.
+
+**Not verified:** in a real browser; `Intl`'s `longGeneric` zone name is used ("Pacific Time"), which every current browser supports and falls back to the long name or the zone id otherwise.
+
+---
+
 ## HANDOFF — 2026-11-16 (reschedule showed "Something went wrong" although it worked)
 
 **Branch / PR:** `reschedule-400-fix`, one PR against `main`, not merged.
