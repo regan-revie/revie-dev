@@ -137,3 +137,117 @@ describe('availability handler', () => {
     expect(createSession).not.toHaveBeenCalled();
   });
 });
+
+describe('availability handler: only times both Nylas and Sharetribe accept', () => {
+  let logSpy;
+  beforeEach(() => {
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => logSpy.mockRestore());
+
+  const HOUR = 3600000;
+  const DAY0 = Math.floor(Date.now() / 86400000) * 86400000 + 10 * 86400000;
+  const nylas = (fromHour, toHour) => ({
+    start_time: Math.floor((DAY0 + fromHour * HOUR) / 1000),
+    end_time: Math.floor((DAY0 + toHour * HOUR) / 1000),
+  });
+  const timeslot = (fromHour, toHour) => ({
+    attributes: { start: new Date(DAY0 + fromHour * HOUR), end: new Date(DAY0 + toHour * HOUR) },
+  });
+  const publicData = {
+    calendarBookingEnabled: true,
+    unitType: 'fixed',
+    nylasConfigurationId: 'cfg-60',
+  };
+
+  // `query` is what Sharetribe's time slots call does; `raw` is what the calendar offers.
+  const call = async ({ raw, query }) => {
+    jest.resetModules();
+    const timeslotsQuery = jest.fn(query);
+    jest.doMock('../../log', () => ({ error: jest.fn() }));
+    jest.doMock('../../api-util/sdk', () => ({
+      getSdk: () => ({
+        listings: {
+          show: async () => ({
+            data: { data: { attributes: { publicData, availabilityPlan: {} } } },
+          }),
+        },
+        timeslots: { query: timeslotsQuery },
+      }),
+      handleError: jest.fn(),
+    }));
+    jest.doMock('./config', () => ({ isConfigured: () => true }));
+    jest.doMock('./availability', () => ({
+      createSession: async () => 'session',
+      fetchAvailability: async () => raw,
+      filterSlotsByNotice: s => s,
+      filterSlotsByOpenHours: s => s,
+      toBookableSlot: s => ({ start: s.start_time * 1000, end: s.end_time * 1000 }),
+    }));
+    const handler = require('./availabilityEndpoint');
+    const res = {
+      status(c) {
+        this.code = c;
+        return this;
+      },
+      json(b) {
+        this.body = b;
+        return this;
+      },
+    };
+    await handler(
+      {
+        query: {
+          listingId: 'l',
+          start: new Date(DAY0).toISOString(),
+          end: new Date(DAY0 + 3 * 86400000).toISOString(),
+        },
+      },
+      res
+    );
+    return { res, timeslotsQuery };
+  };
+
+  const page = data => ({ data: { data, meta: { totalPages: 1 } } });
+  const startsOf = res => res.body.slots.map(s => (s.start - DAY0) / HOUR);
+
+  it('does not show a slot that is held in Sharetribe but free in Nylas, and shows a normal free one', async () => {
+    // Nylas offers 10:00 and 12:00; Sharetribe still holds 10:00-11:00 for an earlier booking.
+    const { res } = await call({
+      raw: [nylas(10, 11), nylas(12, 13)],
+      query: async () => page([timeslot(0, 10), timeslot(11, 72)]),
+    });
+    expect(res.code).toBe(200);
+    expect(startsOf(res)).toEqual([12]);
+    expect(res.body.connected).toBe(true);
+    expect(logSpy.mock.calls.flat().some(l => /left out 1 of 2 slot/.test(String(l)))).toBe(true);
+  });
+
+  it('shows every slot both accept', async () => {
+    const { res } = await call({
+      raw: [nylas(10, 11), nylas(12, 13)],
+      query: async () => page([timeslot(0, 72)]),
+    });
+    expect(startsOf(res)).toEqual([10, 12]);
+  });
+
+  it('makes exactly one Sharetribe call per request', async () => {
+    const { timeslotsQuery } = await call({
+      raw: [nylas(10, 11)],
+      query: async () => page([timeslot(0, 72)]),
+    });
+    expect(timeslotsQuery).toHaveBeenCalledTimes(1);
+    expect(timeslotsQuery.mock.calls[0][0].listingId).toBe('l');
+  });
+
+  it("still shows the calendar's times when Sharetribe cannot be asked (the checkout message is the backstop)", async () => {
+    const { res } = await call({
+      raw: [nylas(10, 11), nylas(12, 13)],
+      query: async () => {
+        throw Object.assign(new Error('rate limited'), { status: 429 });
+      },
+    });
+    expect(res.code).toBe(200);
+    expect(startsOf(res)).toEqual([10, 12]);
+  });
+});

@@ -19,6 +19,7 @@ const {
   toBookableSlot,
 } = require('./availability');
 const { isConfigured } = require('./config');
+const { fetchSharetribeIntervals, filterSlotsBySharetribe } = require('./sharetribeSlots');
 const {
   lengthForVariant,
   offeredLengths,
@@ -104,8 +105,13 @@ module.exports = async (req, res) => {
       return;
     }
 
+    // Sharetribe's own view of what it would accept: asked at the same time as the calendar, since
+    // neither needs the other's answer. Null when it cannot be read (then nothing is left out).
     const sessionId = await createSession(configurationId);
-    const raw = await fetchAvailability({ from: window.start, to: window.end, sessionId });
+    const [raw, sharetribeIntervals] = await Promise.all([
+      fetchAvailability({ from: window.start, to: window.end, sessionId }),
+      fetchSharetribeIntervals({ sdk, listingId, from: window.start, to: window.end }),
+    ]);
 
     // Written alongside the configuration id by the same sync, so the two cannot drift.
     const notice = publicData.nylasMinBookingNoticeMinutes;
@@ -118,7 +124,22 @@ module.exports = async (req, res) => {
     const coachTimeZone = response.data.data.attributes.availabilityPlan?.timezone;
     const withinHours = filterSlotsByOpenHours(raw, publicData.nylasOpenHours, coachTimeZone);
 
-    const slots = filterSlotsByNotice(withinHours, notice, nowSeconds).map(toBookableSlot);
+    // Last: a time the calendar offers but Sharetribe holds for another booking would only end in an
+    // error at checkout (see sharetribeSlots.js). The friendly 409 there remains the backstop.
+    const offered = filterSlotsByNotice(withinHours, notice, nowSeconds);
+    const accepted = filterSlotsBySharetribe(offered, sharetribeIntervals);
+    if (accepted.length < offered.length) {
+      // Said when it happens, so the filter can be seen working (or wrongly emptying a calendar).
+      console.log(
+        `[nylas] availability for listing ${String(listingId).slice(
+          0,
+          8
+        )}: left out ${offered.length - accepted.length} of ${
+          offered.length
+        } slot(s) that Sharetribe holds`
+      );
+    }
+    const slots = accepted.map(toBookableSlot);
 
     res.status(200).json({ slots, connected: true });
   } catch (e) {

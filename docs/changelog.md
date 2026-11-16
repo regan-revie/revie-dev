@@ -19,6 +19,18 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-17 (availability leaves out times Sharetribe holds)
+
+**Branch / PR:** `availability-sharetribe-filter`, one PR against `main`, not merged.
+
+**What changed:** `GET /api/nylas/availability` now keeps a Nylas slot only if it fits inside one of Sharetribe's own time slots for the listing (one `timeslots.query` call, cached 15 s, merged across day boundaries). A slot held in Sharetribe but free in the calendar (late-cancelled sessions, the coach-deletion wait, a client mid-checkout, old release-5 reschedules) is no longer offered. If Sharetribe cannot be asked, or answers nothing useful, every Nylas slot is shown and the friendly 409 from #38 is the backstop. Late-cancelled slots staying blocked is accepted (the coach is paid).
+
+**Tests:** a slot held in Sharetribe but free in Nylas is not shown; a normal free slot is; one Sharetribe call per request; fails open on errors, empty answers and paged answers; cache sharing; midnight-spanning sessions; partial overlaps.
+
+**Not verified live:** I could not call `timeslots.query` against Dev: the Integration API has no time slots call and the Marketplace API refuses an anonymous caller on this private marketplace. The shape (`timeslot` resources with `start`/`end`) comes from Sharetribe's documentation and the template's own use. **After it deploys, check it:** open a coach's listing and look in Render for `availability for listing ... left out` (listing `6af4acb6` should hide Nov 17 17:30 while transaction `6af4b535` holds it) and for `nylas-timeslots-failed` in Sentry. If a calendar ever looks emptier than it should, that log line is the first place to look.
+
+---
+
 ## HANDOFF — 2026-11-17 (Sentry triage: REVIE-PLATFORM-6 and -8)
 
 **Branch / PR:** `sentry-triage-429-409`, one PR against `main`, not merged.
