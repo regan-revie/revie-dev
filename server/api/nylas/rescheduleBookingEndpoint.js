@@ -11,12 +11,62 @@
  * booking.rescheduled webhook confirms it, so there is exactly one place that writes the new time.
  */
 
+const log = require('../../log');
 const { createCookieTokenStore, getSdk, handleError } = require('../../api-util/sdk');
 const { rescheduleBooking } = require('./availability');
 const { isConfigured } = require('./config');
 const { loadCalendarBookingTransaction } = require('./manageBookingShared');
 const db = require('./db');
+const { COACH_CANCELLING } = require('./coachCancelling');
 const { canClientReschedule, resolveMinBookingNotice } = require('./scheduler');
+
+const sameTime = (a, b) => Math.abs(new Date(a).getTime() - new Date(b).getTime()) < 1000;
+
+// The same move asked for twice (a second request for the same new time reaches the server while the
+// first is still with Nylas, or just after it finished and before its notice has updated our row) must
+// not go to Nylas twice: the second would be refused, because the first has already taken the slot,
+// and the client would see an error for a session that has in fact moved. Found in the Nov 16 test
+// logs: every reschedule arrived as two POSTs about 2.3 seconds apart, the first succeeding. So the
+// call is shared per transaction and time, kept for a minute after it succeeds, and dropped at once
+// if it fails so a retry is a real retry.
+const KEEP_AFTER_SUCCESS_MS = 60 * 1000;
+const moves = new Map();
+const moveOnce = (key, run) => {
+  let call = moves.get(key);
+  if (!call) {
+    call = run();
+    moves.set(key, call);
+    call.then(
+      () => setTimeout(() => moves.delete(key), KEEP_AFTER_SUCCESS_MS).unref(),
+      () => moves.delete(key)
+    );
+  }
+  return call;
+};
+
+/**
+ * What a Nylas failure means for the client, as a stable code the page turns into a sentence.
+ * Nylas answers a time it will not take with 400 "The selected timeslot is unavailable"; a booking it
+ * has cancelled with a 404 or a message saying so.
+ */
+const classifyNylasFailure = e => {
+  const message = String((e.nylasError && e.nylasError.message) || '');
+  if (e.status === 404 || /cancel/i.test(message)) {
+    return { status: 409, code: 'booking-cancelled', error: 'This session has been cancelled.' };
+  }
+  if (e.status === 400 && /unavailable|not available/i.test(message)) {
+    return {
+      status: 409,
+      code: 'reschedule-slot-unavailable',
+      error: "That time isn't available any more.",
+    };
+  }
+  return {
+    status: 502,
+    code: 'reschedule-failed',
+    error: 'Could not reschedule the calendar booking',
+  };
+};
 
 module.exports = async (req, res) => {
   if (!isConfigured()) {
@@ -73,7 +123,29 @@ module.exports = async (req, res) => {
     const mappings = await db.findByTransactionId(transactionId);
     const active = mappings.find(m => m.status !== 'cancelled');
     if (!active) {
-      res.status(409).json({ error: 'No active calendar booking found for this transaction' });
+      const wasCancelled = mappings.some(m => m.status === 'cancelled');
+      res.status(409).json({
+        code: wasCancelled ? 'booking-cancelled' : 'no-active-booking',
+        error: wasCancelled
+          ? 'This session has been cancelled.'
+          : 'No active calendar booking found for this transaction',
+      });
+      return;
+    }
+
+    // Already at the requested time: the same request again (see moveOnce), or the page asking for
+    // what has just happened. Nothing to do, and not an error. Checked before the 48-hour rule, which
+    // looks at the session's *current* start and would otherwise refuse a repeat of a move that
+    // landed the session inside it.
+    if (sameTime(active.booking_start, startDate) && sameTime(active.booking_end, endDate)) {
+      res.status(200).json({ ok: true, alreadyMoved: true });
+      return;
+    }
+
+    // The coach has deleted the event and the five-minute wait has not ended: the session is about
+    // to be cancelled by the coach, so it is not moved.
+    if (await db.hasPendingEventCancellation(active.nylas_booking_id)) {
+      res.status(409).json(COACH_CANCELLING);
       return;
     }
 
@@ -108,12 +180,16 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const moved = await rescheduleBooking({
-      configurationId,
-      bookingId: active.nylas_booking_id,
-      start: startDate,
-      end: endDate,
-    });
+    const moved = await moveOnce(
+      `${transactionId}|${startDate.getTime()}|${endDate.getTime()}`,
+      () =>
+        rescheduleBooking({
+          configurationId,
+          bookingId: active.nylas_booking_id,
+          start: startDate,
+          end: endDate,
+        })
+    );
 
     // Keep the calendar event id current in case moving the session gave it a new one, so the coach
     // deleting it afterwards is still recognised. Best effort; a reschedule never fails for this.
@@ -127,6 +203,21 @@ module.exports = async (req, res) => {
 
     res.status(200).json({ ok: true });
   } catch (e) {
+    if (e.source === 'nylas') {
+      // Nylas's own answer is what says why, so it is written down: its error type and message (never
+      // the booking's people or times), to the log and to Sentry. Before this the logs said only
+      // "failed with status 400".
+      const reason = classifyNylasFailure(e);
+      log.error(e, 'nylas-reschedule-failed', {
+        transactionId,
+        nylasStatus: e.status,
+        nylasErrorType: e.nylasError && e.nylasError.type,
+        nylasErrorMessage: e.nylasError && e.nylasError.message,
+        code: reason.code,
+      });
+      res.status(reason.status).json({ code: reason.code, error: reason.error });
+      return;
+    }
     if (e.status) {
       handleError(res, e);
       return;
@@ -134,6 +225,11 @@ module.exports = async (req, res) => {
     console.error(
       `[nylas] Booking reschedule failed for transaction ${transactionId}: ${e.message}`
     );
-    res.status(502).json({ error: 'Could not reschedule the calendar booking' });
+    res.status(502).json({
+      code: 'reschedule-failed',
+      error: 'Could not reschedule the calendar booking',
+    });
   }
 };
+
+module.exports.resetMoves = () => moves.clear();

@@ -14,6 +14,7 @@ jest.mock('./integration', () => ({
 jest.mock('./db', () => ({
   isAvailable: jest.fn(() => true),
   findByTransactionId: jest.fn(async () => [{ nylas_booking_id: 'bk-1', status: 'created' }]),
+  hasPendingEventCancellation: jest.fn(async () => false),
 }));
 
 const { cancelBooking } = require('./availability');
@@ -38,6 +39,7 @@ beforeEach(() => {
   require('./manageBookingShared').loadCalendarBookingTransaction.mockResolvedValue({
     configurationId: 'cfg-1',
   });
+  require('./db').hasPendingEventCancellation.mockResolvedValue(false);
   cancelBooking.mockResolvedValue({});
   updateTransactionMetadata.mockResolvedValue({ ok: true });
 });
@@ -78,5 +80,46 @@ describe('POST /api/nylas/cancel-booking', () => {
     });
     expect(res.status).toHaveBeenCalledWith(502);
     spy.mockRestore();
+  });
+
+  describe("while the coach's deletion of the event is in its five-minute wait", () => {
+    beforeEach(() => {
+      require('./db').hasPendingEventCancellation.mockResolvedValue(true);
+    });
+
+    it("refuses with the coach-is-cancelling message, and the client's cancel never reaches Nylas", async () => {
+      const res = makeRes();
+      await handler({ body: { transactionId: 'tx-1' } }, res);
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({
+        code: 'being-cancelled-by-coach',
+        error: "This session is being cancelled by the coach. You'll get a full refund.",
+      });
+      expect(cancelBooking).not.toHaveBeenCalled();
+    });
+
+    it('never writes the "customer asked" note, so the coach cancellation can never be read as a late client cancel (which charges)', async () => {
+      const res = makeRes();
+      await handler({ body: { transactionId: 'tx-1' } }, res);
+      expect(updateTransactionMetadata).not.toHaveBeenCalled();
+    });
+
+    it('asks about the booking that is actually active, not another one on the same transaction', async () => {
+      require('./db').findByTransactionId.mockResolvedValue([
+        { nylas_booking_id: 'old-cancelled', status: 'cancelled' },
+        { nylas_booking_id: 'bk-2', status: 'created' },
+      ]);
+      await handler({ body: { transactionId: 'tx-1' } }, makeRes());
+      expect(require('./db').hasPendingEventCancellation).toHaveBeenCalledWith('bk-2');
+    });
+
+    it('works as before once the wait is over (the coach put the event back)', async () => {
+      require('./db').hasPendingEventCancellation.mockResolvedValue(false);
+      const res = makeRes();
+      await handler({ body: { transactionId: 'tx-1' } }, res);
+      expect(cancelBooking).toHaveBeenCalledTimes(1);
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
   });
 });

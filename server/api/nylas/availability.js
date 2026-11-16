@@ -290,6 +290,7 @@ const rescheduleBooking = async ({ configurationId, bookingId, start, end }) => 
     const err = new Error(`Nylas booking reschedule failed with status ${response.status}`);
     err.status = response.status;
     err.nylasError = payload && payload.error;
+    err.source = 'nylas';
     throw err;
   }
 

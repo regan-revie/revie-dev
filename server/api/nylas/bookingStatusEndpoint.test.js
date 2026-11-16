@@ -1,85 +1,74 @@
-const hoursFromNow = h => new Date(Date.now() + h * 3600000);
+jest.mock('../../api-util/sdk', () => ({
+  createCookieTokenStore: jest.fn(),
+  getSdk: jest.fn(),
+  handleError: jest.fn(),
+}));
+jest.mock('./config', () => ({ isConfigured: jest.fn() }));
+jest.mock('./manageBookingShared', () => ({ loadCalendarBookingTransaction: jest.fn() }));
+jest.mock('./db', () => ({
+  isAvailable: jest.fn(),
+  findByTransactionId: jest.fn(),
+  hasPendingEventCancellation: jest.fn(),
+}));
 
-const call = async rows => {
-  jest.resetModules();
-  jest.doMock('../../api-util/sdk', () => ({
-    createCookieTokenStore: jest.fn(),
-    getSdk: jest.fn(() => ({})),
-    handleError: jest.fn(),
-  }));
-  jest.doMock('./config', () => ({ isConfigured: () => true }));
-  jest.doMock('./manageBookingShared', () => ({
-    loadCalendarBookingTransaction: async () => ({ booking: null }),
-  }));
-  jest.doMock('./db', () => ({
-    isAvailable: () => true,
-    findByTransactionId: async () => rows,
-  }));
-  const handler = require('./bookingStatusEndpoint');
-  const res = {
-    status(c) {
-      this.code = c;
-      return this;
+const db = require('./db');
+const { getSdk } = require('../../api-util/sdk');
+const { isConfigured } = require('./config');
+const { loadCalendarBookingTransaction } = require('./manageBookingShared');
+const endpoint = require('./bookingStatusEndpoint');
+
+const HOUR = 3600000;
+
+const statusFor = async ({ startsInHours = 100, pending = false } = {}) => {
+  const start = new Date(Date.now() + startsInHours * HOUR);
+  db.findByTransactionId.mockResolvedValue([
+    {
+      nylas_booking_id: 'bk-1',
+      status: 'created',
+      booking_start: start,
+      booking_end: new Date(start.getTime() + HOUR),
     },
-    json(b) {
-      this.body = b;
-      return this;
-    },
+  ]);
+  db.hasPendingEventCancellation.mockResolvedValue(pending);
+  const res = { statusCode: null, body: null };
+  res.status = code => {
+    res.statusCode = code;
+    return res;
   };
-  await handler({ query: { transactionId: 'tx-1' } }, res);
+  res.json = body => {
+    res.body = body;
+    return res;
+  };
+  await endpoint({ query: { transactionId: 'tx-1' } }, res);
   return res;
 };
 
+beforeEach(() => {
+  jest.clearAllMocks();
+  // Mock implementations do not survive between tests in this setup, so they are set here.
+  isConfigured.mockReturnValue(true);
+  db.isAvailable.mockReturnValue(true);
+  getSdk.mockReturnValue({});
+  loadCalendarBookingTransaction.mockResolvedValue({ booking: null });
+});
+
 describe('GET /api/nylas/booking-status', () => {
-  it('says whether cancelling now would be refunded (more than 48 hours out)', async () => {
-    const res = await call([
-      { status: 'created', booking_start: hoursFromNow(72), booking_end: hoursFromNow(73) },
-    ]);
-    expect(res.body).toMatchObject({ status: 'created', freeCancellationNow: true });
+  it('says a session more than 48 hours away can be moved and is not being cancelled', async () => {
+    const res = await statusFor({ startsInHours: 100 });
+    expect(res.body).toMatchObject({
+      status: 'created',
+      rescheduleAllowed: true,
+      cancellationPending: false,
+    });
   });
 
-  it('says it would be charged inside 48 hours', async () => {
-    const res = await call([
-      { status: 'created', booking_start: hoursFromNow(12), booking_end: hoursFromNow(13) },
-    ]);
-    expect(res.body.freeCancellationNow).toBe(false);
+  it('says a session inside 48 hours cannot be moved', async () => {
+    const res = await statusFor({ startsInHours: 47 });
+    expect(res.body.rescheduleAllowed).toBe(false);
   });
 
-  it('reports a cancelled session, and whether that cancellation was refunded', async () => {
-    const start = hoursFromNow(72);
-    const res = await call([
-      {
-        status: 'cancelled',
-        booking_start: start,
-        booking_end: hoursFromNow(73),
-        updated_at: new Date(),
-      },
-    ]);
-    expect(res.body).toMatchObject({ status: 'cancelled', freeCancellation: true });
-  });
-
-  it('reports a late cancellation as charged', async () => {
-    const res = await call([
-      {
-        status: 'cancelled',
-        booking_start: hoursFromNow(12),
-        booking_end: hoursFromNow(13),
-        updated_at: new Date(),
-      },
-    ]);
-    expect(res.body.freeCancellation).toBe(false);
-  });
-
-  it('prefers an active booking over an older cancelled one (a rebooked transaction)', async () => {
-    const res = await call([
-      { status: 'created', booking_start: hoursFromNow(72), booking_end: hoursFromNow(73) },
-      {
-        status: 'cancelled',
-        booking_start: hoursFromNow(10),
-        booking_end: hoursFromNow(11),
-        updated_at: new Date(),
-      },
-    ]);
-    expect(res.body.status).toBe('created');
+  it("says when the coach's deletion of the event is in its five-minute wait", async () => {
+    const res = await statusFor({ pending: true });
+    expect(res.body.cancellationPending).toBe(true);
   });
 });

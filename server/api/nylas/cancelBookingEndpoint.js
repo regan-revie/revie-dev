@@ -20,6 +20,7 @@ const { isConfigured } = require('./config');
 const { loadCalendarBookingTransaction } = require('./manageBookingShared');
 const { updateTransactionMetadata } = require('./integration');
 const db = require('./db');
+const { COACH_CANCELLING } = require('./coachCancelling');
 
 module.exports = async (req, res) => {
   if (!isConfigured()) {
@@ -53,6 +54,14 @@ module.exports = async (req, res) => {
     const active = mappings.find(m => m.status !== 'cancelled');
     if (!active) {
       res.status(409).json({ error: 'No active calendar booking found for this transaction' });
+      return;
+    }
+
+    // The coach has deleted the event and the five-minute wait is running: the session is about to be
+    // cancelled by the coach, with a full refund. Refused here, before the note below is written, so
+    // this can never become a client cancellation (and so never the late-cancel path, which charges).
+    if (await db.hasPendingEventCancellation(active.nylas_booking_id)) {
+      res.status(409).json(COACH_CANCELLING);
       return;
     }
 

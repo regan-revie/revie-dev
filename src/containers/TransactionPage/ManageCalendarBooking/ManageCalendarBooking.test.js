@@ -225,4 +225,135 @@ describe('ManageCalendarBooking', () => {
       ).toBeInTheDocument();
     });
   });
+
+  describe('when a reschedule is turned down', () => {
+    const pickASlot = async () => {
+      await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
+      await userEvent.click(await screen.findByText('pick a slot'));
+    };
+    const failWith = code =>
+      jest
+        .spyOn(api, 'nylasRescheduleBooking')
+        .mockRejectedValue(Object.assign(new Error(), { code }));
+
+    beforeEach(() => {
+      jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+    });
+
+    it("says the time isn't available any more, and shows the times that are free now", async () => {
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+      failWith('reschedule-slot-unavailable');
+      renderPanel();
+      await pickASlot();
+
+      expect(
+        await screen.findByText('ManageCalendarBooking.rescheduleSlotUnavailable')
+      ).toBeInTheDocument();
+      // Back on the picker, with the availability asked for again.
+      expect(await screen.findByText('pick a slot')).toBeInTheDocument();
+      expect(api.nylasAvailability).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText('ManageCalendarBooking.genericError')).not.toBeInTheDocument();
+    });
+
+    it('says the session has been cancelled when the server says so', async () => {
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+      failWith('booking-cancelled');
+      renderPanel();
+      await pickASlot();
+
+      expect(await screen.findByText('ManageCalendarBooking.sessionCancelled')).toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.genericError')).not.toBeInTheDocument();
+    });
+
+    it('says the coach is cancelling when the server says so, and reads the session again', async () => {
+      const status = jest.spyOn(api, 'nylasBookingStatus');
+      status.mockResolvedValueOnce(active(72));
+      status.mockResolvedValue(active(72, { cancellationPending: true }));
+      failWith('being-cancelled-by-coach');
+      renderPanel();
+      await pickASlot();
+
+      expect(
+        await screen.findByText('ManageCalendarBooking.beingCancelledByCoach')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.rescheduleButton')).not.toBeInTheDocument();
+    });
+
+    it('keeps the plain message for anything it does not recognise', async () => {
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+      failWith('reschedule-failed');
+      renderPanel();
+      await pickASlot();
+      expect(await screen.findByText('ManageCalendarBooking.genericError')).toBeInTheDocument();
+    });
+  });
+
+  it('shows that the coach is cancelling, instead of an error, when the server refuses a cancel for that reason', async () => {
+    const status = jest.spyOn(api, 'nylasBookingStatus');
+    status.mockResolvedValueOnce(active(72));
+    status.mockResolvedValue(active(72, { cancellationPending: true }));
+    jest
+      .spyOn(api, 'nylasCancelBooking')
+      .mockRejectedValue(Object.assign(new Error(), { code: 'being-cancelled-by-coach' }));
+    renderPanel();
+    await userEvent.click(await screen.findByText('ManageCalendarBooking.cancelButton'));
+    await userEvent.click(screen.getByText('ManageCalendarBooking.confirmCancelButton'));
+
+    expect(
+      await screen.findByText('ManageCalendarBooking.beingCancelledByCoach')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('ManageCalendarBooking.genericError')).not.toBeInTheDocument();
+    expect(screen.queryByText('ManageCalendarBooking.cancelButton')).not.toBeInTheDocument();
+  });
+
+  describe("while the coach's deletion of the event is in its five-minute wait", () => {
+    it('hides Reschedule (and Cancel) and says the coach is cancelling the session', async () => {
+      jest
+        .spyOn(api, 'nylasBookingStatus')
+        .mockResolvedValue(active(72, { cancellationPending: true }));
+      renderPanel();
+
+      expect(
+        await screen.findByText('ManageCalendarBooking.beingCancelledByCoach')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.rescheduleButton')).not.toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.cancelButton')).not.toBeInTheDocument();
+    });
+
+    it('brings the buttons back when the coach puts the event back (the wait is over)', async () => {
+      jest
+        .spyOn(api, 'nylasBookingStatus')
+        .mockResolvedValue(active(72, { cancellationPending: false }));
+      renderPanel();
+      expect(await screen.findByText('ManageCalendarBooking.rescheduleButton')).toBeInTheDocument();
+      expect(
+        screen.queryByText('ManageCalendarBooking.beingCancelledByCoach')
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('sends one reschedule however many times the time is clicked while it is being made', async () => {
+    jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+    jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockChosenSlot] });
+    let finish;
+    const reschedule = jest.spyOn(api, 'nylasRescheduleBooking').mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finish = () => resolve({ ok: true });
+        })
+    );
+    renderPanel();
+    await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
+    const pick = await screen.findByText('pick a slot');
+    await userEvent.click(pick);
+    await userEvent.click(pick).catch(() => {});
+
+    expect(reschedule).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('ManageCalendarBooking.reschedulingInProgress')).toBeInTheDocument();
+    finish();
+    expect(await screen.findByText('ManageCalendarBooking.rescheduled')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'ManageCalendarBooking.rescheduled'
+    );
+  });
 });
