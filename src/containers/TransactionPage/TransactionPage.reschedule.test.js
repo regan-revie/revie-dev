@@ -102,11 +102,19 @@ const props = {
 };
 
 // Two free times, a week out, a session long.
-const slotStart = Date.now() + 7 * 24 * HOUR;
+const slotStart = Math.ceil((Date.now() + 7 * 24 * HOUR) / HOUR) * HOUR;
 const slots = [
   { start: slotStart, end: slotStart + HOUR },
   { start: slotStart + 2 * HOUR, end: slotStart + 3 * HOUR },
 ];
+
+// The app's page has a #portal-root (public/index.html) that the Modal renders into.
+beforeEach(() => {
+  document.body.insertAdjacentHTML('beforeend', '<div id="portal-root"></div>');
+});
+afterEach(() => {
+  document.getElementById('portal-root')?.remove();
+});
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -133,7 +141,20 @@ describe('the reschedule flow on the real order page', () => {
   const timeButtons = () =>
     screen.getAllByRole('button').filter(button => /^\d{2}:\d{2}$/.test(button.textContent.trim()));
 
-  it('offers Reschedule on the order page, and a time click opens the confirm panel and sends nothing', async () => {
+  // The dialog ignores clicks on Confirm for its first half second (a double-click on a time), so the
+  // clock is moved on for the click that is meant.
+  const confirmMove = async () => {
+    const button = await screen.findByText('ManageCalendarBooking.confirmMoveButton');
+    const realNow = Date.now;
+    const spy = jest.spyOn(Date, 'now').mockImplementation(() => realNow() + 1000);
+    try {
+      await userEvent.click(button);
+    } finally {
+      spy.mockRestore();
+    }
+  };
+
+  it('offers Reschedule on the order page, and a time click opens the confirm dialog and sends nothing', async () => {
     const reschedule = await openOrderPage();
 
     await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
@@ -141,7 +162,7 @@ describe('the reschedule flow on the real order page', () => {
 
     expect(await screen.findByText('ManageCalendarBooking.confirmMoveHeading')).toBeInTheDocument();
     expect(screen.getByText('ManageCalendarBooking.confirmMoveButton')).toBeInTheDocument();
-    expect(screen.getByText('ManageCalendarBooking.pickDifferentTime')).toBeInTheDocument();
+    expect(screen.getByText('ManageCalendarBooking.confirmMoveCancel')).toBeInTheDocument();
     expect(reschedule).not.toHaveBeenCalled();
   });
 
@@ -152,7 +173,10 @@ describe('the reschedule flow on the real order page', () => {
     await userEvent.click(timeButtons()[1]);
     expect(reschedule).not.toHaveBeenCalled();
 
+    // Straight after the time click it is ignored; half a second later it counts.
     await userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveButton'));
+    expect(reschedule).not.toHaveBeenCalled();
+    await confirmMove();
     expect(reschedule).toHaveBeenCalledTimes(1);
     expect(reschedule).toHaveBeenCalledWith({
       transactionId: transaction.id.uuid,
@@ -161,14 +185,14 @@ describe('the reschedule flow on the real order page', () => {
     });
   });
 
-  it("'Pick a different time' returns to the real picker with nothing sent", async () => {
+  it('Cancel closes the dialog and leaves the real picker as it was, with nothing sent', async () => {
     const reschedule = await openOrderPage();
 
     await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
     await userEvent.click(timeButtons()[0]);
-    await userEvent.click(await screen.findByText('ManageCalendarBooking.pickDifferentTime'));
+    await userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveCancel'));
 
-    expect(timeButtons().length).toBeGreaterThan(0);
+    expect(timeButtons().length).toBe(2);
     expect(screen.queryByText('ManageCalendarBooking.confirmMoveHeading')).not.toBeInTheDocument();
     expect(reschedule).not.toHaveBeenCalled();
   });

@@ -9,12 +9,9 @@ import {
   nylasRescheduleBooking,
 } from '../../../util/api';
 import NylasSlotPicker from '../../../components/OrderPanel/NylasBookingForm/NylasSlotPicker';
-import {
-  dayKeyOf,
-  formatTimeZoneName,
-} from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
+import { formatTimeZoneName } from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
 
-import { H4, PrimaryButton, SecondaryButton, InlineTextButton } from '../../../components';
+import { H4, Modal, PrimaryButton, SecondaryButton, InlineTextButton } from '../../../components';
 
 import css from './ManageCalendarBooking.module.css';
 
@@ -41,10 +38,19 @@ const ERROR_MESSAGE_IDS = {
   'being-cancelled-by-coach': 'ManageCalendarBooking.beingCancelledByCoach',
 };
 
+// How long after the confirm dialog opens a click on "Confirm new time" is ignored. A double-click on
+// a time opens the dialog with its second click, which would otherwise land on the confirm button.
+const CONFIRM_GUARD_MS = 500;
+// A session this close to its start is inside the window where it cannot be moved again and
+// cancelling is charged (the same 48 hours the server applies, server/api/nylas/scheduler.js).
+const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000;
+const MODAL_ID = 'ManageCalendarBookingConfirmMove';
+
 const ManageCalendarBooking = ({
   transactionId: transactionIdMaybe,
   listingId: listingIdMaybe,
   onCancelled,
+  onManageDisableScrolling = () => {},
 }) => {
   // Callers pass the SDK entities' own .id (transaction.id, listing.id), which may be a UUID
   // object or already a plain string - normalised here rather than pushed onto every caller.
@@ -67,10 +73,11 @@ const ManageCalendarBooking = ({
   // One reschedule at a time. State updates are not instant, so a second click (or a second call of
   // the handler) before the first has answered could still get through; a ref cannot be late.
   const rescheduleInFlight = useRef(false);
-  // The time the client has clicked and not yet confirmed (nothing is sent until they do), and the
-  // day the picker should reopen on if they decide to pick a different one.
+  // The time the client has clicked and not yet confirmed (nothing is sent until they do). It is what
+  // the confirm dialog is open for. The picker underneath is left exactly as it was.
   const [pendingSlot, setPendingSlot] = useState(null);
-  const [pickerDayKey, setPickerDayKey] = useState(null);
+  // When clicks on "Confirm new time" start to count (see CONFIRM_GUARD_MS).
+  const confirmReadyAt = useRef(0);
 
   const loadStatus = () => {
     setStatus({ state: 'loading' });
@@ -123,22 +130,32 @@ const ManageCalendarBooking = ({
       ? Math.round((new Date(status.bookingEnd) - new Date(status.bookingStart)) / 60000)
       : null;
 
-  // A click on a time only asks to confirm it: the request is sent by the confirm button.
+  // A click on a time only opens the confirm dialog: the request is sent by its confirm button.
   const chooseSlot = slot => {
     setActionError(null);
-    setPickerDayKey(dayKeyOf(slot.start, getDefaultTimeZoneOnBrowser()));
+    confirmReadyAt.current = Date.now() + CONFIRM_GUARD_MS;
     setPendingSlot(slot);
   };
 
-  const pickDifferentTime = () => {
-    setActionError(null);
+  // "Cancel" in the dialog, its close button and Escape: back to the picker, as it was. Not while the
+  // request is in flight.
+  const closeConfirm = () => {
+    if (rescheduleInFlight.current) return;
+    const tooLate = actionError && actionError.code === 'reschedule-too-late';
     setPendingSlot(null);
+    setActionError(null);
+    // Nothing left to pick for when the session has just moved inside the 48 hours.
+    if (tooLate) setMode('idle');
+  };
+
+  const confirmMove = () => {
+    if (Date.now() < confirmReadyAt.current) return;
+    handleReschedule(pendingSlot);
   };
 
   const startReschedule = () => {
     setMode('reschedule');
     setPendingSlot(null);
-    setPickerDayKey(null);
     setActionError(null);
     setAvailability({ state: 'loading', slots: [] });
     // The booked length picks the Nylas configuration, so only slots of that length come back.
@@ -201,8 +218,8 @@ const ManageCalendarBooking = ({
         const code = e && e.code;
         setActionError(e);
         if (code === 'reschedule-slot-unavailable') {
-          // Someone else took that time (or Nylas no longer offers it). The message stays on the
-          // confirm panel; the free times are fetched again quietly, ready for "Pick a different time".
+          // Someone else took that time (or Nylas no longer offers it). The message stays in the
+          // dialog; the free times are fetched again quietly, ready for the picker behind it.
           nylasAvailability({
             listingId,
             ...(durationMinutes ? { lengthMinutes: durationMinutes } : {}),
@@ -215,7 +232,7 @@ const ManageCalendarBooking = ({
             })
             .catch(() => {});
         } else if (code === 'reschedule-too-late') {
-          // Inside the 48 hours now: said on the panel, and the card behind it is brought up to date.
+          // Inside the 48 hours now: said in the dialog, and the card behind it is brought up to date.
           setStatus(current => ({ ...current, rescheduleAllowed: false }));
         } else if (['booking-cancelled', 'being-cancelled-by-coach'].includes(code)) {
           // The session is not what the page thought: say so and show it as it really is.
@@ -380,62 +397,7 @@ const ManageCalendarBooking = ({
 
       {mode === 'reschedule' ? (
         <div className={css.reschedule}>
-          {actionInProgress ? (
-            <p role="status">
-              <FormattedMessage id="ManageCalendarBooking.reschedulingInProgress" />
-            </p>
-          ) : pendingSlot ? (
-            // Clicking a time only brings us here; the request is sent by "Confirm new time".
-            <div className={css.confirmMove}>
-              <H4 as="h3" className={css.confirmHeading}>
-                <FormattedMessage id="ManageCalendarBooking.confirmMoveHeading" />
-              </H4>
-              <p className={css.confirmLine}>
-                <FormattedMessage
-                  id="ManageCalendarBooking.confirmMoveFrom"
-                  values={{ time: formatSession(sessionStart, sessionEnd) }}
-                />
-              </p>
-              <p className={css.confirmLine}>
-                <FormattedMessage
-                  id="ManageCalendarBooking.confirmMoveTo"
-                  values={{
-                    time: formatSession(pendingSlot.start, pendingSlot.end),
-                    timeZone: formatTimeZoneName(timeZone, pendingSlot.start, intl.locale),
-                  }}
-                />
-              </p>
-              {actionError ? (
-                <p className={css.error} role="alert">
-                  {errorLine}
-                </p>
-              ) : null}
-              <div className={css.actions}>
-                {!['reschedule-slot-unavailable', 'reschedule-too-late'].includes(
-                  actionError?.code
-                ) ? (
-                  <PrimaryButton onClick={() => handleReschedule(pendingSlot)}>
-                    <FormattedMessage id="ManageCalendarBooking.confirmMoveButton" />
-                  </PrimaryButton>
-                ) : null}
-                {actionError?.code === 'reschedule-too-late' ? (
-                  <SecondaryButton
-                    onClick={() => {
-                      setPendingSlot(null);
-                      setActionError(null);
-                      setMode('idle');
-                    }}
-                  >
-                    <FormattedMessage id="ManageCalendarBooking.cancelRescheduleButton" />
-                  </SecondaryButton>
-                ) : (
-                  <InlineTextButton className={css.cancelLink} onClick={pickDifferentTime}>
-                    <FormattedMessage id="ManageCalendarBooking.pickDifferentTime" />
-                  </InlineTextButton>
-                )}
-              </div>
-            </div>
-          ) : availability.state === 'loading' ? (
+          {availability.state === 'loading' ? (
             <p>
               <FormattedMessage id="ManageCalendarBooking.loadingSlots" />
             </p>
@@ -449,17 +411,75 @@ const ManageCalendarBooking = ({
             <NylasSlotPicker
               slots={availability.slots}
               timeZone={timeZone}
-              initialDayKey={pickerDayKey}
               onSelectSlot={chooseSlot}
             />
           )}
-          {!pendingSlot ? (
-            <SecondaryButton disabled={actionInProgress} onClick={() => setMode('idle')}>
-              <FormattedMessage id="ManageCalendarBooking.cancelRescheduleButton" />
-            </SecondaryButton>
-          ) : null}
+          <SecondaryButton disabled={actionInProgress} onClick={() => setMode('idle')}>
+            <FormattedMessage id="ManageCalendarBooking.cancelRescheduleButton" />
+          </SecondaryButton>
         </div>
       ) : null}
+
+      <Modal
+        id={MODAL_ID}
+        containerClassName={css.modalRoot}
+        contentClassName={css.modalContent}
+        isOpen={mode === 'reschedule' && !!pendingSlot}
+        onClose={closeConfirm}
+        onManageDisableScrolling={onManageDisableScrolling}
+        usePortal
+      >
+        {pendingSlot ? (
+          actionInProgress ? (
+            <p className={css.modalMessage} role="status">
+              <FormattedMessage id="ManageCalendarBooking.reschedulingInProgress" />
+            </p>
+          ) : (
+            <>
+              <H4 as="h2" className={css.modalTitle}>
+                <FormattedMessage id="ManageCalendarBooking.confirmMoveHeading" />
+              </H4>
+              <p className={css.modalMessage}>
+                <FormattedMessage
+                  id="ManageCalendarBooking.confirmMoveFrom"
+                  values={{ time: formatSession(sessionStart, sessionEnd) }}
+                />
+              </p>
+              <p className={css.modalMessage}>
+                <FormattedMessage
+                  id="ManageCalendarBooking.confirmMoveTo"
+                  values={{
+                    time: formatSession(pendingSlot.start, pendingSlot.end),
+                    timeZone: formatTimeZoneName(timeZone, pendingSlot.start, intl.locale),
+                  }}
+                />
+              </p>
+              {new Date(pendingSlot.start).getTime() - Date.now() < LOCK_WINDOW_MS ? (
+                <p className={css.modalMessage}>
+                  <FormattedMessage id="ManageCalendarBooking.confirmMoveInsideLockWindow" />
+                </p>
+              ) : null}
+              {actionError ? (
+                <p className={css.error} role="alert">
+                  {errorLine}
+                </p>
+              ) : null}
+              <div className={css.actions}>
+                {!['reschedule-slot-unavailable', 'reschedule-too-late'].includes(
+                  actionError?.code
+                ) ? (
+                  <PrimaryButton onClick={confirmMove}>
+                    <FormattedMessage id="ManageCalendarBooking.confirmMoveButton" />
+                  </PrimaryButton>
+                ) : null}
+                <SecondaryButton onClick={closeConfirm}>
+                  <FormattedMessage id="ManageCalendarBooking.confirmMoveCancel" />
+                </SecondaryButton>
+              </div>
+            </>
+          )
+        ) : null}
+      </Modal>
     </div>
   );
 };
