@@ -23,9 +23,15 @@
  * or arriving by both routes refunds once. Back (undone), and nothing happens, logged once. A real
  * `booking.cancelled` from our own cancel button is not delayed: it never comes through here.
  *
- * Only the coach's calendar is ever watched (the one grant we hold). A client declining the invitation
- * or deleting the event from their own calendar changes their copy and the guest list of the coach's
- * event, whose status stays confirmed, so it is ignored here and cancels nothing.
+ * Only the coach's own copy of the event can cancel a booking: the notice has to come from the
+ * booking's own coach grant AND the calendar the booking was made on. A client declining the
+ * invitation or deleting the event from their own calendar changes their copy and the guest list of
+ * the coach's event, whose status stays confirmed, so it cancels nothing. And when that client is
+ * *also* a coach with a connected calendar, their copy of the same Google event has the same event
+ * id, arrives as a notice on *their* grant, and is ignored (and logged), never mistaken for the
+ * organiser's. The same rule holds at every step: the stored-id match, the read-back of a grant's
+ * bookings, and the five-minute recheck, which reads the event from the booking's own grant and
+ * calendar, never from whatever the notice named.
  */
 
 const log = require('../../log');
@@ -34,7 +40,11 @@ const db = require('./db');
 const { nylasRequest } = require('./client');
 const { processBookingCancelled } = require('./bookingSync');
 const { lookupEventId } = require('./eventIdBackfill');
-const { isConfigured: integrationConfigured, getTransactionBasics } = require('./integration');
+const {
+  isConfigured: integrationConfigured,
+  getTransactionBasics,
+  loadTransactionAsOperator,
+} = require('./integration');
 
 // How long a deletion has to stand before it is believed.
 const CANCEL_DELAY_MINUTES = 5;
@@ -53,6 +63,42 @@ const CANCELLED_TRANSITIONS = [
 
 /** First eight characters of an id, for logs: enough to find it, nothing personal. */
 const short = id => String(id || '').slice(0, 8);
+
+/**
+ * The calendar a booking's own event lives on: the one its listing sells against. Null when the
+ * listing has none recorded. Throws if Sharetribe cannot be read, so the notice is delivered again
+ * instead of being judged on missing information.
+ */
+const ownCalendarOf = async mapping => {
+  const { listing } = await loadTransactionAsOperator(mapping.sharetribe_transaction_id);
+  return (listing && listing.attributes?.publicData?.nylasCalendarId) || null;
+};
+
+/**
+ * Is this the coach's own copy of the booking's event? It is only if it comes from the booking's own
+ * coach grant and from the calendar the booking was made on. Anything else (another grant's copy of
+ * the same event, a different calendar) is not allowed to cancel anything.
+ *
+ * @returns {Promise<{ok: true, calendarId: string} | {ok: false, why: string}>}
+ */
+const checkOwnCopy = async ({ mapping, grant, calendarId }) => {
+  if (grant !== mapping.nylas_grant_id) {
+    return {
+      ok: false,
+      why: `grant ${short(grant)} is not the coach's grant ${short(mapping.nylas_grant_id)}`,
+    };
+  }
+  const own = await ownCalendarOf(mapping);
+  if (!own)
+    return { ok: false, why: "the booking's calendar is not known, so it cannot be checked" };
+  if (calendarId && calendarId !== own) {
+    return {
+      ok: false,
+      why: `calendar ${short(calendarId)} is not the booking's calendar ${short(own)}`,
+    };
+  }
+  return { ok: true, calendarId: own };
+};
 
 // How long after a lookup on a miss before the next one (it asks Nylas about each of a grant's bookings).
 const LOOKUP_COOLDOWN_MS = 30 * 1000;
@@ -143,6 +189,19 @@ const handleCalendarEvent = async ({
   }
   if (!mapping) {
     if (plainlyCancelled) {
+      // The same event id under another grant is somebody else's copy of a booking's event (a
+      // guest's, say): said so, because that is a different thing from an unrelated event.
+      const copies = await db.findBookingsByEventId(eventId);
+      if (copies.length > 0) {
+        console.log(
+          `[nylas] calendar event ignored: it is another grant's copy of booking ${short(
+            copies[0].nylas_booking_id
+          )}'s event (${trigger}, grant ${short(grant)}, event ${short(
+            eventId
+          )}); only the coach's own copy can cancel it`
+        );
+        return { handled: false, reason: 'not-the-coach-copy' };
+      }
       console.log(
         `[nylas] calendar event did not match any booking (${trigger}, grant ${short(
           grant
@@ -162,9 +221,20 @@ const handleCalendarEvent = async ({
     return { handled: false, reason: 'booking-not-active' };
   }
 
+  // Whatever matched it, the notice must be the coach's own copy: the booking's grant and calendar.
+  const own = await checkOwnCopy({ mapping, grant, calendarId: data.calendar_id });
+  if (!own.ok) {
+    console.log(
+      `[nylas] calendar event ignored for booking ${short(mapping.nylas_booking_id)}: ${
+        own.why
+      } (${trigger}, event ${short(eventId)})`
+    );
+    return { handled: false, reason: 'not-the-coach-copy' };
+  }
+
   let status = trigger === 'event.deleted' ? 'cancelled' : data.status;
-  if (!status && data.calendar_id) {
-    status = await getEventStatus({ grantId: grant, calendarId: data.calendar_id, eventId });
+  if (!status) {
+    status = await getEventStatus({ grantId: grant, calendarId: own.calendarId, eventId });
   }
 
   if (status === 'cancelled') {
@@ -172,7 +242,7 @@ const handleCalendarEvent = async ({
       nylasBookingId: mapping.nylas_booking_id,
       nylasEventId: eventId,
       nylasGrantId: grant,
-      calendarId: data.calendar_id,
+      calendarId: own.calendarId,
       delayMinutes: CANCEL_DELAY_MINUTES,
     });
     const due = new Date(Date.now() + CANCEL_DELAY_MINUTES * 60000);
@@ -239,14 +309,29 @@ const processDueEventCancellations = async ({ getEventStatus = fetchEventStatus 
         continue; // eslint-disable-line no-continue
       }
 
+      // The event is read again from the booking's OWN grant and calendar, whatever the notice that
+      // started the wait named. A wait that somehow names another grant or calendar is dropped.
       // eslint-disable-next-line no-await-in-loop
-      const status = row.calendar_id
-        ? await getEventStatus({
-            grantId: row.nylas_grant_id,
-            calendarId: row.calendar_id,
-            eventId: row.nylas_event_id,
-          })
-        : 'cancelled';
+      const own = await checkOwnCopy({
+        mapping,
+        grant: row.nylas_grant_id,
+        calendarId: row.calendar_id,
+      });
+      if (!own.ok) {
+        console.log(
+          `[nylas] calendar deletion ignored for booking ${short(bookingId)}: ${own.why}`
+        );
+        // eslint-disable-next-line no-await-in-loop
+        await db.finishEventCancellation(bookingId, 'ignored');
+        summary.ignored += 1;
+        continue; // eslint-disable-line no-continue
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const status = await getEventStatus({
+        grantId: mapping.nylas_grant_id,
+        calendarId: own.calendarId,
+        eventId: row.nylas_event_id,
+      });
 
       if (status !== 'cancelled') {
         // Back after all: the coach pressed undo or restored it. Said once, here, as the wait ends.

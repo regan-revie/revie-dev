@@ -59,6 +59,23 @@ describe('resolveMissingEventIds()', () => {
     expect(summary).toEqual({ checked: 1, resolved: 1, failed: 0, gaveUp: 0 });
   });
 
+  it("stores every id under its own booking's coach grant, never under another one", async () => {
+    // Two coaches' bookings in one run; a guest copy of either event shares its id, but the id is
+    // only ever recorded for the booking, under that booking's grant.
+    db.findBookingsNeedingEventCheck.mockResolvedValue([
+      { ...row('b1'), nylas_grant_id: 'coach-a' },
+      { ...row('b2'), nylas_grant_id: 'coach-b' },
+    ]);
+    getBooking
+      .mockResolvedValueOnce({ event_id: 'ev-a' })
+      .mockResolvedValueOnce({ event_id: 'ev-b' });
+    await resolveMissingEventIds();
+    expect(db.recordBookingEvent.mock.calls.map(c => c[0])).toEqual([
+      { nylasBookingId: 'b1', nylasEventId: 'ev-a', nylasGrantId: 'coach-a', verified: true },
+      { nylasBookingId: 'b2', nylasEventId: 'ev-b', nylasGrantId: 'coach-b', verified: true },
+    ]);
+  });
+
   it('also checks bookings whose stored id was never confirmed by Nylas (the query includes them)', async () => {
     await resolveMissingEventIds({ limit: 7 });
     expect(db.findBookingsNeedingEventCheck).toHaveBeenCalledWith(7, 5, 3);

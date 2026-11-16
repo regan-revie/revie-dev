@@ -317,12 +317,30 @@ const recordBookingEvent = async ({
  */
 const findBookingByEvent = async (nylasGrantId, nylasEventId) => {
   const { rows } = await query(
+    // The booking's own coach grant is required as well as the event row's: an event id recorded
+    // under any other grant (a guest's copy of the same Google event carries the same id) must never
+    // make a booking look cancelled.
     `SELECT b.* FROM nylas_booking_events e
        JOIN nylas_bookings b ON b.nylas_booking_id = e.nylas_booking_id
-      WHERE e.nylas_grant_id = $1 AND e.nylas_event_id = $2`,
+      WHERE e.nylas_grant_id = $1 AND e.nylas_event_id = $2
+        AND b.nylas_grant_id = e.nylas_grant_id`,
     [nylasGrantId, nylasEventId]
   );
   return rows[0] || null;
+};
+
+/**
+ * Bookings whose calendar event has this id under ANY grant. Used only to recognise (and log) a
+ * notice that is another person's copy of a booking's event; never to act on one.
+ */
+const findBookingsByEventId = async nylasEventId => {
+  const { rows } = await query(
+    `SELECT b.* FROM nylas_booking_events e
+       JOIN nylas_bookings b ON b.nylas_booking_id = e.nylas_booking_id
+      WHERE e.nylas_event_id = $1`,
+    [nylasEventId]
+  );
+  return rows;
 };
 
 /**
@@ -675,6 +693,7 @@ module.exports = {
   findUpcomingByGrantId,
   recordBookingEvent,
   findBookingByEvent,
+  findBookingsByEventId,
   findBookingsNeedingEventCheck,
   recordEventLookupFailure,
   findActiveBookingsByGrant,

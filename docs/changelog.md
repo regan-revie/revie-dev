@@ -19,6 +19,20 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-16 (guest-copy guard; Dev listings on release-6)
+
+**Branch / PR:** `guest-copy-guard`, one PR against `main`, not merged.
+
+**Dev listings moved to release-6** (not part of the PR): Test 2 (`6af4daab`), Test Session 1 (`6af4acb6`) and Test Session (`6aa17447`), the three enabled calendar listings. Each got `transactionProcessAlias = default-booking/release-6` and its sync signature re-stamped in the same step (outcome `adopted`, only `nylasSyncSignature` written); the reconcile loop reports all three `unchanged`. The other two listings are not calendar listings and were left alone. `render.yaml` still says `release-5` for *new* listings.
+
+**What changed:** a calendar notice can only cancel a booking when it comes from the booking's own coach grant and calendar; the same event id on any other grant (a guest's copy) is ignored and logged. Applied to the stored-id match (SQL now also requires the booking's own grant), the per-grant read-back, the five-minute recheck (reads from the booking's own grant and calendar; a wait naming another is dropped; a wait with no calendar no longer counts as "still deleted") and the backfill (tested: ids stored under their own booking's grant).
+
+**Tests:** guest copy deleted on another connected grant → ignored and logged, nothing scheduled or refunded; coach's own copy → cancelled after five minutes with one refund; wrong calendar, unknown calendar, mis-recorded grant, recheck variants.
+
+**Not verified:** no live deletion on Dev yet. Try: book a session as a client who is also a coach with a connected calendar, delete the event from the *client's* calendar (nothing should happen; Render logs "ignored: it is another grant's copy"), then delete it from the coach's (cancel after 5 minutes).
+
+---
+
 ## HANDOFF — 2026-11-12 (release-6: Sharetribe's booking follows a reschedule)
 
 **Branch / PR:** `release-6-update-booking`, one PR against `main`, not merged. Independent of the reschedule-confirmation PR (already merged).

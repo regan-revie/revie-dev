@@ -165,8 +165,20 @@ describe('calendar event ids', () => {
     const row = await loadDb(URL).findBookingByEvent('g1', 'e1');
     const [sql, params] = mockQuery.mock.calls[0];
     expect(sql).toMatch(/nylas_grant_id = \$1 AND e\.nylas_event_id = \$2/);
+    // The booking's own coach grant has to be the same grant: a guest's copy of the event shares the id.
+    expect(sql).toMatch(/b\.nylas_grant_id = e\.nylas_grant_id/);
     expect(params).toEqual(['g1', 'e1']);
     expect(row).toEqual({ nylas_booking_id: 'b1' });
+  });
+
+  it('finds bookings by event id under any grant, only so a copy can be recognised and logged', async () => {
+    mockQuery.mockResolvedValue({ rows: [{ nylas_booking_id: 'b1' }] });
+    const rows = await loadDb(URL).findBookingsByEventId('e1');
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toMatch(/e\.nylas_event_id = \$1/);
+    expect(sql).not.toMatch(/nylas_grant_id = \$/);
+    expect(params).toEqual(['e1']);
+    expect(rows).toHaveLength(1);
   });
 
   it('returns null for an event that is not a booking', async () => {
