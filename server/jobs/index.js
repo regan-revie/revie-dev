@@ -10,7 +10,12 @@ const { runBookingSweep } = require('./bookingSweeper');
 const { runReconcile } = require('../api/nylas/reconcile');
 const { resolveMissingEventIds } = require('../api/nylas/eventIdBackfill');
 const { processDueEventCancellations } = require('../api/nylas/calendarEventSync');
-const { processDueSessionEmails, backfillReminders } = require('../api/nylas/sessionEmails');
+const {
+  processDueSessionEmails,
+  backfillReminders,
+  backfillConfirmations,
+  reportOverdueConfirmations,
+} = require('../api/nylas/sessionEmails');
 const { reconcileBookingTimes } = require('../api/nylas/bookingTimeSync');
 const log = require('../log');
 
@@ -54,6 +59,13 @@ const start = () => {
       if (bookingTimes.updated > 0 || bookingTimes.failed > 0) {
         console.log('[jobs] booking times', JSON.stringify(bookingTimes)); // eslint-disable-line no-console
       }
+      // Recent confirmed bookings whose "You're booked" email was never queued, and ones that were
+      // queued but have not gone out (reported once each).
+      const confirmations = await backfillConfirmations();
+      if (confirmations.queued > 0) {
+        console.log('[jobs] confirmations queued', JSON.stringify(confirmations)); // eslint-disable-line no-console
+      }
+      await reportOverdueConfirmations();
       // Bookings with no calendar event recorded yet, so the coach deleting one is recognised.
       const backfill = await resolveMissingEventIds();
       // Said when something changed; a booking that cannot be resolved is logged once, as it is given up on.

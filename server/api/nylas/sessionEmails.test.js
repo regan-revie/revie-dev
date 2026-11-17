@@ -28,16 +28,18 @@ jest.mock('./db', () => ({
     });
     return true;
   }),
-  cancelSessionEmails: jest.fn(async (bookingId, kinds = ['reminder', 'rescheduled']) => {
-    let n = 0;
-    mockStore.rows.forEach(r => {
-      if (r.nylas_booking_id === bookingId && kinds.includes(r.kind) && r.status === 'pending') {
-        r.status = 'cancelled';
-        n += 1;
-      }
-    });
-    return n;
-  }),
+  cancelSessionEmails: jest.fn(
+    async (bookingId, kinds = ['reminder', 'rescheduled', 'confirmed']) => {
+      let n = 0;
+      mockStore.rows.forEach(r => {
+        if (r.nylas_booking_id === bookingId && kinds.includes(r.kind) && r.status === 'pending') {
+          r.status = 'cancelled';
+          n += 1;
+        }
+      });
+      return n;
+    }
+  ),
   claimDueSessionEmails: jest.fn(async () => {
     const now = Date.now();
     const rows = [...mockStore.rows.values()].filter(
@@ -68,6 +70,62 @@ jest.mock('./db', () => ({
           )
       )
       .slice(0, limit);
+  }),
+  getSessionEmail: jest.fn(async key => {
+    const r = mockStore.rows.get(key);
+    return r ? { ...r } : null;
+  }),
+  postponeSessionEmail: jest.fn(async (key, seconds) => {
+    const r = mockStore.rows.get(key);
+    if (r && r.status === 'sending') {
+      Object.assign(r, {
+        status: 'pending',
+        send_at: new Date(Date.now() + seconds * 1000),
+        attempts: Math.max(r.attempts - 1, 0),
+      });
+    }
+  }),
+  countRescheduleEmails: jest.fn(
+    async id =>
+      [...mockStore.rows.values()].filter(
+        r =>
+          r.nylas_booking_id === id &&
+          r.kind === 'rescheduled' &&
+          r.recipient === 'client' &&
+          r.status !== 'cancelled'
+      ).length
+  ),
+  findBookingsMissingConfirmation: jest.fn(async (hours, limit) => {
+    const cutoff = Date.now() - hours * 3600000;
+    return [...mockStore.bookings.values()]
+      .filter(
+        b =>
+          ['created', 'rescheduled'].includes(b.status) &&
+          new Date(b.created_at).getTime() > cutoff &&
+          new Date(b.booking_start).getTime() > Date.now() &&
+          ![...mockStore.rows.values()].some(
+            r => r.nylas_booking_id === b.nylas_booking_id && r.kind === 'confirmed'
+          )
+      )
+      .slice(0, limit);
+  }),
+  claimOverdueConfirmations: jest.fn(async minutes => {
+    const cutoff = Date.now() - minutes * 60000;
+    const rows = [...mockStore.rows.values()].filter(
+      r =>
+        r.kind === 'confirmed' &&
+        ['pending', 'sending'].includes(r.status) &&
+        r.send_at.getTime() < cutoff &&
+        !(r.details && r.details.alerted)
+    );
+    rows.forEach(r => {
+      r.details = { ...(r.details || {}), alerted: true };
+    });
+    return rows.map(r => ({
+      nylas_booking_id: r.nylas_booking_id,
+      status: r.status,
+      attempts: r.attempts,
+    }));
   }),
   findByBookingId: jest.fn(async id => mockStore.bookings.get(id) || null),
   // Only ids Nylas itself has given us (verified) are ever returned.
@@ -101,7 +159,13 @@ const load = () => {
   db.isAvailable.mockReturnValue(true);
   integration.isConfigured.mockReturnValue(true);
   integration.loadTransactionAsOperator.mockImplementation(async () => ({
-    tx: { id: { uuid: TX }, attributes: { protectedData: { clientTimeZone: 'America/New_York' } } },
+    tx: {
+      id: { uuid: TX },
+      attributes: {
+        protectedData: { clientTimeZone: 'America/New_York' },
+        payinTotal: { amount: 5000, currency: 'USD' },
+      },
+    },
     listing: {
       attributes: {
         title: 'Find your focus',
@@ -140,6 +204,7 @@ const makeBooking = (startHours, extra = {}) => {
     booking_start: start,
     booking_end: new Date(start.getTime() + HOUR),
     status: 'created',
+    created_at: new Date(),
     ...extra,
   });
   return start;
@@ -402,7 +467,7 @@ describe('sending', () => {
     advance(48);
     await emails.processDueSessionEmails({ send });
     const client = sent.find(s => s.templateAlias === 'session-reminder-client');
-    expect(client.model.timeZoneNote).toMatch(/Sam's timezone: London time/);
+    expect(client.model.timeZoneNote).toMatch(/Sam's timezone: United Kingdom Time/);
   });
 
   it('sends the email without a Meet link rather than not at all when the link cannot be read', async () => {
@@ -713,5 +778,389 @@ describe('backfill', () => {
   it('leaves a session under 24 hours away alone', async () => {
     makeBooking(10);
     expect((await emails.backfillReminders()).checked).toBe(0);
+  });
+});
+
+// --- the client's "You're booked" email -------------------------------------------------------------
+
+describe('"You\'re booked" (the client\'s confirmation)', () => {
+  const MINUTE = 60000;
+  // Nylas has told us which calendar event the booking is, so its Meet link can be read.
+  beforeEach(() => mockStore.eventIds.set(BOOKING, 'ev-1'));
+  const advanceMinutes = m => jest.setSystemTime(Date.now() + m * MINUTE);
+  const confirmedRows = () => rowsOf().filter(r => r.kind === 'confirmed');
+  const decode = attachment => Buffer.from(attachment.content, 'base64').toString('utf8');
+  const unfold = text => text.replace(/\r\n /g, '');
+  const queue = (startHours = 72) => {
+    const start = makeBooking(startHours);
+    return emails.queueConfirmation({ bookingId: BOOKING, sessionStart: start });
+  };
+
+  describe('queueing', () => {
+    it('queues one for the client, due at once, and none for the coach', async () => {
+      expect(await queue()).toEqual({ queued: 1 });
+      expect(confirmedRows()).toHaveLength(1);
+      expect(confirmedRows()[0]).toMatchObject({
+        recipient: 'client',
+        kind: 'confirmed',
+        status: 'pending',
+        nylas_booking_id: BOOKING,
+      });
+      expect(confirmedRows()[0].send_at.getTime()).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('is once per booking: asking again, or after the session moves, queues nothing more', async () => {
+      await queue();
+      expect(await queue()).toEqual({ queued: 0 });
+      await emails.rescheduleEmails({
+        bookingId: BOOKING,
+        oldStart: at(72),
+        oldEnd: at(73),
+        newStart: at(100),
+        newEnd: at(101),
+      });
+      expect(confirmedRows()).toHaveLength(1);
+    });
+
+    it('is queued even for a booking made less than 24 hours ahead (which gets no reminder)', async () => {
+      expect(await queue(5)).toEqual({ queued: 1 });
+    });
+
+    it('is cancelled with the booking, if it has not gone out yet', async () => {
+      await queue();
+      await emails.cancelBookingEmails(BOOKING);
+      expect(confirmedRows()[0].status).toBe('cancelled');
+    });
+  });
+
+  describe('sending', () => {
+    it('sends to the client, by its own template, with the session, the time in their zone, the length, what was paid and the refund line', async () => {
+      await queue(72);
+      const summary = await emails.processDueSessionEmails({ send });
+
+      expect(summary).toMatchObject({ checked: 1, sent: 1, postponed: 0 });
+      const mail = sent[0];
+      expect(mail.to).toBe('alex@client.example');
+      expect(mail.templateAlias).toBe('booking-confirmed-client');
+      expect(mail.tag).toBe('confirmed');
+      expect(mail.model).toMatchObject({
+        recipientName: 'Alex',
+        coachName: 'Sam Coach',
+        sessionName: 'Find your focus',
+        timeZoneName: 'Eastern Time',
+        lengthText: '1 hour',
+        meetLink: 'https://meet.google.com/abc-defg',
+        hasMeetLink: true,
+        totalPaid: '$50.00',
+        hasTotalPaid: true,
+        freeWindowOpen: true,
+        freeWindowClosed: false,
+        manageUrl: 'https://revie-dev.onrender.com/order/tx-1',
+      });
+      expect(mail.model.freeUntil).toMatch(/\(Eastern Time\)$/);
+      expect(mail.model.outlookCalendarUrl).toMatch(/^https:\/\/outlook\.live\.com\//);
+      expect(confirmedRows()[0].status).toBe('sent');
+    });
+
+    it('attaches a calendar file with the Meet link and the booking link, at sequence 0', async () => {
+      await queue(72);
+      await emails.processDueSessionEmails({ send });
+
+      expect(sent[0].attachments).toHaveLength(1);
+      const [file] = sent[0].attachments;
+      expect(file.name).toBe('revie-session.ics');
+      expect(file.contentType).toMatch(/^text\/calendar/);
+      const ics = unfold(decode(file));
+      expect(ics).toContain('UID:booking-bk-1@heyrevie.com');
+      expect(ics).toContain('SEQUENCE:0');
+      expect(ics).toContain('LOCATION:https://meet.google.com/abc-defg');
+      expect(ics).toContain('URL:https://revie-dev.onrender.com/order/tx-1');
+      expect(ics).toContain('Join on Google Meet: https://meet.google.com/abc-defg');
+      expect(ics).toContain('SUMMARY:Find your focus with Sam Coach');
+    });
+
+    it('says there is no free window for a booking made less than 48 hours ahead', async () => {
+      await queue(30);
+      await emails.processDueSessionEmails({ send });
+      expect(sent[0].model).toMatchObject({ freeWindowOpen: false, freeWindowClosed: true });
+    });
+  });
+
+  describe('waiting for the Meet link', () => {
+    const noLink = () => nylasRequest.mockResolvedValue({ conferencing: null });
+
+    it('is put back, without using a try, while the booking is new and there is no link yet', async () => {
+      noLink();
+      await queue(72);
+      const summary = await emails.processDueSessionEmails({ send });
+
+      expect(summary).toMatchObject({ sent: 0, postponed: 1, retried: 0, failed: 0 });
+      expect(sent).toHaveLength(0);
+      const row = confirmedRows()[0];
+      expect(row.status).toBe('pending');
+      expect(row.attempts).toBe(0);
+      expect(row.send_at.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('goes as soon as the link exists, on a later tick', async () => {
+      noLink();
+      await queue(72);
+      await emails.processDueSessionEmails({ send });
+      advanceMinutes(2);
+      nylasRequest.mockResolvedValue({
+        conferencing: { details: { url: 'https://meet.google.com/new-link' } },
+      });
+      const summary = await emails.processDueSessionEmails({ send });
+      expect(summary.sent).toBe(1);
+      expect(sent[0].model.meetLink).toBe('https://meet.google.com/new-link');
+    });
+
+    it('waits through many ticks without ever being counted as failing', async () => {
+      noLink();
+      await queue(72);
+      for (let i = 0; i < 6; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await emails.processDueSessionEmails({ send });
+        advanceMinutes(1.5);
+      }
+      expect(sent).toHaveLength(0);
+      expect(confirmedRows()[0].attempts).toBeLessThanOrEqual(1);
+      expect(confirmedRows()[0].status).toBe('pending');
+    });
+
+    it('goes without a link after ten minutes (a coach whose calendar has no Meet), with the calendar file still attached', async () => {
+      noLink();
+      await queue(72);
+      advanceMinutes(11);
+      const summary = await emails.processDueSessionEmails({ send });
+
+      expect(summary.sent).toBe(1);
+      expect(sent[0].model.hasMeetLink).toBe(false);
+      const ics = unfold(decode(sent[0].attachments[0]));
+      expect(ics).not.toMatch(/LOCATION:/);
+      expect(ics).toContain('URL:https://revie-dev.onrender.com/order/tx-1');
+    });
+
+    it("does not wait for a reschedule confirmation, whatever the booking's age", async () => {
+      noLink();
+      makeBooking(72);
+      await emails.rescheduleEmails({
+        bookingId: BOOKING,
+        oldStart: at(72),
+        oldEnd: at(73),
+        newStart: at(100),
+        newEnd: at(101),
+      });
+      const summary = await emails.processDueSessionEmails({ send });
+      expect(summary.postponed).toBe(0);
+      expect(summary.sent).toBe(2);
+    });
+  });
+
+  describe('until the session starts', () => {
+    it('is still sent hours later (sending had been off): it is not dropped as stale', async () => {
+      await queue(72);
+      advance(10);
+      const summary = await emails.processDueSessionEmails({ send });
+      expect(summary).toMatchObject({ sent: 1, skipped: 0 });
+    });
+
+    it('is skipped, and reported to Sentry, if the session has already started', async () => {
+      await queue(5);
+      advance(6);
+      const summary = await emails.processDueSessionEmails({ send });
+
+      expect(summary).toMatchObject({ sent: 0, skipped: 1 });
+      expect(confirmedRows()[0].status).toBe('skipped');
+      expect(log.error).toHaveBeenCalledWith(expect.any(Error), 'postmark-confirmation-missed', {
+        bookingId: BOOKING,
+      });
+    });
+
+    it('is skipped quietly for a booking that was cancelled meanwhile', async () => {
+      await queue(72);
+      mockStore.bookings.get(BOOKING).status = 'cancelled';
+      await emails.processDueSessionEmails({ send });
+      expect(confirmedRows()[0]).toMatchObject({ status: 'skipped', last_error: 'inactive' });
+      expect(log.error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when it fails', () => {
+    it('is reported to Sentry as a missing confirmation once the third try fails', async () => {
+      send.mockRejectedValue(new Error('postmark down'));
+      await queue(72);
+      for (let i = 0; i < 3; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await emails.processDueSessionEmails({ send });
+      }
+      expect(confirmedRows()[0].status).toBe('failed');
+      const tags = log.error.mock.calls.map(c => c[1]);
+      expect(tags.filter(t => t === 'postmark-confirmation-failed')).toHaveLength(1);
+      expect(tags.filter(t => t === 'postmark-send-failed')).toHaveLength(3);
+    });
+
+    it('does not report a reminder that fails as a missing confirmation', async () => {
+      send.mockRejectedValue(new Error('postmark down'));
+      const start = makeBooking(72);
+      await emails.scheduleReminders({ bookingId: BOOKING, sessionStart: start });
+      advance(48);
+      for (let i = 0; i < 3; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await emails.processDueSessionEmails({ send });
+      }
+      expect(log.error.mock.calls.map(c => c[1])).not.toContain('postmark-confirmation-failed');
+    });
+  });
+
+  describe('a confirmation that never went out', () => {
+    it('is reported once when it is still unsent half an hour after it was due', async () => {
+      await queue(72);
+      send.mockRejectedValue(new Error('postmark down')); // never leaves the queue within the half hour
+      await emails.processDueSessionEmails({ send });
+      advanceMinutes(31);
+      expect(await emails.reportOverdueConfirmations()).toBe(1);
+      expect(log.error).toHaveBeenCalledWith(
+        expect.any(Error),
+        'postmark-confirmation-overdue',
+        expect.objectContaining({ bookingId: BOOKING })
+      );
+      expect(await emails.reportOverdueConfirmations()).toBe(0); // once each
+    });
+
+    it('is not reported while sending is switched off (nothing is expected to go out)', async () => {
+      process.env.POSTMARK_SENDING_ENABLED = 'false';
+      await queue(72);
+      advanceMinutes(60);
+      expect(await emails.reportOverdueConfirmations()).toBe(0);
+      expect(log.error).not.toHaveBeenCalled();
+    });
+
+    it('is not reported when it went out', async () => {
+      await queue(72);
+      await emails.processDueSessionEmails({ send });
+      advanceMinutes(60);
+      expect(await emails.reportOverdueConfirmations()).toBe(0);
+    });
+
+    it('is queued by the catch-up when the webhook never did, and reported because that path failed', async () => {
+      makeBooking(72);
+      const result = await emails.backfillConfirmations();
+      expect(result).toEqual({ checked: 1, queued: 1 });
+      expect(confirmedRows()).toHaveLength(1);
+      expect(log.error).toHaveBeenCalledWith(
+        expect.any(Error),
+        'postmark-confirmation-not-queued',
+        { bookingId: BOOKING }
+      );
+      // And not again.
+      log.error.mockClear();
+      expect(await emails.backfillConfirmations()).toEqual({ checked: 0, queued: 0 });
+      expect(log.error).not.toHaveBeenCalled();
+    });
+
+    it('is not queued by the catch-up for an old booking (nobody is emailed about a session booked long ago)', async () => {
+      makeBooking(72, { created_at: new Date(Date.now() - 3 * 24 * HOUR) });
+      expect(await emails.backfillConfirmations()).toEqual({ checked: 0, queued: 0 });
+    });
+  });
+
+  describe('the reminder that follows it', () => {
+    const remindersFor = booking =>
+      emails.scheduleReminders({ bookingId: BOOKING, sessionStart: booking });
+
+    it('is skipped for the client when the confirmation went out less than two hours before it is due, and still sent to the coach', async () => {
+      const start = makeBooking(25); // reminder due in one hour
+      await emails.queueConfirmation({ bookingId: BOOKING, sessionStart: start });
+      await remindersFor(start);
+      await emails.processDueSessionEmails({ send }); // the confirmation goes now
+      advance(1);
+      const summary = await emails.processDueSessionEmails({ send });
+
+      expect(sent.filter(s => s.templateAlias === 'session-reminder-client')).toHaveLength(0);
+      expect(sent.filter(s => s.templateAlias === 'session-reminder-coach')).toHaveLength(1);
+      expect(summary.skipped).toBe(1);
+      const skipped = rowsOf('skipped').find(r => r.kind === 'reminder');
+      expect(skipped.last_error).toBe('confirmation-just-sent');
+    });
+
+    it('is sent as usual when the booking was made more than two hours before it is due', async () => {
+      const start = makeBooking(30); // reminder due in six hours
+      await emails.queueConfirmation({ bookingId: BOOKING, sessionStart: start });
+      await remindersFor(start);
+      await emails.processDueSessionEmails({ send });
+      advance(6);
+      await emails.processDueSessionEmails({ send });
+      expect(sent.filter(s => s.templateAlias === 'session-reminder-client')).toHaveLength(1);
+    });
+
+    it('is sent as usual when there was no confirmation (an older booking)', async () => {
+      const start = makeBooking(72);
+      await remindersFor(start);
+      advance(48);
+      await emails.processDueSessionEmails({ send });
+      expect(sent.filter(s => s.templateAlias === 'session-reminder-client')).toHaveLength(1);
+    });
+  });
+});
+
+describe("the client's reschedule email and its calendar file", () => {
+  const decode = attachment => Buffer.from(attachment.content, 'base64').toString('utf8');
+  const unfold = text => text.replace(/\r\n /g, '');
+  const move = async (from, to, extra = {}) => {
+    await emails.rescheduleEmails({
+      bookingId: BOOKING,
+      oldStart: at(from),
+      oldEnd: at(from + 1),
+      newStart: at(to),
+      newEnd: at(to + 1),
+      ...extra,
+    });
+  };
+
+  it('attaches the moved event for the client: the same UID as the first file, one sequence higher', async () => {
+    makeBooking(72);
+    await move(72, 100);
+    await emails.processDueSessionEmails({ send });
+
+    const client = sent.find(s => s.templateAlias === 'session-rescheduled-client');
+    const ics = unfold(decode(client.attachments[0]));
+    expect(ics).toContain('UID:booking-bk-1@heyrevie.com');
+    expect(ics).toContain('SEQUENCE:1');
+    const newStart = at(100)
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d{3}/, '');
+    expect(ics).toContain(`DTSTART:${newStart}`);
+  });
+
+  it('raises the sequence with every further move', async () => {
+    makeBooking(72);
+    await move(72, 100);
+    await emails.processDueSessionEmails({ send });
+    sent.length = 0;
+    mockStore.bookings.get(BOOKING).booking_start = at(100);
+    await move(100, 130);
+    await emails.processDueSessionEmails({ send });
+
+    const client = sent.find(s => s.templateAlias === 'session-rescheduled-client');
+    expect(unfold(decode(client.attachments[0]))).toContain('SEQUENCE:2');
+  });
+
+  it('gives the coach no file (their calendar has the event already)', async () => {
+    makeBooking(72);
+    await move(72, 100);
+    await emails.processDueSessionEmails({ send });
+    const coach = sent.find(s => s.templateAlias === 'session-rescheduled-coach');
+    expect(coach.attachments).toBeUndefined();
+  });
+
+  it('says when it is free to cancel or move until, for the new time', async () => {
+    makeBooking(72);
+    await move(72, 100);
+    await emails.processDueSessionEmails({ send });
+    const client = sent.find(s => s.templateAlias === 'session-rescheduled-client');
+    expect(client.model).toMatchObject({ freeWindowOpen: true, timeZoneName: 'Eastern Time' });
+    expect(client.model.freeUntil).toMatch(/\(Eastern Time\)$/);
   });
 });

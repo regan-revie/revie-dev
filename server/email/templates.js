@@ -13,6 +13,7 @@
 const MAROON = '#310416';
 
 const TEMPLATE_ALIASES = {
+  'confirmed-client': 'booking-confirmed-client',
   'reminder-client': 'session-reminder-client',
   'reminder-coach': 'session-reminder-coach',
   'rescheduled-client': 'session-rescheduled-client',
@@ -29,6 +30,21 @@ const when = (dateVar, timeVar) =>
   `<p style="margin:0 0 4px 0;font-size:20px;font-weight:700;line-height:1.3;color:${MAROON}">{{${dateVar}}}</p>
 <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:${MAROON}">{{${timeVar}}} ({{timeZoneName}})</p>
 {{#timeZoneNote}}${p('{{timeZoneNote}}')}{{/timeZoneNote}}`;
+
+const outlookButton = () =>
+  `{{#hasOutlookLink}}${button('{{outlookCalendarUrl}}', 'Add to Outlook')}{{/hasOutlookLink}}`;
+
+// The refund rule in one line. Two sections rather than a section and its opposite.
+const policyLine = () =>
+  `{{#freeWindowOpen}}${p(
+    "Free to cancel or move until {{freeUntil}}. After that, it's charged in full."
+  )}{{/freeWindowOpen}}{{#freeWindowClosed}}${p(
+    "This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full."
+  )}{{/freeWindowClosed}}`;
+
+// Small print under the buttons.
+const small = text =>
+  `<p style="margin:0 0 12px 0;font-size:13px;line-height:1.5;color:#6b5560">${text}</p>`;
 
 const meetButton = () =>
   `{{#hasMeetLink}}${button('{{meetLink}}', 'Join on Google Meet')}{{/hasMeetLink}}`;
@@ -51,6 +67,59 @@ ${body}
 </html>`;
 
 const TEMPLATES = {
+  'booking-confirmed-client': {
+    name: "You're booked (client)",
+    subject: "You're booked: {{sessionName}} with {{coachName}}",
+    html: layout(
+      [
+        p('Hi {{recipientName}},'),
+        p("You're booked. Your session with {{coachName}} is confirmed."),
+        when('sessionDate', 'sessionTime'),
+        p('{{lengthText}}'),
+        meetButton(),
+        outlookButton(),
+        button('{{manageUrl}}', 'See your booking'),
+        small("Using Google Calendar? It's already there."),
+        small('Apple Calendar or another app? Open the attached calendar file.'),
+        `{{#hasTotalPaid}}${p('Total paid: {{totalPaid}}')}{{/hasTotalPaid}}`,
+        policyLine(),
+      ].join('\n')
+    ),
+    text: `Hi {{recipientName}},
+
+You're booked. Your session with {{coachName}} is confirmed.
+
+{{sessionDate}}
+{{sessionTime}} ({{timeZoneName}})
+{{timeZoneNote}}
+{{lengthText}}
+{{#hasMeetLink}}
+Join on Google Meet: {{meetLink}}
+{{/hasMeetLink}}
+{{#hasOutlookLink}}
+Add to Outlook: {{outlookCalendarUrl}}
+{{/hasOutlookLink}}
+See your booking: {{manageUrl}}
+
+Using Google Calendar? It's already there.
+Apple Calendar or another app? Open the attached calendar file.
+{{#hasTotalPaid}}
+
+Total paid: {{totalPaid}}
+{{/hasTotalPaid}}
+
+{{#freeWindowOpen}}
+Free to cancel or move until {{freeUntil}}. After that, it's charged in full.
+{{/freeWindowOpen}}
+{{#freeWindowClosed}}
+This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full.
+{{/freeWindowClosed}}
+
+Questions? Reply to this email or write to hello@heyrevie.com.
+
+Revie`,
+  },
+
   'session-reminder-client': {
     name: 'Session reminder (client)',
     subject: 'Tomorrow: {{sessionName}} with {{coachName}}',
@@ -125,6 +194,9 @@ Revie`,
         p('It was {{oldSessionDate}}, {{oldSessionTime}}.'),
         meetButton(),
         button('{{manageUrl}}', 'See your booking'),
+        small("Using Google Calendar? It's already moved."),
+        small('Apple Calendar or another app? Open the attached calendar file to update it.'),
+        policyLine(),
         p('Nothing else to do.'),
       ].join('\n')
     ),
@@ -141,6 +213,16 @@ It was {{oldSessionDate}}, {{oldSessionTime}}.
 Join on Google Meet: {{meetLink}}
 {{/hasMeetLink}}
 See your booking: {{manageUrl}}
+
+Using Google Calendar? It's already moved.
+Apple Calendar or another app? Open the attached calendar file to update it.
+
+{{#freeWindowOpen}}
+Free to cancel or move until {{freeUntil}}. After that, it's charged in full.
+{{/freeWindowOpen}}
+{{#freeWindowClosed}}
+This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full.
+{{/freeWindowClosed}}
 
 Nothing else to do.
 

@@ -1,14 +1,20 @@
 /**
- * Session reminders and reschedule confirmations, sent through Postmark.
+ * The client's "You're booked" email, session reminders and reschedule confirmations, sent through
+ * Postmark.
  *
  * Everything is a row in Postgres (`session_emails`), never a timer in memory, and the existing
  * sweeper tick (server/jobs/) sends what is due, so a restart or a second worker cannot lose or
  * double an email.
  *
+ *  - "You're booked" goes to the client once per booking, as soon as the booking is confirmed and
+ *    its Google Meet link exists (up to ten minutes' wait, then it goes without), with a calendar
+ *    file attached. It is sent any time until the session starts; one that could not be sent by then
+ *    is reported. (The coach's booked email is still Sharetribe's.)
  *  - A reminder goes to the client and to the coach 24 hours before a confirmed session. A booking
- *    made less than 24 hours ahead gets none.
+ *    made less than 24 hours ahead gets none, and the client's is skipped when their "You're booked"
+ *    went out less than two hours before it was due.
  *  - Moving the session cancels its pending reminders and queues new ones from the new time, and
- *    sends both people a confirmation of the change.
+ *    sends both people a confirmation of the change (the client's carries the moved calendar file).
  *  - Cancelling it, from any side and by any route (our button, the Scheduler, the coach deleting
  *    the calendar event and the five-minute wait ending), cancels everything still pending.
  *
@@ -31,6 +37,7 @@ const { lookupEventId } = require('./eventIdBackfill');
 const postmark = require('../../email/postmark');
 const { buildSessionEmailModel } = require('./sessionEmailModel');
 const { TEMPLATE_ALIASES } = require('../../email/templates');
+const { buildIcs, icsAttachment, outlookCalendarUrl } = require('../../email/calendarFile');
 
 const HOUR = 60 * 60 * 1000;
 const REMINDER_LEAD_MS = 24 * HOUR;
@@ -38,6 +45,16 @@ const REMINDER_LEAD_MS = 24 * HOUR;
 const TOO_LATE_MS = 2 * HOUR;
 // A reschedule confirmation that has waited this long (sending was off, or down) is no longer news.
 const CONFIRMATION_STALE_MS = 6 * HOUR;
+// How long "You're booked" waits for the Google Meet link, which Google creates a moment after the
+// event. Past this it goes without one (a coach on another calendar will never have one).
+const MEET_WAIT_MS = 10 * 60 * 1000;
+const POSTPONE_SECONDS = 60;
+// A reminder this soon after "You're booked" would only repeat it.
+const CONFIRMATION_REMINDER_GAP_MS = 2 * HOUR;
+// A "You're booked" still unsent this long after it was due is reported.
+const OVERDUE_CONFIRMATION_MINUTES = 30;
+// Bookings older than this are never given a "You're booked" by the catch-up.
+const CONFIRMATION_BACKFILL_HOURS = 24;
 const MAX_ATTEMPTS = 3;
 const RECIPIENTS = ['client', 'coach'];
 const ACTIVE = ['created', 'rescheduled'];
@@ -82,6 +99,27 @@ const scheduleReminders = async ({ bookingId, sessionStart, now = Date.now() }) 
   return { queued };
 };
 
+const confirmationKey = bookingId => `confirmed:${bookingId}:client`;
+
+/**
+ * Queue the client's "You're booked": once per booking (the key has no time in it, so moving the
+ * session never sends it again). Due at once; the sender waits for the Meet link.
+ *
+ * @returns {Promise<{queued: number}>}
+ */
+const queueConfirmation = async ({ bookingId, sessionStart, now = Date.now() }) => {
+  const start = new Date(sessionStart);
+  const added = await db.queueSessionEmail({
+    dedupeKey: confirmationKey(bookingId),
+    kind: 'confirmed',
+    nylasBookingId: bookingId,
+    recipient: 'client',
+    sendAt: new Date(now),
+    sessionStart: Number.isFinite(start.getTime()) ? start : null,
+  });
+  return { queued: added ? 1 : 0 };
+};
+
 /**
  * The session moved: drop the pending reminders, queue new ones from the new time, and queue a
  * confirmation to each person.
@@ -103,6 +141,9 @@ const rescheduleEmails = async ({
     return { reminders, confirmations: 0 };
   }
 
+  // The calendar file of this move is one newer than the last, so an app updates the event it has.
+  const sequence = (await db.countRescheduleEmails(bookingId)) + 1;
+
   let confirmations = 0;
   for (const recipient of RECIPIENTS) {
     // eslint-disable-next-line no-await-in-loop
@@ -118,6 +159,7 @@ const rescheduleEmails = async ({
         oldEnd: oldEnd ? iso(oldEnd) : null,
         newStart: iso(start),
         newEnd: newEnd ? iso(newEnd) : null,
+        sequence,
       },
     });
     if (added) confirmations += 1;
@@ -145,6 +187,51 @@ const backfillReminders = async ({ limit = 20, now = Date.now() } = {}) => {
     queued += result.queued;
   }
   return { checked: rows.length, queued };
+};
+
+/**
+ * Queue "You're booked" for confirmed recent bookings that never had one queued (the webhook died
+ * between accepting and queueing). Each one is reported: it means the normal path failed.
+ */
+const backfillConfirmations = async ({ limit = 20, now = Date.now() } = {}) => {
+  const rows = await db.findBookingsMissingConfirmation(CONFIRMATION_BACKFILL_HOURS, limit);
+  let queued = 0;
+  for (const row of rows) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await queueConfirmation({
+      bookingId: row.nylas_booking_id,
+      sessionStart: row.booking_start,
+      now,
+    });
+    if (result.queued) {
+      queued += 1;
+      log.error(
+        new Error('A confirmed booking had no "You\'re booked" email queued; queued it now'),
+        'postmark-confirmation-not-queued',
+        { bookingId: row.nylas_booking_id }
+      );
+    }
+  }
+  return { checked: rows.length, queued };
+};
+
+/**
+ * "You're booked" emails still unsent well after they were due, reported once each. Only while
+ * sending is on: with it off, nothing is expected to go out and a report per booking would be noise.
+ */
+const reportOverdueConfirmations = async () => {
+  if (!db.isAvailable() || !postmark.isSendingEnabled() || !postmark.isConfigured()) return 0;
+  const rows = await db.claimOverdueConfirmations(OVERDUE_CONFIRMATION_MINUTES);
+  rows.forEach(row => {
+    log.error(
+      new Error(
+        `A "You're booked" email has not gone out ${OVERDUE_CONFIRMATION_MINUTES} minutes after it was due`
+      ),
+      'postmark-confirmation-overdue',
+      { bookingId: row.nylas_booking_id, status: row.status, attempts: row.attempts }
+    );
+  });
+  return rows.length;
 };
 
 // --- sending -----------------------------------------------------------------------------------
@@ -208,10 +295,46 @@ const loadEmailContext = async ({ row, mapping, now }) => {
     calendarId: publicData.nylasCalendarId,
   });
 
+  const sessionName = listing?.attributes?.title || 'your session';
+  const coachName = provider?.attributes?.profile?.displayName || 'your coach';
+  const manageUrl = `${root}/${row.recipient === 'coach' ? 'sale' : 'order'}/${txId}`;
+
+  // The client's calendar: a file for any app (Apple Calendar, Outlook...) and a link for Outlook.
+  // Google Calendar users already have the event. The same UID goes in every file about this booking,
+  // with a higher SEQUENCE after each move, so an app updates its event instead of adding another.
+  const wantsCalendar =
+    row.recipient === 'client' && (row.kind === 'confirmed' || row.kind === 'rescheduled');
+  const calendarEvent = {
+    start,
+    end,
+    summary: `${sessionName} with ${coachName}`,
+    description: [
+      `Your session with ${coachName}.`,
+      meetLink && `Join on Google Meet: ${meetLink}`,
+      `Your booking: ${manageUrl}`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    location: meetLink,
+    url: manageUrl,
+  };
+  const attachments = wantsCalendar
+    ? [
+        icsAttachment(
+          buildIcs({
+            uid: `booking-${mapping.nylas_booking_id}@heyrevie.com`,
+            sequence: row.kind === 'rescheduled' ? Number(details.sequence) || 1 : 0,
+            ...calendarEvent,
+            now,
+          })
+        ),
+      ]
+    : [];
+
   const model = buildSessionEmailModel({
     recipient: row.recipient,
-    sessionName: listing?.attributes?.title || 'your session',
-    coachName: provider?.attributes?.profile?.displayName || 'your coach',
+    sessionName,
+    coachName,
     clientName: customer?.attributes?.profile?.displayName || 'your client',
     start,
     end,
@@ -221,13 +344,29 @@ const loadEmailContext = async ({ row, mapping, now }) => {
       listing?.attributes?.availabilityPlan?.timezone || providerPrivate.bookingHours?.timeZone,
     clientTimeZone: tx?.attributes?.protectedData?.clientTimeZone,
     meetLink,
-    manageUrl: `${root}/${row.recipient === 'coach' ? 'sale' : 'order'}/${txId}`,
+    manageUrl,
+    payinTotal: row.kind === 'confirmed' ? tx?.attributes?.payinTotal : undefined,
+    outlookUrl: row.kind === 'confirmed' ? outlookCalendarUrl(calendarEvent) : undefined,
+    now,
   });
 
-  return { to: recipientUser?.attributes?.email, model, now };
+  return { to: recipientUser?.attributes?.email, model, attachments, now };
 };
 
 const templateAliasFor = row => TEMPLATE_ALIASES[`${row.kind}-${row.recipient}`];
+
+/**
+ * Was this client's "You're booked" sent (or about to be) less than two hours before this reminder is
+ * due? Then the reminder would only repeat it.
+ */
+const confirmationJustSent = async row => {
+  const confirmation = await db.getSessionEmail(confirmationKey(row.nylas_booking_id));
+  if (!confirmation || ['cancelled', 'failed', 'skipped'].includes(confirmation.status)) {
+    return false;
+  }
+  const at = new Date(confirmation.sent_at || confirmation.send_at).getTime();
+  return new Date(row.send_at).getTime() - at < CONFIRMATION_REMINDER_GAP_MS;
+};
 
 /**
  * Send what is due. Run every minute from the sweeper's tick.
@@ -238,7 +377,7 @@ const processDueSessionEmails = async ({
   now = Date.now(),
   send = postmark.sendTemplateEmail,
 } = {}) => {
-  const summary = { checked: 0, sent: 0, skipped: 0, retried: 0, failed: 0 };
+  const summary = { checked: 0, sent: 0, skipped: 0, retried: 0, failed: 0, postponed: 0 };
   if (!db.isAvailable() || !integration.isConfigured()) return summary;
   // Off, or no token: nothing is claimed, so everything waits untouched until it is switched on.
   if (!postmark.isSendingEnabled() || !postmark.isConfigured())
@@ -261,19 +400,47 @@ const processDueSessionEmails = async ({
         const start = new Date(row.session_start).getTime();
         if (start !== new Date(mapping.booking_start).getTime()) skip = 'moved';
         else if (start - now < TOO_LATE_MS) skip = 'too-late';
+        // eslint-disable-next-line no-await-in-loop
+        else if (row.recipient === 'client' && (await confirmationJustSent(row))) {
+          skip = 'confirmation-just-sent';
+        }
+      } else if (row.kind === 'confirmed') {
+        // Sent any time until the session starts: a late "You're booked" is still the only
+        // confirmation the client gets. Only a session already under way is too late.
+        if (new Date(mapping.booking_start).getTime() <= now) skip = 'started';
       } else if (now - new Date(row.send_at).getTime() > CONFIRMATION_STALE_MS) skip = 'stale';
 
       if (skip) {
         // eslint-disable-next-line no-await-in-loop
         await db.finishSessionEmail(row.dedupe_key, 'skipped', skip);
         summary.skipped += 1;
+        if (row.kind === 'confirmed' && skip === 'started') {
+          log.error(
+            new Error('A "You\'re booked" email never went out: the session started first'),
+            'postmark-confirmation-missed',
+            { bookingId }
+          );
+        }
         continue; // eslint-disable-line no-continue
       }
 
       // eslint-disable-next-line no-await-in-loop
-      const { to, model } = await loadEmailContext({ row, mapping, now });
+      const { to, model, attachments } = await loadEmailContext({ row, mapping, now });
       if (!to) throw new Error('the recipient has no email address on record');
       domain = postmark.domainOf(to);
+
+      // "You're booked" waits for the Meet link (Google adds it a moment after the event). A wait is
+      // not a failure: it is put back without using a try, and goes without the link after ten minutes.
+      if (
+        row.kind === 'confirmed' &&
+        !model.hasMeetLink &&
+        now - new Date(mapping.created_at).getTime() < MEET_WAIT_MS
+      ) {
+        // eslint-disable-next-line no-await-in-loop
+        await db.postponeSessionEmail(row.dedupe_key, POSTPONE_SECONDS);
+        summary.postponed += 1;
+        continue; // eslint-disable-line no-continue
+      }
 
       // eslint-disable-next-line no-await-in-loop
       await send({
@@ -281,6 +448,7 @@ const processDueSessionEmails = async ({
         templateAlias: templateAliasFor(row),
         model,
         tag: row.kind,
+        ...(attachments && attachments.length ? { attachments } : {}),
       });
       // eslint-disable-next-line no-await-in-loop
       await db.finishSessionEmail(row.dedupe_key, 'sent');
@@ -300,6 +468,10 @@ const processDueSessionEmails = async ({
         // eslint-disable-next-line no-await-in-loop
         await db.finishSessionEmail(row.dedupe_key, 'failed', e.message).catch(() => {});
         summary.failed += 1;
+        if (row.kind === 'confirmed') {
+          // Once Sharetribe's booked email is switched off, this is the client's only confirmation.
+          log.error(e, 'postmark-confirmation-failed', { bookingId, domain });
+        }
       } else {
         // eslint-disable-next-line no-await-in-loop
         await db.retrySessionEmail(row.dedupe_key, e.message).catch(() => {});
@@ -311,6 +483,9 @@ const processDueSessionEmails = async ({
 };
 
 module.exports = {
+  queueConfirmation,
+  backfillConfirmations,
+  reportOverdueConfirmations,
   scheduleReminders,
   rescheduleEmails,
   cancelBookingEmails,
@@ -318,8 +493,11 @@ module.exports = {
   processDueSessionEmails,
   // For bookingSync: the same calls that cannot throw.
   safeScheduleReminders: safely('queue reminders', scheduleReminders),
+  safeQueueConfirmation: safely('queue the booked email', queueConfirmation),
   safeRescheduleEmails: safely('queue reschedule emails', rescheduleEmails),
   safeCancelBookingEmails: safely('cancel session emails', cancelBookingEmails),
   REMINDER_LEAD_MS,
   MAX_ATTEMPTS,
+  MEET_WAIT_MS,
+  CONFIRMATION_REMINDER_GAP_MS,
 };
