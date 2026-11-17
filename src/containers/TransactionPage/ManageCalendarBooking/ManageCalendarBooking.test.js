@@ -408,9 +408,9 @@ describe('ManageCalendarBooking', () => {
       expect(formatTimeZoneName('America/Los_Angeles', new Date('2026-07-20T19:30:00Z'))).toBe(
         'Pacific Time'
       );
-      expect(formatTimeZoneName('Europe/London', new Date('2026-11-20T19:30:00Z'))).toMatch(
-        /United Kingdom|Greenwich|British/
-      );
+      // "UK time", not "United Kingdom Time", in winter and summer alike.
+      expect(formatTimeZoneName('Europe/London', new Date('2026-11-20T19:30:00Z'))).toBe('UK time');
+      expect(formatTimeZoneName('Europe/London', new Date('2026-07-20T19:30:00Z'))).toBe('UK time');
     });
   });
 

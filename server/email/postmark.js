@@ -56,6 +56,8 @@ const sendTemplateEmail = async ({
   fetchFn = fetch,
 }) => {
   if (!isConfigured()) throw new Error('POSTMARK_SERVER_TOKEN is not set');
+  // Said plainly: without it the failure below could only read "for template undefined".
+  if (!templateAlias) throw new Error('sendTemplateEmail was called without a templateAlias');
 
   const response = await fetchFn(`${API_BASE}/email/withTemplate`, {
     method: 'POST',

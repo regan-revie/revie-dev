@@ -77,7 +77,7 @@ describe('Postmark templates', () => {
 
   it('every one links to the Meet call and to the booking page', () => {
     Object.values(TEMPLATES).forEach(t => {
-      expect(t.html).toMatch(/\{\{meetLink\}\}/);
+      expect(t.html).toMatch(/\{\{#meetLink\}\}/);
       expect(t.html).toMatch(/\{\{manageUrl\}\}/);
     });
   });
@@ -99,7 +99,7 @@ describe('Postmark templates', () => {
       expect(t.html).toContain('Join on Google Meet');
       expect(t.html).toContain('Add to Outlook');
       expect(t.html).toContain('See your booking');
-      expect(t.html).toMatch(/\{\{outlookCalendarUrl\}\}/);
+      expect(t.html).toMatch(/\{\{#outlookCalendarUrl\}\}/);
       expect(t.html).toContain(`background-color:${MAROON}`);
     });
 
@@ -113,20 +113,20 @@ describe('Postmark templates', () => {
 
     it('says what was paid, only when there is an amount', () => {
       expect(t.html).toMatch(
-        /\{\{#hasTotalPaid\}\}[\s\S]*Total paid: \{\{totalPaid\}\}[\s\S]*\{\{\/hasTotalPaid\}\}/
+        /\{\{#totalPaid\}\}[\s\S]*Total paid: \{\{\.\}\}[\s\S]*\{\{\/totalPaid\}\}/
       );
-      expect(t.text).toMatch(/Total paid: \{\{totalPaid\}\}/);
+      expect(t.text).toMatch(/\{\{#totalPaid\}\}[\s\S]*Total paid: \{\{\.\}\}/);
     });
 
     it('states the refund rule in one line, and a different line when there is no free window', () => {
       [t.html, t.text].forEach(body => {
         expect(body).toContain(
-          "Free to cancel or move until {{freeUntil}}. After that, it's charged in full."
+          "Free to cancel or move until {{.}}. After that, it's charged in full."
         );
         expect(body).toContain(
           "This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full."
         );
-        expect(body).toMatch(/\{\{#freeWindowOpen\}\}/);
+        expect(body).toMatch(/\{\{#freeUntilOpen\}\}/);
         expect(body).toMatch(/\{\{#freeWindowClosed\}\}/);
       });
     });
@@ -135,7 +135,7 @@ describe('Postmark templates', () => {
   it('the client reschedule email says when it is free to cancel or move until, and points at the updated calendar file', () => {
     const t = TEMPLATES['session-rescheduled-client'];
     [t.html, t.text].forEach(body => {
-      expect(body).toMatch(/\{\{freeUntil\}\}/);
+      expect(body).toMatch(/\{\{#freeUntilOpen\}\}/);
       expect(body).toMatch(/attached calendar file/);
     });
   });
@@ -143,6 +143,135 @@ describe('Postmark templates', () => {
   it("the coach's emails say nothing about the client's calendar file or refund rule", () => {
     ['session-reminder-coach', 'session-rescheduled-coach'].forEach(alias => {
       expect(TEMPLATES[alias].text).not.toMatch(/calendar file|charged in full/);
+    });
+  });
+
+  describe("Postmark's scoping: nothing prints blank", () => {
+    // A small stand-in for Postmark's template engine (Mustachio) with the one rule that matters:
+    // inside {{#name}}...{{/name}} a variable is looked up in the section's own value, not in the
+    // model it came from, and {{.}} is the value itself. This is the rule that left "Total paid:"
+    // and "Free to cancel or move until ." empty in a real email.
+    const lookup = (scope, name) =>
+      scope !== null && typeof scope === 'object' ? scope[name] : undefined;
+    const SECTION = /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/;
+    const render = (template, scope) => {
+      let out = template;
+      let match = SECTION.exec(out);
+      while (match) {
+        const value = lookup(scope, match[1]);
+        const shown = value !== undefined && value !== null && value !== false && value !== '';
+        // eslint-disable-next-line no-loop-func
+        out = out.replace(match[0], shown ? render(match[2], value === true ? true : value) : '');
+        match = SECTION.exec(out);
+      }
+      return out
+        .replace(
+          /\{\{\{\s*\.\s*\}\}\}|\{\{\s*\.\s*\}\}/g,
+          typeof scope === 'object' ? '' : String(scope)
+        )
+        .replace(/\{\{\{?\s*(\w+)\s*\}?\}\}/g, (_, name) => {
+          const value = lookup(scope, name);
+          return value === undefined || value === null ? '' : String(value);
+        });
+    };
+
+    const model = buildSessionEmailModel({
+      recipient: 'client',
+      sessionName: 'Find your focus',
+      coachName: 'Sam Coach',
+      clientName: 'Alex Client',
+      start: Date.now() + 72 * 3600000,
+      end: Date.now() + 73 * 3600000,
+      coachTimeZone: 'Europe/London',
+      clientTimeZone: 'America/Los_Angeles',
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+      manageUrl: 'https://heyrevie.com/order/x',
+      payinTotal: { amount: 5000, currency: 'USD' },
+      outlookUrl: 'https://outlook.live.com/calendar/0/deeplink/compose?subject=x',
+    });
+
+    it('the booked email shows what was paid, the free-until time, the Meet link and the Outlook link', () => {
+      const t = TEMPLATES['booking-confirmed-client'];
+      [t.html, t.text].forEach(body => {
+        const out = render(body, model);
+        expect(out).toContain('Total paid: $50.00');
+        expect(out).toMatch(
+          /Free to cancel or move until \w+ \d+ \w+, [\d:]+ [ap]m \(Pacific Time\)\. After that/
+        );
+        expect(out).toContain('https://meet.google.com/abc-defg-hij');
+        expect(out).toContain('https://outlook.live.com/calendar/0/deeplink/compose?subject=x');
+        expect(out).not.toMatch(/Total paid: *(<|\n)|until \./);
+      });
+    });
+
+    it("the same engine would have printed the old template's two lines blank (so this test can fail)", () => {
+      const old = '{{#hasTotalPaid}}Total paid: {{totalPaid}}{{/hasTotalPaid}}';
+      expect(render(old, model)).toBe('Total paid: ');
+    });
+
+    it('a booking with no amount shows no paid line at all, and one made inside 48 hours shows the locked line instead', () => {
+      const t = TEMPLATES['booking-confirmed-client'];
+      const noAmount = { ...model, totalPaid: '', hasTotalPaid: false };
+      expect(render(t.text, noAmount)).not.toMatch(/Total paid/);
+
+      const soon = buildSessionEmailModel({
+        recipient: 'client',
+        sessionName: 'S',
+        coachName: 'C',
+        clientName: 'A',
+        start: Date.now() + 30 * 3600000,
+        end: Date.now() + 31 * 3600000,
+        coachTimeZone: 'Europe/London',
+        clientTimeZone: 'America/Los_Angeles',
+        manageUrl: 'u',
+      });
+      const out = render(t.text, soon);
+      expect(out).toContain("This session is less than 48 hours away, so it can't be moved.");
+      expect(out).not.toMatch(/Free to cancel or move until/);
+    });
+
+    it('every template prints every value it has (reminders and reschedules too)', () => {
+      const withMove = buildSessionEmailModel({
+        recipient: 'client',
+        sessionName: 'Find your focus',
+        coachName: 'Sam Coach',
+        clientName: 'Alex Client',
+        start: Date.now() + 72 * 3600000,
+        end: Date.now() + 73 * 3600000,
+        oldStart: Date.now() + 50 * 3600000,
+        oldEnd: Date.now() + 51 * 3600000,
+        coachTimeZone: 'Europe/London',
+        clientTimeZone: 'America/Los_Angeles',
+        meetLink: 'https://meet.google.com/abc-defg-hij',
+        manageUrl: 'https://heyrevie.com/order/x',
+      });
+      Object.values(TEMPLATES).forEach(t => {
+        expect(render(t.html, withMove)).toContain('https://meet.google.com/abc-defg-hij');
+        expect(render(t.text, withMove)).toContain('https://meet.google.com/abc-defg-hij');
+      });
+    });
+
+    it("no section prints a variable by name: inside one, only {{.}} (the section's own value) is safe", () => {
+      Object.entries(TEMPLATES).forEach(([alias, t]) => {
+        [t.html, t.text].forEach(body => {
+          const sections = body.match(/\{\{#(\w+)\}\}[\s\S]*?\{\{\/\1\}\}/g) || [];
+          sections.forEach(section => {
+            const inner = section
+              .replace(/^\{\{#\w+\}\}/, '')
+              .replace(/\{\{\/\w+\}\}$/, '')
+              .replace(/\{\{\{?\s*\.\s*\}?\}\}/g, '');
+            // A nested section is looked at on its own; here, no plain interpolation.
+            const withoutNested = inner.replace(/\{\{#(\w+)\}\}[\s\S]*?\{\{\/\1\}\}/g, '');
+            expect({
+              alias,
+              leftovers: withoutNested.match(/\{\{\{?\s*\w+\s*\}?\}\}/g) || [],
+            }).toEqual({
+              alias,
+              leftovers: [],
+            });
+          });
+        });
+      });
     });
   });
 });

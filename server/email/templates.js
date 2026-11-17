@@ -6,6 +6,12 @@
  * changing copy needs no deploy. The code sends an alias and a model (sessionEmailModel.js), and a
  * test checks that every {{variable}} used below is something the model provides.
  *
+ * **A section changes scope.** Inside {{#name}}...{{/name}}, a variable is looked up in the section's
+ * own value, not in the rest of the model, so {{#hasTotalPaid}}Total paid: {{totalPaid}}{{/hasTotalPaid}}
+ * shows "Total paid: " and nothing else (a blank that reached a real email). To show a value only when
+ * it exists, make the section the value itself and print it with {{.}}: {{#totalPaid}}Total paid: {{.}}{{/totalPaid}}.
+ * A section with no variables inside it (a plain true/false flag) is fine. A test enforces this.
+ *
  * Postmark template syntax: {{name}} fills a value in (HTML-escaped), {{#name}}...{{/name}} shows a
  * block only when `name` has a value.
  */
@@ -29,16 +35,16 @@ const p = text =>
 const when = (dateVar, timeVar) =>
   `<p style="margin:0 0 4px 0;font-size:20px;font-weight:700;line-height:1.3;color:${MAROON}">{{${dateVar}}}</p>
 <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:${MAROON}">{{${timeVar}}} ({{timeZoneName}})</p>
-{{#timeZoneNote}}${p('{{timeZoneNote}}')}{{/timeZoneNote}}`;
+{{#timeZoneNote}}${p('{{.}}')}{{/timeZoneNote}}`;
 
 const outlookButton = () =>
-  `{{#hasOutlookLink}}${button('{{outlookCalendarUrl}}', 'Add to Outlook')}{{/hasOutlookLink}}`;
+  `{{#outlookCalendarUrl}}${button('{{.}}', 'Add to Outlook')}{{/outlookCalendarUrl}}`;
 
 // The refund rule in one line. Two sections rather than a section and its opposite.
 const policyLine = () =>
-  `{{#freeWindowOpen}}${p(
-    "Free to cancel or move until {{freeUntil}}. After that, it's charged in full."
-  )}{{/freeWindowOpen}}{{#freeWindowClosed}}${p(
+  `{{#freeUntilOpen}}${p(
+    "Free to cancel or move until {{.}}. After that, it's charged in full."
+  )}{{/freeUntilOpen}}{{#freeWindowClosed}}${p(
     "This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full."
   )}{{/freeWindowClosed}}`;
 
@@ -46,8 +52,7 @@ const policyLine = () =>
 const small = text =>
   `<p style="margin:0 0 12px 0;font-size:13px;line-height:1.5;color:#6b5560">${text}</p>`;
 
-const meetButton = () =>
-  `{{#hasMeetLink}}${button('{{meetLink}}', 'Join on Google Meet')}{{/hasMeetLink}}`;
+const meetButton = () => `{{#meetLink}}${button('{{.}}', 'Join on Google Meet')}{{/meetLink}}`;
 
 const layout = body => `<!DOCTYPE html>
 <html lang="en">
@@ -81,7 +86,7 @@ const TEMPLATES = {
         button('{{manageUrl}}', 'See your booking'),
         small("Using Google Calendar? It's already there."),
         small('Apple Calendar or another app? Open the attached calendar file.'),
-        `{{#hasTotalPaid}}${p('Total paid: {{totalPaid}}')}{{/hasTotalPaid}}`,
+        `{{#totalPaid}}${p('Total paid: {{.}}')}{{/totalPaid}}`,
         policyLine(),
       ].join('\n')
     ),
@@ -93,24 +98,24 @@ You're booked. Your session with {{coachName}} is confirmed.
 {{sessionTime}} ({{timeZoneName}})
 {{timeZoneNote}}
 {{lengthText}}
-{{#hasMeetLink}}
-Join on Google Meet: {{meetLink}}
-{{/hasMeetLink}}
-{{#hasOutlookLink}}
-Add to Outlook: {{outlookCalendarUrl}}
-{{/hasOutlookLink}}
+{{#meetLink}}
+Join on Google Meet: {{{.}}}
+{{/meetLink}}
+{{#outlookCalendarUrl}}
+Add to Outlook: {{{.}}}
+{{/outlookCalendarUrl}}
 See your booking: {{manageUrl}}
 
 Using Google Calendar? It's already there.
 Apple Calendar or another app? Open the attached calendar file.
-{{#hasTotalPaid}}
+{{#totalPaid}}
 
-Total paid: {{totalPaid}}
-{{/hasTotalPaid}}
+Total paid: {{.}}
+{{/totalPaid}}
 
-{{#freeWindowOpen}}
-Free to cancel or move until {{freeUntil}}. After that, it's charged in full.
-{{/freeWindowOpen}}
+{{#freeUntilOpen}}
+Free to cancel or move until {{.}}. After that, it's charged in full.
+{{/freeUntilOpen}}
 {{#freeWindowClosed}}
 This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full.
 {{/freeWindowClosed}}
@@ -142,9 +147,9 @@ Your session with {{coachName}} is tomorrow.
 {{sessionDate}}
 {{sessionTime}} ({{timeZoneName}})
 {{timeZoneNote}}
-{{#hasMeetLink}}
-Join on Google Meet: {{meetLink}}
-{{/hasMeetLink}}
+{{#meetLink}}
+Join on Google Meet: {{{.}}}
+{{/meetLink}}
 See your booking: {{manageUrl}}
 
 This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full.
@@ -173,9 +178,9 @@ Revie`,
 {{sessionDate}}
 {{sessionTime}} ({{timeZoneName}})
 {{timeZoneNote}}
-{{#hasMeetLink}}
-Join on Google Meet: {{meetLink}}
-{{/hasMeetLink}}
+{{#meetLink}}
+Join on Google Meet: {{{.}}}
+{{/meetLink}}
 See the booking: {{manageUrl}}
 
 Questions? Reply to this email or write to hello@heyrevie.com.
@@ -209,17 +214,17 @@ Your session with {{coachName}} has a new time.
 {{timeZoneNote}}
 
 It was {{oldSessionDate}}, {{oldSessionTime}}.
-{{#hasMeetLink}}
-Join on Google Meet: {{meetLink}}
-{{/hasMeetLink}}
+{{#meetLink}}
+Join on Google Meet: {{{.}}}
+{{/meetLink}}
 See your booking: {{manageUrl}}
 
 Using Google Calendar? It's already moved.
 Apple Calendar or another app? Open the attached calendar file to update it.
 
-{{#freeWindowOpen}}
-Free to cancel or move until {{freeUntil}}. After that, it's charged in full.
-{{/freeWindowOpen}}
+{{#freeUntilOpen}}
+Free to cancel or move until {{.}}. After that, it's charged in full.
+{{/freeUntilOpen}}
 {{#freeWindowClosed}}
 This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full.
 {{/freeWindowClosed}}
@@ -253,9 +258,9 @@ Your session with {{clientName}} has a new time. Your calendar has it already.
 {{timeZoneNote}}
 
 It was {{oldSessionDate}}, {{oldSessionTime}}.
-{{#hasMeetLink}}
-Join on Google Meet: {{meetLink}}
-{{/hasMeetLink}}
+{{#meetLink}}
+Join on Google Meet: {{{.}}}
+{{/meetLink}}
 See the booking: {{manageUrl}}
 
 Questions? Reply to this email or write to hello@heyrevie.com.

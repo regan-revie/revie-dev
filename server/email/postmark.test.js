@@ -12,6 +12,30 @@ describe('sendTemplateEmail()', () => {
     else process.env.POSTMARK_SERVER_TOKEN = OLD;
   });
 
+  it('says plainly when it is called without a template alias, rather than failing as "for template undefined"', async () => {
+    const fetchFn = jest.fn();
+    await expect(
+      postmark.sendTemplateEmail({ to: 'client@example.com', model: {}, fetchFn })
+    ).rejects.toThrow('without a templateAlias');
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('names the template alias in a Postmark failure', async () => {
+    const fetchFn = jest.fn(async () => ({
+      ok: false,
+      status: 422,
+      json: async () => ({ ErrorCode: 1101 }),
+    }));
+    await expect(
+      postmark.sendTemplateEmail({
+        to: 'client@example.com',
+        templateAlias: 'booking-confirmed-client',
+        model: {},
+        fetchFn,
+      })
+    ).rejects.toThrow('code 1101) for template booking-confirmed-client');
+  });
+
   it('attaches files when given them, in the shape Postmark takes, and none when not', async () => {
     const fetchFn = jest.fn(async () => okResponse({ ErrorCode: 0, MessageID: 'm-2' }));
     await postmark.sendTemplateEmail({
