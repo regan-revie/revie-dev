@@ -1,9 +1,9 @@
 /**
  * Sending email through Postmark, by hosted template.
  *
- * Only for the emails Sharetribe cannot send: session reminders and reschedule confirmations
- * (server/api/nylas/sessionEmails.js). Booked, cancelled, late-cancelled, payouts and reviews stay
- * with Sharetribe.
+ * For the session emails (server/api/nylas/sessionEmails.js): the client's "You're booked" (with a
+ * calendar file), reminders and reschedule confirmations. Cancelled, late-cancelled, payouts, reviews
+ * and the coach's booked email stay with Sharetribe.
  *
  * The wording lives in Postmark, as hosted templates identified by an alias (created once by
  * scripts/postmark-create-templates.js), so it can be edited there without a deploy. The code sends
@@ -40,12 +40,21 @@ const domainOf = address => {
  * @param {string} params.templateAlias e.g. 'session-reminder-client'
  * @param {object} params.model values for the template
  * @param {string} [params.tag] Postmark tag, for filtering in their dashboard
+ * @param {Array<{name: string, content: string, contentType: string}>} [params.attachments] files to
+ *   attach; `content` is base64 (server/email/calendarFile.js makes the calendar file)
  * @param {Function} [params.fetchFn] injected in tests
  * @returns {Promise<{messageId: string}>}
  * @throws an Error with `status` (HTTP) and `postmarkCode` set; its message never contains the
  *   response body, the address or the model.
  */
-const sendTemplateEmail = async ({ to, templateAlias, model, tag, fetchFn = fetch }) => {
+const sendTemplateEmail = async ({
+  to,
+  templateAlias,
+  model,
+  tag,
+  attachments,
+  fetchFn = fetch,
+}) => {
   if (!isConfigured()) throw new Error('POSTMARK_SERVER_TOKEN is not set');
 
   const response = await fetchFn(`${API_BASE}/email/withTemplate`, {
@@ -63,6 +72,15 @@ const sendTemplateEmail = async ({ to, templateAlias, model, tag, fetchFn = fetc
       TemplateModel: model,
       MessageStream: 'outbound',
       ...(tag ? { Tag: tag } : {}),
+      ...(attachments && attachments.length
+        ? {
+            Attachments: attachments.map(a => ({
+              Name: a.name,
+              Content: a.content,
+              ContentType: a.contentType,
+            })),
+          }
+        : {}),
       TrackOpens: false,
     }),
   });

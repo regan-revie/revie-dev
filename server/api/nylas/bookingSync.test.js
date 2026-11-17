@@ -18,6 +18,7 @@ jest.mock('./integration', () => ({
 
 jest.mock('./sessionEmails', () => ({
   safeScheduleReminders: jest.fn(async () => ({})),
+  safeQueueConfirmation: jest.fn(async () => ({})),
   safeRescheduleEmails: jest.fn(async () => ({})),
   safeCancelBookingEmails: jest.fn(async () => 0),
 }));
@@ -37,6 +38,7 @@ const { cancelIfDeclined } = require('./bookingRecovery');
 const { applyBookingTime } = require('./bookingTimeSync');
 const {
   safeScheduleReminders,
+  safeQueueConfirmation,
   safeRescheduleEmails,
   safeCancelBookingEmails,
 } = require('./sessionEmails');
@@ -676,6 +678,36 @@ describe('session emails (Postmark)', () => {
     cancelIfDeclined.mockResolvedValue(true);
     await handleBookingWebhook(created);
     expect(safeScheduleReminders).not.toHaveBeenCalled();
+  });
+
+  it('queues the client\'s "You\'re booked" once the booking is confirmed, from the real session time, even when it is under 24 hours away', async () => {
+    await handleBookingWebhook(created);
+    expect(safeQueueConfirmation).toHaveBeenCalledTimes(1);
+    const { bookingId, sessionStart } = safeQueueConfirmation.mock.calls[0][0];
+    expect(bookingId).toBe(BOOKING);
+    expect(new Date(sessionStart).toISOString()).toBe('2026-12-01T15:00:00.000Z');
+  });
+
+  it('asks again on a redelivery (it is keyed, so this changes nothing), but not for an orphaned booking', async () => {
+    applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+    cancelIfDeclined.mockResolvedValue(false);
+    await handleBookingWebhook(created);
+    expect(safeQueueConfirmation).toHaveBeenCalledTimes(1);
+
+    jest.clearAllMocks();
+    applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+    cancelIfDeclined.mockResolvedValue(true);
+    await handleBookingWebhook(created);
+    expect(safeQueueConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('queues no "You\'re booked" for a booking that is only pending, or that could not be confirmed', async () => {
+    await handleBookingWebhook({ ...created, trigger: 'booking.pending' });
+    expect(safeQueueConfirmation).not.toHaveBeenCalled();
+
+    applyTransition.mockResolvedValue({ ok: false, error: new Error('stripe down') });
+    await expect(handleBookingWebhook(created)).rejects.toThrow('stripe down');
+    expect(safeQueueConfirmation).not.toHaveBeenCalled();
   });
 
   it('queues nothing for a booking that is only pending, or that could not be confirmed', async () => {

@@ -19,6 +19,28 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-17 (the client's "You're booked" email, via Postmark)
+
+**Branch / PR:** `booking-confirmed-email`, one PR against `main`, not merged. **PR 2 (release-7, stopping Sharetribe's booked email to the client) is deliberately not built: it waits for Regan's test of this one.**
+
+**What changed**
+- New template `booking-confirmed-client`: "You're booked", the session, coach, date and time in the client's timezone (friendly name), length, Meet link, "Add to Outlook", "Using Google Calendar? It's already there.", "Total paid", and the free-until line; an `.ics` is attached (stable UID, Meet link and booking link inside). No "Add to Google Calendar".
+- Queued once per booking right after the booking is confirmed; waits up to 10 minutes for the Meet link (without using a retry); sent any time until the session starts.
+- The client's reschedule email now carries the moved `.ics` (same UID, SEQUENCE + 1) and the new free-until line.
+- Friendly timezone names ("Pacific Time") in all session emails (was "GMT-8").
+- The client's 24-hour reminder is skipped if their booked email went out under 2 hours before it was due.
+- Sentry: `postmark-confirmation-failed`, `-missed`, `-overdue`, `-not-queued`.
+
+**Steps for Regan (in this order)**
+1. Merge, then create the template (create-only; the others are left alone): `op run --env-file=.env -- node scripts/postmark-create-templates.js --dry-run` first (Postmark's own validator; I could not run it, I have no Postmark token), then without `--dry-run`.
+2. Make sure `POSTMARK_SENDING_ENABLED=true` and the token are set on the Render Dev service.
+3. Book as a Google client and as an Apple or Outlook one. Check: Meet link, `.ics` imports, "free until", total paid, and that your Google calendar shows no duplicate. Then reschedule and check the calendar moves.
+4. Tell me how it went; then I build PR 2.
+
+**Not verified:** nothing has been sent through Postmark (no token here); the template has not been through Postmark's validator (it uses plain `{{#section}}` blocks only); how Apple Calendar and Outlook treat the updated file in practice.
+
+---
+
 ## HANDOFF — 2026-11-17 (availability leaves out times Sharetribe holds)
 
 **Branch / PR:** `availability-sharetribe-filter`, one PR against `main`, not merged.

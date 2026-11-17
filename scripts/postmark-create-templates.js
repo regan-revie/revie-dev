@@ -1,5 +1,7 @@
 /**
- * Create Revie's Postmark email templates (session reminders and reschedule confirmations).
+ * Create Revie's Postmark email templates (the client's "You're booked", session reminders and
+ * reschedule confirmations). A template that already exists is left alone unless --overwrite is given,
+ * so adding "You're booked" (alias booking-confirmed-client) does not touch the others.
  * Run once, by hand:
  *
  *   POSTMARK_SERVER_TOKEN=<the revie-dev server token> node scripts/postmark-create-templates.js
@@ -56,6 +58,8 @@ const sampleModel = recipient =>
     clientTimeZone: null,
     meetLink: 'https://meet.google.com/abc-defg-hij',
     manageUrl: 'https://heyrevie.com/order/example',
+    payinTotal: { amount: 5000, currency: 'USD' },
+    outlookUrl: 'https://outlook.live.com/calendar/0/deeplink/compose?subject=Find%20your%20focus',
   });
 
 (async () => {

@@ -24,6 +24,7 @@ const variablesIn = text =>
 describe('Postmark templates', () => {
   it('has one template per email the code sends, under the aliases the code uses', () => {
     expect(Object.values(TEMPLATE_ALIASES).sort()).toEqual([
+      'booking-confirmed-client',
       'session-reminder-client',
       'session-reminder-coach',
       'session-rescheduled-client',
@@ -78,6 +79,70 @@ describe('Postmark templates', () => {
     Object.values(TEMPLATES).forEach(t => {
       expect(t.html).toMatch(/\{\{meetLink\}\}/);
       expect(t.html).toMatch(/\{\{manageUrl\}\}/);
+    });
+  });
+
+  describe('the client\'s "You\'re booked" email', () => {
+    const t = TEMPLATES['booking-confirmed-client'];
+
+    it('says it, with the session, the coach and the length', () => {
+      expect(t.subject).toBe("You're booked: {{sessionName}} with {{coachName}}");
+      [t.html, t.text].forEach(body => {
+        expect(body).toMatch(/You're booked/);
+        expect(body).toMatch(/\{\{coachName\}\}/);
+        expect(body).toMatch(/\{\{lengthText\}\}/);
+        expect(body).toMatch(/\{\{timeZoneName\}\}/);
+      });
+    });
+
+    it('has Join on Google Meet, Add to Outlook and See your booking, as buttons, in maroon', () => {
+      expect(t.html).toContain('Join on Google Meet');
+      expect(t.html).toContain('Add to Outlook');
+      expect(t.html).toContain('See your booking');
+      expect(t.html).toMatch(/\{\{outlookCalendarUrl\}\}/);
+      expect(t.html).toContain(`background-color:${MAROON}`);
+    });
+
+    it('has no "Add to Google Calendar": it says the session is already there, and points the rest at the attached file', () => {
+      [t.html, t.text].forEach(body => {
+        expect(body).not.toMatch(/Add to Google Calendar/i);
+        expect(body).toContain("Using Google Calendar? It's already there.");
+        expect(body).toMatch(/attached calendar file/);
+      });
+    });
+
+    it('says what was paid, only when there is an amount', () => {
+      expect(t.html).toMatch(
+        /\{\{#hasTotalPaid\}\}[\s\S]*Total paid: \{\{totalPaid\}\}[\s\S]*\{\{\/hasTotalPaid\}\}/
+      );
+      expect(t.text).toMatch(/Total paid: \{\{totalPaid\}\}/);
+    });
+
+    it('states the refund rule in one line, and a different line when there is no free window', () => {
+      [t.html, t.text].forEach(body => {
+        expect(body).toContain(
+          "Free to cancel or move until {{freeUntil}}. After that, it's charged in full."
+        );
+        expect(body).toContain(
+          "This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full."
+        );
+        expect(body).toMatch(/\{\{#freeWindowOpen\}\}/);
+        expect(body).toMatch(/\{\{#freeWindowClosed\}\}/);
+      });
+    });
+  });
+
+  it('the client reschedule email says when it is free to cancel or move until, and points at the updated calendar file', () => {
+    const t = TEMPLATES['session-rescheduled-client'];
+    [t.html, t.text].forEach(body => {
+      expect(body).toMatch(/\{\{freeUntil\}\}/);
+      expect(body).toMatch(/attached calendar file/);
+    });
+  });
+
+  it("the coach's emails say nothing about the client's calendar file or refund rule", () => {
+    ['session-reminder-coach', 'session-rescheduled-coach'].forEach(alias => {
+      expect(TEMPLATES[alias].text).not.toMatch(/calendar file|charged in full/);
     });
   });
 });

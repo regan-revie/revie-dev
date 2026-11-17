@@ -575,7 +575,10 @@ const queueSessionEmail = async ({
 };
 
 /** Cancel a booking's emails that have not gone out (only pending ones; a sent one stays sent). */
-const cancelSessionEmails = async (nylasBookingId, kinds = ['reminder', 'rescheduled']) => {
+const cancelSessionEmails = async (
+  nylasBookingId,
+  kinds = ['reminder', 'rescheduled', 'confirmed']
+) => {
   const { rows } = await query(
     `UPDATE session_emails SET status = 'cancelled', updated_at = now()
       WHERE nylas_booking_id = $1 AND kind = ANY($2) AND status = 'pending'
@@ -624,6 +627,80 @@ const retrySessionEmail = async (dedupeKey, lastError) => {
       WHERE dedupe_key = $1 AND status = 'sending'`,
     [dedupeKey, lastError]
   );
+};
+
+/**
+ * Put a claimed email back for another look in `seconds`, without counting it as a failed try. Used
+ * when an email is waiting for something that is not an error (the Meet link not existing yet).
+ */
+const postponeSessionEmail = async (dedupeKey, seconds) => {
+  await query(
+    `UPDATE session_emails
+        SET status = 'pending', send_at = now() + ($2 || ' seconds')::interval,
+            attempts = GREATEST(attempts - 1, 0), updated_at = now()
+      WHERE dedupe_key = $1 AND status = 'sending'`,
+    [dedupeKey, String(seconds)]
+  );
+};
+
+/** One queued email by its key, or null. */
+const getSessionEmail = async dedupeKey => {
+  const { rows } = await query(`SELECT * FROM session_emails WHERE dedupe_key = $1`, [dedupeKey]);
+  return rows[0] || null;
+};
+
+/**
+ * How many times the client has been told this booking moved. The next calendar file for the booking
+ * carries one more than this as its SEQUENCE, so an app knows it is a newer copy of the same event.
+ */
+const countRescheduleEmails = async nylasBookingId => {
+  const { rows } = await query(
+    `SELECT count(*)::int AS n FROM session_emails
+      WHERE nylas_booking_id = $1 AND kind = 'rescheduled' AND recipient = 'client'
+        AND status <> 'cancelled'`,
+    [nylasBookingId]
+  );
+  return rows[0] ? rows[0].n : 0;
+};
+
+/**
+ * Active bookings made recently that have no "You're booked" email queued: the webhook that should
+ * have queued it did not (a crash between accepting and queueing, say). Limited to recent bookings so
+ * that switching this on never emails someone about a session they booked long ago.
+ */
+const findBookingsMissingConfirmation = async (withinHours = 24, limit = 20) => {
+  const { rows } = await query(
+    `SELECT b.* FROM nylas_bookings b
+      WHERE b.status IN ('created', 'rescheduled')
+        AND b.created_at > now() - ($1 || ' hours')::interval
+        AND b.booking_start > now()
+        AND NOT EXISTS (
+          SELECT 1 FROM session_emails e
+           WHERE e.nylas_booking_id = b.nylas_booking_id AND e.kind = 'confirmed')
+      ORDER BY b.created_at
+      LIMIT $2`,
+    [String(withinHours), limit]
+  );
+  return rows;
+};
+
+/**
+ * "You're booked" emails still unsent a while after they were due, claimed here so each is reported
+ * once: marked in the same statement that returns them.
+ */
+const claimOverdueConfirmations = async (minutes = 30) => {
+  const { rows } = await query(
+    `UPDATE session_emails
+        SET details = COALESCE(details, '{}'::jsonb) || '{"alerted": true}'::jsonb,
+            updated_at = now()
+      WHERE kind = 'confirmed'
+        AND status IN ('pending', 'sending')
+        AND send_at < now() - ($1 || ' minutes')::interval
+        AND COALESCE((details->>'alerted')::boolean, false) = false
+      RETURNING dedupe_key, nylas_booking_id, status, attempts, send_at`,
+    [String(minutes)]
+  );
+  return rows;
 };
 
 /** Active upcoming bookings more than `leadHours` away that have never had a reminder queued. */
@@ -717,6 +794,11 @@ module.exports = {
   claimDueSessionEmails,
   finishSessionEmail,
   retrySessionEmail,
+  postponeSessionEmail,
+  getSessionEmail,
+  countRescheduleEmails,
+  findBookingsMissingConfirmation,
+  claimOverdueConfirmations,
   findBookingsMissingReminders,
   findVerifiedEventIdForBooking,
   scheduleEventCancellation,

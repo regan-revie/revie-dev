@@ -12,6 +12,30 @@ describe('sendTemplateEmail()', () => {
     else process.env.POSTMARK_SERVER_TOKEN = OLD;
   });
 
+  it('attaches files when given them, in the shape Postmark takes, and none when not', async () => {
+    const fetchFn = jest.fn(async () => okResponse({ ErrorCode: 0, MessageID: 'm-2' }));
+    await postmark.sendTemplateEmail({
+      to: 'client@example.com',
+      templateAlias: 'booking-confirmed-client',
+      model: {},
+      attachments: [
+        { name: 'revie-session.ics', content: 'QkVHSU4=', contentType: 'text/calendar' },
+      ],
+      fetchFn,
+    });
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body).Attachments).toEqual([
+      { Name: 'revie-session.ics', Content: 'QkVHSU4=', ContentType: 'text/calendar' },
+    ]);
+
+    await postmark.sendTemplateEmail({
+      to: 'client@example.com',
+      templateAlias: 'session-reminder-client',
+      model: {},
+      fetchFn,
+    });
+    expect(JSON.parse(fetchFn.mock.calls[1][1].body)).not.toHaveProperty('Attachments');
+  });
+
   it('sends by template alias from Revie, with the model, to the transactional stream', async () => {
     const fetchFn = jest.fn(async () => okResponse({ ErrorCode: 0, MessageID: 'm-1' }));
     const result = await postmark.sendTemplateEmail({
