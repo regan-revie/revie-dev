@@ -85,20 +85,26 @@ export const slotMatchesVariant = (slot, priceVariant) => {
  * `longGeneric` is exactly that form. Falls back to the long name, then to the zone id, on an
  * environment that cannot produce it.
  */
+// Where the standard name is not how people say it. The same list is in the server's emails
+// (server/api/nylas/sessionEmailModel.js).
+const FRIENDLY_ZONE_NAMES = { 'United Kingdom Time': 'UK time' };
+
 export const formatTimeZoneName = (timeZone, date = new Date(), locale = 'en-US') => {
-  const nameOf = timeZoneName => {
-    const part = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName })
+  const nameOf = zoneNameStyle => {
+    const part = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: zoneNameStyle })
       .formatToParts(new Date(date))
       .find(p => p.type === 'timeZoneName');
     return part && part.value;
   };
+  let name;
   try {
-    return nameOf('longGeneric') || nameOf('long') || timeZone;
+    name = nameOf('longGeneric') || nameOf('long') || timeZone;
   } catch (e) {
     try {
-      return nameOf('long') || timeZone;
+      name = nameOf('long') || timeZone;
     } catch (e2) {
-      return timeZone;
+      name = timeZone;
     }
   }
+  return FRIENDLY_ZONE_NAMES[name] || name;
 };

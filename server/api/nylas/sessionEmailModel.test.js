@@ -38,7 +38,8 @@ describe('formatting a time in a timezone', () => {
     expect(formatZoneName(summer, 'America/Los_Angeles')).toBe('Pacific Time');
     expect(formatZoneName(winter, 'America/New_York')).toBe('Eastern Time');
     expect(formatZoneName(winter, 'America/Chicago')).toBe('Central Time');
-    expect(formatZoneName(winter, 'Europe/London')).toBe('United Kingdom Time');
+    expect(formatZoneName(winter, 'Europe/London')).toBe('UK time');
+    expect(formatZoneName(summer, 'Europe/London')).toBe('UK time');
   });
 });
 
@@ -88,7 +89,7 @@ describe("the client's email", () => {
     const model = clientModel({ clientTimeZone: undefined });
     expect(model.sessionTime).toBe('3:00 pm to 4:00 pm');
     expect(model.timeZoneNote).toBe(
-      "We don't have your timezone, so these times are in Sam Coach's timezone: United Kingdom Time."
+      "We don't have your timezone, so these times are in Sam Coach's timezone: UK time."
     );
   });
 
@@ -194,12 +195,23 @@ describe('the booking confirmation fields', () => {
     expect(model.freeUntil).toBe('Monday 23 November, 10:00 am (Pacific Time)');
     expect(model.freeWindowOpen).toBe(true);
     expect(model.freeWindowClosed).toBe(false);
+    // The text the templates print: the whole value when open, nothing when it does not apply.
+    expect(model.freeUntilOpen).toBe(model.freeUntil);
   });
 
   it('says there is no free window when the session is less than 48 hours away', () => {
     const model = confirmed({ start: '2026-11-18T18:00:00Z', end: '2026-11-18T19:00:00Z' });
     expect(model.freeWindowOpen).toBe(false);
     expect(model.freeWindowClosed).toBe(true);
+    expect(model.freeUntilOpen).toBe('');
+  });
+
+  it('has no free-until at all, and neither flag, when the start cannot be read (the caller reports it)', () => {
+    const model = confirmed({ start: 'not a time', end: 'not a time' });
+    expect(model.freeUntil).toBe('');
+    expect(model.freeUntilOpen).toBe('');
+    expect(model.freeWindowOpen).toBe(false);
+    expect(model.freeWindowClosed).toBe(false);
   });
 
   it('is open right up to the 48-hour mark and closed after it', () => {

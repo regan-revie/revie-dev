@@ -19,6 +19,30 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-17 (booked email blanks fixed; release-7 on Dev)
+
+**Branch / PR:** `booked-email-fixes-release-7`, one PR against `main`, not merged. Release-7 is already pushed to Dev (below), not Test or Live.
+
+**1. Why "Total paid:" and "Free to cancel or move until ." were blank.** Not missing data (the model had both). Postmark's template engine looks a variable up *inside* `{{#name}}...{{/name}}` in the section's own value, so `{{#hasTotalPaid}}Total paid: {{totalPaid}}{{/hasTotalPaid}}` printed the label and nothing else (Postmark's docs: "variables resolve within the section's own object scope"; a scalar is printed with `{{.}}`). I could not run Postmark to see it; the fit with the evidence is exact: the two blanks were the only values inside sections, while everything outside a section printed. **The same flaw hit the Meet and Outlook buttons** (the link inside `{{#hasMeetLink}}`), in the booked, reminder and reschedule emails: their links were likely empty too. Fixed in all templates; the catch-up path uses the same code, so it was never different.
+- New form: `{{#totalPaid}}Total paid: {{.}}{{/totalPaid}}`, `{{#freeUntilOpen}}Free to cancel or move until {{.}}...{{/freeUntilOpen}}`, `{{#meetLink}}`, `{{#outlookCalendarUrl}}`, `{{#timeZoneNote}}`. Total paid comes from the transaction's payin total and currency; free-until is the session start minus 48 hours in the client's zone with the zone name.
+- A value that cannot be worked out: the email still goes and Sentry gets `postmark-confirmation-missing-field` (booking id and the field names), once per email.
+- **Sentry "for template undefined":** every send in the code passes the alias (tests assert it); I could not find the path that sent none, so a send with no alias now fails loudly ("called without a templateAlias" / "no Postmark template for a <kind> email to the <recipient>"), the failure message names the alias, and the Sentry event carries `templateAlias`.
+- **"UK time"** replaces "United Kingdom Time" in all emails and on the page ("Pacific Time", "Eastern Time" unchanged).
+
+**2. Release-7 (Dev only).** `ext/transaction-processes/default-booking/process.edn` no longer has `:notification/booking-operator-accepted-request-to-customer`; the graph is otherwise release-6's. Pushed to Dev as **version 8, alias `release-7`** (flex-cli warns the template `booking-accepted-request` is now unused: expected). The three enabled Dev listings (Test 2, Test Session 1, Test Session) were moved and re-stamped; the reconcile loop reports them `unchanged`. `render.yaml` now sets `BOOKING_PROCESS_ALIAS=default-booking/release-7`. Test and Live are untouched.
+
+**For Regan, in this order**
+1. **Merge this PR.** Render redeploys.
+2. **Update the Postmark templates** (the blanks are in the templates, so the code fix alone changes nothing). In the Render Shell of the Dev service (the token is already in its environment):
+   `node scripts/postmark-create-templates.js --dry-run` then `node scripts/postmark-create-templates.js --overwrite`
+   `--overwrite` replaces all four templates (booked, reminder, reschedule x2) with the repo's wording, which is what is needed since the reminder and reschedule templates had the same flaw; any wording you edited by hand in Postmark is replaced.
+3. **Render environment:** set `BOOKING_PROCESS_ALIAS` to `default-booking/release-7` (it is the value in `render.yaml` too; if the Dev service holds its own value, change it there).
+4. **Test (book 3+ days out as a Gmail client, on a Dev listing):** you should get **one** booked email (Revie's), with: "Total paid: $…" filled in; "Free to cancel or move until <a date and time> (<your zone>)"; a working Join on Google Meet button; Add to Outlook; the attached calendar file. There must be no second "booked" email from Sharetribe. (Bookings made before step 3, or on release-6, still send the old one as well; that is expected.) Then reschedule and check the moved email and calendar. If Sentry shows `postmark-confirmation-missing-field`, send me the booking.
+
+**Not verified:** nothing has been sent through Postmark from here (no token), so the template fix is verified against a stand-in for Postmark's scoping rule, not Postmark itself; `--dry-run` is Postmark's own validation.
+
+---
+
 ## HANDOFF — 2026-11-17 (the client's "You're booked" email, via Postmark)
 
 **Branch / PR:** `booking-confirmed-email`, one PR against `main`, not merged. **PR 2 (release-7, stopping Sharetribe's booked email to the client) is deliberately not built: it waits for Regan's test of this one.**

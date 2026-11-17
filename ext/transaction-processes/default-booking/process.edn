@@ -1,3 +1,12 @@
+;; Revie changes (release-7, see docs/tech-constraints.md "The client's You're booked email"):
+;; - Removed :notification/booking-operator-accepted-request-to-customer, Sharetribe's "booked" email to
+;;   the client (template booking-accepted-request). The client's confirmation is now Revie's own
+;;   email, sent by Postmark (server/api/nylas/sessionEmails.js, alias booking-confirmed-client), with
+;;   the time in the client's own timezone, the Meet link and a calendar file. The graph is unchanged
+;;   from release-6, and the coach's booked email (:notification/booking-operator-accepted-request-to-
+;;   provider) is kept.
+;; - Transactions already started stay on their own version and keep sending the old email; only new
+;;   bookings on a listing whose alias is release-7 stop.
 ;; Revie changes (release-6, see docs/decisions.md and docs/tech-constraints.md "Sharetribe's booking follows a reschedule"):
 ;; - :transition/update-booking (operator, :state/accepted -> :state/accepted) runs :action/update-booking,
 ;;   so a client's reschedule moves Sharetribe's booking to the new time as well as the calendar event.
@@ -229,10 +238,6 @@
    :on :transition/cancel,
    :to :actor.role/provider,
    :template :booking-canceled-to-provider}
-  {:name :notification/booking-operator-accepted-request-to-customer,
-   :on :transition/operator-accept,
-   :to :actor.role/customer,
-   :template :booking-accepted-request}
   {:name :notification/booking-operator-accepted-request-to-provider,
    :on :transition/operator-accept,
    :to :actor.role/provider,

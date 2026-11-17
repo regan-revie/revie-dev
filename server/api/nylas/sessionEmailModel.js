@@ -15,8 +15,15 @@ const { isValidTimeZone } = require('./hours');
 
 const LOCALE = 'en-GB';
 
-const part = (date, timeZone, options) =>
-  new Intl.DateTimeFormat(LOCALE, { timeZone, ...options }).format(date);
+// An unreadable date prints as nothing rather than throwing, so an email can still go out and the
+// caller (sessionEmails.js) reports what is missing.
+const part = (date, timeZone, options) => {
+  try {
+    return new Intl.DateTimeFormat(LOCALE, { timeZone, ...options }).format(date);
+  } catch (e) {
+    return '';
+  }
+};
 
 /** "Thursday 14 November" */
 const formatDate = (date, timeZone) =>
@@ -26,8 +33,12 @@ const formatDate = (date, timeZone) =>
 const formatTime = (date, timeZone) =>
   part(date, timeZone, { hour: 'numeric', minute: '2-digit', hour12: true });
 
+// Where the standard name is not how people say it. The same list is in the page's own
+// formatTimeZoneName (src/components/OrderPanel/NylasBookingForm/nylasSlots.js).
+const FRIENDLY_ZONE_NAMES = { 'United Kingdom Time': 'UK time' };
+
 /**
- * The zone as people say it on that date: "Pacific Time", "Eastern Time", "United Kingdom Time".
+ * The zone as people say it on that date: "Pacific Time", "Eastern Time", "UK time".
  * `longGeneric` is exactly that form (no "Standard"/"Daylight", which would be wrong half the year);
  * it falls back to the long name, then to the zone id, where it cannot be produced.
  */
@@ -38,15 +49,17 @@ const formatZoneName = (date, timeZone) => {
       .find(p => p.type === 'timeZoneName');
     return found && found.value;
   };
+  let name;
   try {
-    return nameOf('longGeneric') || nameOf('long') || timeZone;
+    name = nameOf('longGeneric') || nameOf('long') || timeZone;
   } catch (e) {
     try {
-      return nameOf('long') || timeZone;
+      name = nameOf('long') || timeZone;
     } catch (e2) {
-      return timeZone;
+      name = timeZone;
     }
   }
+  return FRIENDLY_ZONE_NAMES[name] || name;
 };
 
 const HOUR_MS = 3600000;
@@ -167,16 +180,20 @@ const buildSessionEmailModel = ({
     hasTotalPaid: Boolean(formatMoney(payinTotal)),
   };
 
-  // Free to cancel or move until 48 hours before the start. Two flags rather than a section and its
-  // opposite, because Postmark's templates are kept to plain {{#section}}s here.
+  // Free to cancel or move until 48 hours before the start, in the recipient's zone. Each value that
+  // the templates print is the whole text itself (or '' when it does not apply), because a Postmark
+  // section shows a value with {{.}} (see server/email/templates.js). `freeWindowOpen` and
+  // `freeWindowClosed` are kept as plain flags; with an unreadable start neither is set, and the
+  // caller reports it.
   const freeUntilDate = new Date(startDate.getTime() - FREE_WINDOW_MS);
-  const open = freeUntilDate.getTime() > now;
-  model.freeUntil = `${formatDate(freeUntilDate, timeZone)}, ${formatTime(
-    freeUntilDate,
-    timeZone
-  )} (${zoneName})`;
+  const hasStart = Number.isFinite(freeUntilDate.getTime());
+  const open = hasStart && freeUntilDate.getTime() > now;
+  model.freeUntil = hasStart
+    ? `${formatDate(freeUntilDate, timeZone)}, ${formatTime(freeUntilDate, timeZone)} (${zoneName})`
+    : '';
   model.freeWindowOpen = open;
-  model.freeWindowClosed = !open;
+  model.freeUntilOpen = open ? model.freeUntil : '';
+  model.freeWindowClosed = hasStart && !open;
 
   if (oldStart && oldEnd) {
     const was = new Date(oldStart);

@@ -442,10 +442,32 @@ const processDueSessionEmails = async ({
         continue; // eslint-disable-line no-continue
       }
 
+      // A value the email should print that could not be worked out: it still goes (a confirmation
+      // with a gap beats none), and it is reported so it is never a silent blank.
+      if (row.kind === 'confirmed') {
+        const missing = [!model.totalPaid && 'totalPaid', !model.freeUntil && 'freeUntil'].filter(
+          Boolean
+        );
+        if (missing.length > 0) {
+          log.error(
+            new Error(`"You're booked" for booking ${bookingId} is missing: ${missing.join(', ')}`),
+            'postmark-confirmation-missing-field',
+            { bookingId, fields: missing }
+          );
+        }
+      }
+
+      const templateAlias = templateAliasFor(row);
+      if (!templateAlias) {
+        throw new Error(
+          `There is no Postmark template for a ${row.kind} email to the ${row.recipient}`
+        );
+      }
+
       // eslint-disable-next-line no-await-in-loop
       await send({
         to,
-        templateAlias: templateAliasFor(row),
+        templateAlias,
         model,
         tag: row.kind,
         ...(attachments && attachments.length ? { attachments } : {}),
@@ -463,6 +485,7 @@ const processDueSessionEmails = async ({
         bookingId,
         attempt: row.attempts,
         domain,
+        templateAlias: templateAliasFor(row) || null,
       });
       if (row.attempts >= MAX_ATTEMPTS) {
         // eslint-disable-next-line no-await-in-loop

@@ -15,6 +15,7 @@
  *   use-release-4   set it to default-booking/release-4 (late cancellations get their own state)
  *   use-release-5   set it to default-booking/release-5 (corrected cancellation emails)
  *   use-release-6   set it to default-booking/release-6 (Sharetribe's booking follows a reschedule)
+ *   use-release-7   set it to default-booking/release-7 (no Sharetribe booked email to the client)
  *
  * Every command except `status` changes the listing and needs --yes. It reads the Integration API
  * credentials from the environment (via `op run`) and never prints them. Whatever environment
@@ -53,10 +54,11 @@ if (
     'use-release-4',
     'use-release-5',
     'use-release-6',
+    'use-release-7',
   ].includes(command)
 ) {
   fail(
-    'Usage: node scripts/dev-listing-test-helper.js <status|break|restore|use-release-1|use-release-2|use-release-3|use-release-4|use-release-5|use-release-6> --listing <id> [--yes]'
+    'Usage: node scripts/dev-listing-test-helper.js <status|break|restore|use-release-1|use-release-2|use-release-3|use-release-4|use-release-5|use-release-6|use-release-7> --listing <id> [--yes]'
   );
 }
 if (!listingId) fail('--listing <id> is required');

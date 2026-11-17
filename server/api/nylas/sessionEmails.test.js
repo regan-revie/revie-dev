@@ -467,7 +467,7 @@ describe('sending', () => {
     advance(48);
     await emails.processDueSessionEmails({ send });
     const client = sent.find(s => s.templateAlias === 'session-reminder-client');
-    expect(client.model.timeZoneNote).toMatch(/Sam's timezone: United Kingdom Time/);
+    expect(client.model.timeZoneNote).toMatch(/Sam's timezone: UK time/);
   });
 
   it('sends the email without a Meet link rather than not at all when the link cannot be read', async () => {
@@ -983,6 +983,70 @@ describe('"You\'re booked" (the client\'s confirmation)', () => {
       await emails.processDueSessionEmails({ send });
       expect(confirmedRows()[0]).toMatchObject({ status: 'skipped', last_error: 'inactive' });
       expect(log.error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a value that cannot be worked out', () => {
+    const withoutAmount = () =>
+      integration.loadTransactionAsOperator.mockImplementation(async () => ({
+        tx: {
+          id: { uuid: TX },
+          attributes: { protectedData: { clientTimeZone: 'America/New_York' } },
+        },
+        listing: {
+          attributes: {
+            title: 'Find your focus',
+            availabilityPlan: { timezone: 'Europe/London' },
+            publicData: { nylasCalendarId: 'cal-1' },
+          },
+        },
+        customer: {
+          attributes: { email: 'alex@client.example', profile: { displayName: 'Alex' } },
+        },
+        provider: {
+          attributes: {
+            email: 'sam@coach.example',
+            profile: { displayName: 'Sam', privateData: {} },
+          },
+        },
+      }));
+
+    it('still sends, and reports the missing field to Sentry with the booking and the field names', async () => {
+      withoutAmount();
+      await queue(72);
+      const summary = await emails.processDueSessionEmails({ send });
+
+      expect(summary.sent).toBe(1);
+      expect(sent[0].model.totalPaid).toBe('');
+      expect(log.error).toHaveBeenCalledWith(
+        expect.any(Error),
+        'postmark-confirmation-missing-field',
+        { bookingId: BOOKING, fields: ['totalPaid'] }
+      );
+    });
+
+    it('reports once per email, not on every tick it waits for the Meet link', async () => {
+      withoutAmount();
+      nylasRequest.mockResolvedValue({ conferencing: null });
+      await queue(72);
+      await emails.processDueSessionEmails({ send });
+      advanceMinutes(2);
+      await emails.processDueSessionEmails({ send });
+      expect(log.error).not.toHaveBeenCalled(); // still waiting: nothing sent, nothing reported
+      advanceMinutes(11);
+      await emails.processDueSessionEmails({ send });
+      const reports = log.error.mock.calls.filter(
+        c => c[1] === 'postmark-confirmation-missing-field'
+      );
+      expect(reports).toHaveLength(1);
+    });
+
+    it('says nothing when everything is there', async () => {
+      await queue(72);
+      await emails.processDueSessionEmails({ send });
+      expect(log.error).not.toHaveBeenCalled();
+      expect(sent[0].model.totalPaid).toBe('$50.00');
+      expect(sent[0].model.freeUntil).not.toBe('');
     });
   });
 
