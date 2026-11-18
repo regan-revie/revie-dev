@@ -14,6 +14,7 @@ import {
   isValidCurrencyForTransactionProcess,
 } from '../../../../util/fieldHelpers';
 import { maxLength, required, composeValidators } from '../../../../util/validators';
+import { OUTCOME_KEYS } from '../../../../util/sessionOutcomes';
 
 // Import shared components
 import {
@@ -24,6 +25,9 @@ import {
   Heading,
   CustomExtendedDataField,
 } from '../../../../components';
+// Revie: the three session outcomes get one purpose-built block (live character count, help text)
+// instead of three generic inputs; added as its own file to keep this core file's diff small.
+import SessionOutcomesField from '../../../../components/SessionOutcomes/SessionOutcomesField';
 // Import modules from this directory
 import css from './EditListingDetailsForm.module.css';
 
@@ -248,9 +252,33 @@ const AddListingFields = props => {
   const { listingType, listingFieldsConfig, selectedCategories, formId, intl } = props;
   const targetCategoryIds = Object.values(selectedCategories);
 
+  const outcomeConfigs = listingFieldsConfig.reduce(
+    (byKey, config) =>
+      OUTCOME_KEYS.includes(config?.key) ? { ...byKey, [config.key]: config } : byKey,
+    {}
+  );
+
   const fields = listingFieldsConfig.reduce((pickedFields, fieldConfig) => {
     const { key, schemaType, scope } = fieldConfig || {};
     const namespacedKey = scope === 'public' ? `pub_${key}` : `priv_${key}`;
+
+    // Revie: outcome_1..3 are drawn together as one block, at the position of outcome_1. Outcomes 2
+    // and 3 are skipped here. Nothing shows until outcome_1 exists in Console for this listing type.
+    if (OUTCOME_KEYS.includes(key)) {
+      const isFirstOutcome = key === OUTCOME_KEYS[0];
+      return isFirstOutcome &&
+        isFieldForListingType(listingType, fieldConfig) &&
+        isFieldForCategory(targetCategoryIds, fieldConfig)
+        ? [
+            ...pickedFields,
+            <SessionOutcomesField
+              key="session-outcomes"
+              formId={formId}
+              fieldConfigs={outcomeConfigs}
+            />,
+          ]
+        : pickedFields;
+    }
 
     const isKnownSchemaType = EXTENDED_DATA_SCHEMA_TYPES.includes(schemaType);
     const isProviderScope = ['public', 'private'].includes(scope);
