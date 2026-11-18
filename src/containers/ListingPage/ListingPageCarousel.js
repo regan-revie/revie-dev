@@ -54,6 +54,7 @@ import SectionAuthorMaybe from './SectionAuthorMaybe';
 import SectionMapMaybe from './SectionMapMaybe';
 import SectionGallery from './SectionGallery';
 import CustomListingFields from './CustomListingFields';
+import SessionOutcomesSection from '../../components/SessionOutcomes/SessionOutcomesSection';
 import ListingPageAccessWrapper from './ListingPageAccessWrapper';
 
 import css from './ListingPage.module.css';
@@ -272,6 +273,9 @@ export const ListingPageComponent = props => {
               )}
             </div>
             {showDescription && <SectionText text={description} showAsIngress />}
+
+            {/* Revie: the session's outcomes as a numbered list; hidden unless outcome 1 has text */}
+            <SessionOutcomesSection publicData={publicData} />
 
             <CustomListingFields
               publicData={publicData}

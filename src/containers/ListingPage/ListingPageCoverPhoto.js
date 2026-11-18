@@ -48,6 +48,7 @@ import {
   priceForSchemaMaybe,
   getDerivedRenderData,
 } from './ListingPage.shared';
+import SessionOutcomesSection from '../../components/SessionOutcomes/SessionOutcomesSection';
 import SectionHero from './SectionHero';
 import SectionReviews from './SectionReviews';
 import SectionAuthorMaybe from './SectionAuthorMaybe';
@@ -298,6 +299,9 @@ export const ListingPageComponent = props => {
               )}
             </div>
             {showDescription && <SectionText text={description} showAsIngress />}
+
+            {/* Revie: the session's outcomes as a numbered list; hidden unless outcome 1 has text */}
+            <SessionOutcomesSection publicData={publicData} />
 
             <CustomListingFields
               publicData={publicData}

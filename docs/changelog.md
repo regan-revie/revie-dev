@@ -19,6 +19,41 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-18 (session outcomes: three short fields replace the free-text "walk away with")
+
+**Branch / PR:** `session-outcomes-fields`, one PR against `main`, not merged. Independent of PR #42 (the 60-hour reminder); no shared files except `docs/changelog.md`, so expect a trivial conflict there whichever merges second.
+
+**What the "old field" turned out to be.** There is no field called "You'll walk away with" anywhere: not in the repo, not in Dev's hosted listing fields (`identity`, `communication_style`, `structure`, `language`, `coachlocation`, `pre_work`), and not in a hosted translation. On Live, coaches wrote it inside the **listing description**. So nothing was replaced or removed: the description stays as it is and stays required, and there is **no fallback**. You move the Live text by hand.
+
+**What changed**
+1. **Session editor (Details tab):** one block with Outcome 1 (required), Outcome 2 and Outcome 3 (optional), each at most 90 characters, with a live "34 / 90" count (it turns amber from 80), the help text "What will your client leave with? Be specific. One line each." and your three examples listed underneath as a plain list, not as placeholders (the inputs are empty with no placeholder). The block appears where `outcome_1` sits in Console's field order and only if `outcome_1` exists for the listing type.
+2. **Session page:** a plain numbered list (1-2-3) under "You'll walk away with", straight after the description, in both page layouts. Shown only when outcome 1 has text; otherwise the section is not there at all. A blank outcome 2 or 3 is skipped so the numbering never has a gap.
+3. **Where it lives:** listing `publicData.outcome_1`, `outcome_2`, `outcome_3`. New files: `src/util/sessionOutcomes.js` (limit, required check, what to show), `src/components/SessionOutcomes/` (editor block and page section). Small edits: `EditListingDetailsForm.js`, `ListingPageCarousel.js`, `ListingPageCoverPhoto.js`, 11 strings in `en.json`.
+4. **Tests (16 new):** outcome 1 required (empty, missing, spaces only), the 90-character limit (90 saves, 91 is refused, both as a validator and in the form), the live count, the examples are not placeholders, the page list is numbered and hidden without outcome 1, and the old description is never used as a fallback.
+
+**Console changes you need to make: none more on Dev.** I read Dev's hosted `listing-fields.json` just now: `outcome_1`, `outcome_2`, `outcome_3` exist as `shortText`, public, labels "Outcome 1/2/3", `outcome_1` has `saveConfig.required: true`, none is a search filter. That is exactly what the code expects. Notes:
+- **The 90-character limit cannot be set in Console** (it has no length setting for `shortText`), so the code enforces it. Until this is deployed to Render, the stock editor caps these fields at 70 characters.
+- Do **not** turn on "show on listing page" / "detail" for them in Console: the page section already shows them and you would get them twice.
+- **Existing sessions** have no outcome 1, so the first save of their Details tab will ask for it (Console's required flag already does this). Their pages simply show no outcomes section until then.
+- **Test and Live:** untouched. At cutover, add the same three fields there (logged in `docs/go-live-plan.md`).
+
+**Test steps on Dev** (after merging and Render redeploying; hard-refresh once)
+1. Log in as a coach, open a session, go to its Details tab. You should see the Outcome 1-3 block with the help text and three examples, and empty inputs.
+2. Type into Outcome 1: the count goes up as you type. Keep typing: it stops at 90. Paste a 150-character line: it is cut to 90.
+3. Leave Outcome 1 empty and save: "Add at least one outcome." and no save. The description is still required too.
+4. Fill Outcome 1 only, save, open the session page: a section "You'll walk away with" with one numbered line, under the description.
+5. Add Outcomes 2 and 3 (try clearing 2 and keeping 3 to see the list close up as 1, 2). Check both page layouts if you use both.
+6. Open a session that has no outcomes: no section, nothing blank in its place, description unchanged.
+7. Phone width: the count and examples should not overflow.
+
+**Not verified:** I have not looked at it in a browser (the private Dev marketplace needs a login), so spacing and colours are untested; only the tests and the config read above back it. The numbered list is deliberately plain until the session page redesign.
+
+**What's next**
+- Session page redesign picks up `outcomesOf()` from `src/util/sessionOutcomes.js` for the designed layout.
+- At cutover: create the three fields in Test and Live, and move Live's description text by hand.
+
+---
+
 ## HANDOFF — 2026-11-18 (60-hour reminder, "Add to calendar" link, Postmark switched on in render.yaml)
 
 **Branch / PR:** `reminder-60h-calendar-link`, one PR against `main`, not merged.
