@@ -130,7 +130,7 @@ const zoneFor = ({ recipient, coachTimeZone, clientTimeZone }) => {
  * @param {string} [params.meetLink]
  * @param {string} params.manageUrl the booking page for this recipient
  * @param {{amount: number, currency: string}} [params.payinTotal] what the client paid (minor units)
- * @param {string} [params.outlookUrl] the "Add to Outlook" link, built by sessionEmails.js
+ * @param {string} [params.calendarUrl] the "Add to calendar" link (the booking's calendar file)
  * @param {number} [params.now] injectable clock, for "free until"
  * @returns {object} the template model
  */
@@ -148,7 +148,7 @@ const buildSessionEmailModel = ({
   meetLink,
   manageUrl,
   payinTotal,
-  outlookUrl,
+  calendarUrl,
   now = Date.now(),
 }) => {
   const startDate = new Date(start);
@@ -174,8 +174,8 @@ const buildSessionEmailModel = ({
     meetLink: meetLink || '',
     hasMeetLink: Boolean(meetLink),
     manageUrl,
-    outlookCalendarUrl: outlookUrl || '',
-    hasOutlookLink: Boolean(outlookUrl),
+    calendarUrl: calendarUrl || '',
+    hasCalendarLink: Boolean(calendarUrl),
     totalPaid: formatMoney(payinTotal),
     hasTotalPaid: Boolean(formatMoney(payinTotal)),
   };

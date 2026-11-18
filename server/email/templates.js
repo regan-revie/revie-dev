@@ -19,6 +19,7 @@
 const MAROON = '#310416';
 
 const TEMPLATE_ALIASES = {
+  'reminder60-client': 'session-reminder-60h-client',
   'confirmed-client': 'booking-confirmed-client',
   'reminder-client': 'session-reminder-client',
   'reminder-coach': 'session-reminder-coach',
@@ -37,8 +38,8 @@ const when = (dateVar, timeVar) =>
 <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:${MAROON}">{{${timeVar}}} ({{timeZoneName}})</p>
 {{#timeZoneNote}}${p('{{.}}')}{{/timeZoneNote}}`;
 
-const outlookButton = () =>
-  `{{#outlookCalendarUrl}}${button('{{.}}', 'Add to Outlook')}{{/outlookCalendarUrl}}`;
+const calendarButton = () =>
+  `{{#calendarUrl}}${button('{{.}}', 'Add to calendar')}{{/calendarUrl}}`;
 
 // The refund rule in one line. Two sections rather than a section and its opposite.
 const policyLine = () =>
@@ -82,10 +83,10 @@ const TEMPLATES = {
         when('sessionDate', 'sessionTime'),
         p('{{lengthText}}'),
         meetButton(),
-        outlookButton(),
+        calendarButton(),
         button('{{manageUrl}}', 'See your booking'),
         small("Using Google Calendar? It's already there."),
-        small('Apple Calendar or another app? Open the attached calendar file.'),
+        small('Apple Calendar or Outlook? Tap Add to calendar.'),
         `{{#totalPaid}}${p('Total paid: {{.}}')}{{/totalPaid}}`,
         policyLine(),
       ].join('\n')
@@ -101,13 +102,13 @@ You're booked. Your session with {{coachName}} is confirmed.
 {{#meetLink}}
 Join on Google Meet: {{{.}}}
 {{/meetLink}}
-{{#outlookCalendarUrl}}
-Add to Outlook: {{{.}}}
-{{/outlookCalendarUrl}}
+{{#calendarUrl}}
+Add to calendar: {{{.}}}
+{{/calendarUrl}}
 See your booking: {{manageUrl}}
 
 Using Google Calendar? It's already there.
-Apple Calendar or another app? Open the attached calendar file.
+Apple Calendar or Outlook? Tap Add to calendar.
 {{#totalPaid}}
 
 Total paid: {{.}}
@@ -119,6 +120,37 @@ Free to cancel or move until {{.}}. After that, it's charged in full.
 {{#freeWindowClosed}}
 This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full.
 {{/freeWindowClosed}}
+
+Questions? Reply to this email or write to hello@heyrevie.com.
+
+Revie`,
+  },
+
+  'session-reminder-60h-client': {
+    name: 'Session reminder, 60 hours (client)',
+    subject: 'Coming up: {{sessionName}} with {{coachName}}',
+    html: layout(
+      [
+        p('Hi {{recipientName}},'),
+        p(
+          'Your session with {{coachName}} is on {{sessionDate}}, {{sessionTime}} ({{timeZoneName}}).'
+        ),
+        `{{#timeZoneNote}}${p('{{.}}')}{{/timeZoneNote}}`,
+        `{{#freeUntilOpen}}${p(
+          "Free to cancel or move until {{.}}. After that, it's charged in full."
+        )}{{/freeUntilOpen}}`,
+        button('{{manageUrl}}', 'See your booking'),
+      ].join('\n')
+    ),
+    text: `Hi {{recipientName}},
+
+Your session with {{coachName}} is on {{sessionDate}}, {{sessionTime}} ({{timeZoneName}}).
+{{timeZoneNote}}
+{{#freeUntilOpen}}
+Free to cancel or move until {{.}}. After that, it's charged in full.
+{{/freeUntilOpen}}
+
+See your booking: {{manageUrl}}
 
 Questions? Reply to this email or write to hello@heyrevie.com.
 

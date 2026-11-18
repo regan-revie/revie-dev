@@ -2,8 +2,9 @@
  * The calendar file (.ics) and calendar links attached to a client's session emails.
  *
  * Why: the client's own calendar is the only place a session is certain to be found, and clients use
- * every calendar app. The email carries a file Apple Calendar, Outlook and the rest can import, and
- * an "Add to Outlook" link; Google Calendar users already have the event.
+ * every calendar app. The email carries the file as an attachment and as an "Add to calendar" link
+ * (server/api/nylas/calendarLinkEndpoint.js serves the same file); Google Calendar users already
+ * have the event.
  *
  * The file is a plain event (METHOD:PUBLISH: nothing to accept or decline). Its UID is the same for
  * every email about one booking, and SEQUENCE goes up with each move, which is how an app that has
@@ -98,21 +99,4 @@ const icsAttachment = (ics, name = 'revie-session.ics') => ({
   contentType: 'text/calendar; charset=utf-8; method=PUBLISH',
 });
 
-/**
- * "Add to Outlook" (outlook.live.com's compose-event link; Microsoft 365 accounts are asked to sign
- * in there and reach the same form).
- */
-const outlookCalendarUrl = ({ start, end, summary, description, location }) => {
-  const params = new URLSearchParams({
-    path: '/calendar/action/compose',
-    rru: 'addevent',
-    subject: summary,
-    startdt: new Date(start).toISOString(),
-    enddt: new Date(end).toISOString(),
-    ...(description ? { body: description } : {}),
-    ...(location ? { location } : {}),
-  });
-  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
-};
-
-module.exports = { buildIcs, icsAttachment, outlookCalendarUrl, icsTime, escapeText, fold };
+module.exports = { buildIcs, icsAttachment, icsTime, escapeText, fold };

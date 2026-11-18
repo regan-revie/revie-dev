@@ -10,6 +10,7 @@ jest.mock('./client', () => ({ nylasRequest: jest.fn() }));
 jest.mock('./eventIdBackfill', () => ({ lookupEventId: jest.fn() }));
 
 const mockStore = { rows: new Map(), bookings: new Map(), eventIds: new Map() };
+const mockTxState = { last: 'transition/operator-accept' };
 jest.mock('./db', () => ({
   isAvailable: jest.fn(() => true),
   queueSessionEmail: jest.fn(async r => {
@@ -29,7 +30,7 @@ jest.mock('./db', () => ({
     return true;
   }),
   cancelSessionEmails: jest.fn(
-    async (bookingId, kinds = ['reminder', 'rescheduled', 'confirmed']) => {
+    async (bookingId, kinds = ['reminder', 'reminder60', 'rescheduled', 'confirmed']) => {
       let n = 0;
       mockStore.rows.forEach(r => {
         if (r.nylas_booking_id === bookingId && kinds.includes(r.kind) && r.status === 'pending') {
@@ -127,6 +128,7 @@ jest.mock('./db', () => ({
       attempts: r.attempts,
     }));
   }),
+  getOrCreateCalendarToken: jest.fn(async id => `tok-${id}`),
   findByBookingId: jest.fn(async id => mockStore.bookings.get(id) || null),
   // Only ids Nylas itself has given us (verified) are ever returned.
   findVerifiedEventIdForBooking: jest.fn(async id => mockStore.eventIds.get(id) || null),
@@ -164,6 +166,7 @@ const load = () => {
       attributes: {
         protectedData: { clientTimeZone: 'America/New_York' },
         payinTotal: { amount: 5000, currency: 'USD' },
+        lastTransition: mockTxState.last,
       },
     },
     listing: {
@@ -216,6 +219,7 @@ beforeEach(() => {
   mockStore.rows.clear();
   mockStore.bookings.clear();
   mockStore.eventIds.clear();
+  mockTxState.last = 'transition/operator-accept';
   sent.length = 0;
   // Mock implementations do not survive between tests in this setup, so it is set here.
   send.mockImplementation(async args => {
@@ -858,7 +862,9 @@ describe('"You\'re booked" (the client\'s confirmation)', () => {
         manageUrl: 'https://revie-dev.onrender.com/order/tx-1',
       });
       expect(mail.model.freeUntil).toMatch(/\(Eastern Time\)$/);
-      expect(mail.model.outlookCalendarUrl).toMatch(/^https:\/\/outlook\.live\.com\//);
+      expect(mail.model.calendarUrl).toBe(
+        'https://revie-dev.onrender.com/api/nylas/calendar/tok-bk-1/revie-session.ics'
+      );
       expect(confirmedRows()[0].status).toBe('sent');
     });
 
@@ -1226,5 +1232,203 @@ describe("the client's reschedule email and its calendar file", () => {
     const client = sent.find(s => s.templateAlias === 'session-rescheduled-client');
     expect(client.model).toMatchObject({ freeWindowOpen: true, timeZoneName: 'Eastern Time' });
     expect(client.model.freeUntil).toMatch(/\(Eastern Time\)$/);
+  });
+});
+
+// --- the client's 60-hour reminder ------------------------------------------------------------------
+
+describe('the 60-hour reminder (client only)', () => {
+  const rows60 = status => rowsOf(status).filter(r => r.kind === 'reminder60');
+  const queue60 = async (startHours, extra) => {
+    const start = makeBooking(startHours, extra);
+    return emails.schedule60hReminder({ bookingId: BOOKING, sessionStart: start });
+  };
+  const ALIAS = 'session-reminder-60h-client';
+
+  describe('queueing', () => {
+    it('queues one for the client, due 60 hours before the start, for a booking made more than 60 hours ahead', async () => {
+      expect(await queue60(100)).toEqual({ queued: 1 });
+      expect(rows60()).toHaveLength(1);
+      const row = rows60()[0];
+      expect(row.recipient).toBe('client');
+      expect(row.send_at.getTime() - Date.now()).toBeCloseTo(40 * HOUR, -4);
+    });
+
+    it('is once per booking and start time: asking again queues nothing more', async () => {
+      await queue60(100);
+      expect(await queue60(100)).toMatchObject({ queued: 0 });
+    });
+
+    it('queues nothing for a booking made inside 60 hours (its "You\'re booked" already says when it is free until)', async () => {
+      expect(await queue60(59)).toEqual({ queued: 0, skipped: 'under-60h' });
+      expect(rows60()).toHaveLength(0);
+    });
+  });
+
+  describe('a reschedule', () => {
+    const move = (from, to) =>
+      emails.rescheduleEmails({
+        bookingId: BOOKING,
+        oldStart: at(from),
+        oldEnd: at(from + 1),
+        newStart: at(to),
+        newEnd: at(to + 1),
+      });
+
+    it('follows the new time: the old one is cancelled and a new one queued for 60 hours before it', async () => {
+      await queue60(100);
+      await move(100, 130);
+      expect(rows60('cancelled')).toHaveLength(1);
+      const pending = rows60('pending');
+      expect(pending).toHaveLength(1);
+      expect(pending[0].session_start.getTime()).toBe(at(130).getTime());
+    });
+
+    it('queues none when the 60-hour mark has already passed for the new time, and still cancels the old', async () => {
+      await queue60(100);
+      await move(100, 70 - 20); // 50 hours out
+      expect(rows60('pending')).toHaveLength(0);
+      expect(rows60('cancelled')).toHaveLength(1);
+    });
+
+    it('sends none to the coach', async () => {
+      await queue60(100);
+      await move(100, 130);
+      expect(rowsOf().filter(r => r.kind === 'reminder60' && r.recipient === 'coach')).toHaveLength(
+        0
+      );
+    });
+  });
+
+  describe('sending', () => {
+    it('goes to the client by its own template, with the date, the free-until time in their zone, and the booking link', async () => {
+      await queue60(100);
+      advance(40);
+      const summary = await emails.processDueSessionEmails({ send });
+
+      expect(summary).toMatchObject({ sent: 1, skipped: 0 });
+      const mail = sent[0];
+      expect(mail.to).toBe('alex@client.example');
+      expect(mail.templateAlias).toBe(ALIAS);
+      expect(mail.tag).toBe('reminder60');
+      expect(mail.attachments).toBeUndefined();
+      expect(mail.model).toMatchObject({
+        recipientName: 'Alex',
+        coachName: 'Sam Coach',
+        timeZoneName: 'Eastern Time',
+        manageUrl: 'https://revie-dev.onrender.com/order/tx-1',
+      });
+      expect(mail.model.freeUntilOpen).toMatch(/\(Eastern Time\)$/);
+    });
+
+    it.each([
+      ['cancelled', 'transition/cancel'],
+      ['declined', 'transition/operator-decline'],
+      ['late-cancelled', 'transition/late-cancel'],
+      ['expired', 'transition/expire'],
+    ])('never goes for a %s transaction', async (_, transition) => {
+      await queue60(100);
+      advance(40);
+      mockTxState.last = transition;
+      const summary = await emails.processDueSessionEmails({ send });
+      expect(summary).toMatchObject({ sent: 0, skipped: 1 });
+      expect(rows60('skipped')[0].last_error).toBe('not-accepted');
+    });
+
+    it('goes for a transaction whose last transition is a reschedule update', async () => {
+      await queue60(100);
+      advance(40);
+      mockTxState.last = 'transition/update-booking';
+      expect((await emails.processDueSessionEmails({ send })).sent).toBe(1);
+    });
+
+    it('never goes for a booking that was cancelled on our side', async () => {
+      await queue60(100);
+      advance(40);
+      mockStore.bookings.get(BOOKING).status = 'cancelled';
+      await emails.processDueSessionEmails({ send });
+      expect(sent).toHaveLength(0);
+      expect(rows60('skipped')[0].last_error).toBe('inactive');
+    });
+
+    it('is dropped if the session moved after it was queued', async () => {
+      await queue60(100);
+      advance(40);
+      mockStore.bookings.get(BOOKING).booking_start = at(200);
+      await emails.processDueSessionEmails({ send });
+      expect(sent).toHaveLength(0);
+      expect(rows60('skipped')[0].last_error).toBe('moved');
+    });
+
+    it('is dropped, not sent late, once the free window it describes has closed (sending had been off)', async () => {
+      await queue60(100);
+      advance(40 + 13); // 47 hours before the session
+      await emails.processDueSessionEmails({ send });
+      expect(sent).toHaveLength(0);
+      expect(rows60('skipped')[0].last_error).toBe('free-window-closed');
+    });
+
+    it('is cancelled with the booking', async () => {
+      await queue60(100);
+      await emails.cancelBookingEmails(BOOKING);
+      expect(rows60('cancelled')).toHaveLength(1);
+    });
+  });
+
+  describe('when it fails', () => {
+    it('is reported to Sentry as postmark-reminder-60h-failed once the third try fails, and not as anything about a confirmation', async () => {
+      send.mockRejectedValue(new Error('postmark down'));
+      await queue60(100);
+      advance(40);
+      for (let i = 0; i < 3; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await emails.processDueSessionEmails({ send });
+      }
+      expect(rows60('failed')).toHaveLength(1);
+      const tags = log.error.mock.calls.map(c => c[1]);
+      expect(tags.filter(t => t === 'postmark-reminder-60h-failed')).toHaveLength(1);
+      expect(tags).not.toContain('postmark-confirmation-failed');
+    });
+  });
+});
+
+describe('the calendar file behind "Add to calendar"', () => {
+  beforeEach(() => mockStore.eventIds.set(BOOKING, 'ev-1'));
+  const unfold = text => text.replace(/\r\n /g, '');
+
+  it('is the booking as it stands: the current time, the Meet link, the same UID as the attachment', async () => {
+    makeBooking(72);
+    const ics = unfold(
+      await emails.buildBookingCalendar({ mapping: mockStore.bookings.get(BOOKING) })
+    );
+    expect(ics).toContain('UID:booking-bk-1@heyrevie.com');
+    expect(ics).toContain('LOCATION:https://meet.google.com/abc-defg');
+    expect(ics).toContain('URL:https://revie-dev.onrender.com/order/tx-1');
+    expect(ics).toContain('SEQUENCE:0');
+  });
+
+  it('shows the new time after a reschedule, with the same UID and a higher sequence', async () => {
+    makeBooking(72);
+    await emails.rescheduleEmails({
+      bookingId: BOOKING,
+      oldStart: at(72),
+      oldEnd: at(73),
+      newStart: at(100),
+      newEnd: at(101),
+    });
+    Object.assign(mockStore.bookings.get(BOOKING), {
+      booking_start: at(100),
+      booking_end: at(101),
+    });
+    const ics = unfold(
+      await emails.buildBookingCalendar({ mapping: mockStore.bookings.get(BOOKING) })
+    );
+    const start = at(100)
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d{3}/, '');
+    expect(ics).toContain(`DTSTART:${start}`);
+    expect(ics).toContain('UID:booking-bk-1@heyrevie.com');
+    expect(ics).toContain('SEQUENCE:1');
   });
 });

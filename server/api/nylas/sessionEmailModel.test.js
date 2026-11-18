@@ -221,11 +221,13 @@ describe('the booking confirmation fields', () => {
     expect(confirmed({ start: later, end: later + 3600000 }).freeWindowOpen).toBe(false);
   });
 
-  it('carries the Outlook link when there is one', () => {
-    expect(confirmed({ outlookUrl: 'https://outlook.live.com/x' })).toMatchObject({
-      outlookCalendarUrl: 'https://outlook.live.com/x',
-      hasOutlookLink: true,
+  it('carries the Add to calendar link when there is one', () => {
+    expect(
+      confirmed({ calendarUrl: 'https://revie.example/api/nylas/calendar/tok/revie-session.ics' })
+    ).toMatchObject({
+      calendarUrl: 'https://revie.example/api/nylas/calendar/tok/revie-session.ics',
+      hasCalendarLink: true,
     });
-    expect(confirmed().hasOutlookLink).toBe(false);
+    expect(confirmed().hasCalendarLink).toBe(false);
   });
 });

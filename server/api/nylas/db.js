@@ -15,6 +15,7 @@
  * silently losing a booking, the same way the webhook handler treats a missing signing secret.
  */
 
+const crypto = require('crypto');
 const { Pool } = require('pg');
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -158,6 +159,16 @@ const initSchema = async () => {
   await query(
     `CREATE INDEX IF NOT EXISTS session_emails_booking_idx ON session_emails (nylas_booking_id)`
   );
+  // One unguessable token per booking for the client's "Add to calendar" link, which serves the
+  // booking's current calendar file without a login (the file holds the Meet link). Random and kept
+  // here rather than derived from a secret, so it can be looked up, expired and never needs a key.
+  await query(`
+    CREATE TABLE IF NOT EXISTS nylas_calendar_links (
+      token            text PRIMARY KEY,
+      nylas_booking_id text NOT NULL UNIQUE,
+      created_at       timestamptz NOT NULL DEFAULT now()
+    )
+  `);
   return true;
 };
 
@@ -577,7 +588,7 @@ const queueSessionEmail = async ({
 /** Cancel a booking's emails that have not gone out (only pending ones; a sent one stays sent). */
 const cancelSessionEmails = async (
   nylasBookingId,
-  kinds = ['reminder', 'rescheduled', 'confirmed']
+  kinds = ['reminder', 'reminder60', 'rescheduled', 'confirmed']
 ) => {
   const { rows } = await query(
     `UPDATE session_emails SET status = 'cancelled', updated_at = now()
@@ -627,6 +638,35 @@ const retrySessionEmail = async (dedupeKey, lastError) => {
       WHERE dedupe_key = $1 AND status = 'sending'`,
     [dedupeKey, lastError]
   );
+};
+
+/**
+ * The booking's calendar-link token, made on first use. Random (24 bytes), and the same for every
+ * email about the booking, so the link in the first email keeps working after the session moves.
+ */
+const getOrCreateCalendarToken = async nylasBookingId => {
+  const fresh = crypto.randomBytes(24).toString('base64url');
+  await query(
+    `INSERT INTO nylas_calendar_links (token, nylas_booking_id) VALUES ($1, $2)
+     ON CONFLICT (nylas_booking_id) DO NOTHING`,
+    [fresh, nylasBookingId]
+  );
+  const { rows } = await query(
+    `SELECT token FROM nylas_calendar_links WHERE nylas_booking_id = $1`,
+    [nylasBookingId]
+  );
+  return rows[0].token;
+};
+
+/** The booking a calendar-link token belongs to, or null. */
+const findBookingByCalendarToken = async token => {
+  const { rows } = await query(
+    `SELECT b.* FROM nylas_calendar_links l
+       JOIN nylas_bookings b ON b.nylas_booking_id = l.nylas_booking_id
+      WHERE l.token = $1`,
+    [token]
+  );
+  return rows[0] || null;
 };
 
 /**
@@ -795,6 +835,8 @@ module.exports = {
   finishSessionEmail,
   retrySessionEmail,
   postponeSessionEmail,
+  getOrCreateCalendarToken,
+  findBookingByCalendarToken,
   getSessionEmail,
   countRescheduleEmails,
   findBookingsMissingConfirmation,
