@@ -28,6 +28,7 @@ const { cancelIfDeclined } = require('./bookingRecovery');
 const { applyBookingTime } = require('./bookingTimeSync');
 const {
   safeScheduleReminders,
+  safeSchedule60hReminder,
   safeQueueConfirmation,
   safeRescheduleEmails,
   safeCancelBookingEmails,
@@ -353,6 +354,7 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
         // case where the first delivery died before queueing them.
         await safeScheduleReminders({ bookingId, sessionStart: extractBookingStart(data) });
         await safeQueueConfirmation({ bookingId, sessionStart: extractBookingStart(data) });
+        await safeSchedule60hReminder({ bookingId, sessionStart: extractBookingStart(data) });
       }
       return { handled: true, action: orphanCancelled ? 'orphan-cancelled' : 'already-accepted' };
     }
@@ -361,6 +363,7 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
     // client's "You're booked" (once per booking; it waits for the Meet link when it is sent).
     await safeScheduleReminders({ bookingId, sessionStart: extractBookingStart(data) });
     await safeQueueConfirmation({ bookingId, sessionStart: extractBookingStart(data) });
+    await safeSchedule60hReminder({ bookingId, sessionStart: extractBookingStart(data) });
     return { handled: true, action: 'accepted' };
   }
 

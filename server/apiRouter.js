@@ -26,6 +26,7 @@ const nylasCreateBooking = require('./api/nylas/createBookingEndpoint');
 const nylasCancelBooking = require('./api/nylas/cancelBookingEndpoint');
 const nylasRescheduleBooking = require('./api/nylas/rescheduleBookingEndpoint');
 const nylasBookingStatus = require('./api/nylas/bookingStatusEndpoint');
+const nylasCalendarLink = require('./api/nylas/calendarLinkEndpoint');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -114,6 +115,10 @@ router.post('/nylas/reschedule-booking', nylasRescheduleBooking);
 // What a client/coach-facing UI should show as the session time - our own database when a
 // reschedule has moved it, since Sharetribe's own booking record cannot be edited in place.
 router.get('/nylas/booking-status', nylasBookingStatus);
+
+// The client's "Add to calendar" link (from the "You're booked" email): the booking's calendar file,
+// opened by an unguessable token, no login. See server/api/nylas/calendarLinkEndpoint.js.
+router.get('/nylas/calendar/:token/revie-session.ics', nylasCalendarLink);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed

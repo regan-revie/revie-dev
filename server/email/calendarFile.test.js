@@ -99,16 +99,3 @@ describe('icsAttachment()', () => {
     );
   });
 });
-
-describe('outlookCalendarUrl()', () => {
-  it("opens Outlook's new-event form with the session already filled in", () => {
-    const url = new URL(outlookCalendarUrl(base));
-    expect(url.origin + url.pathname).toBe('https://outlook.live.com/calendar/0/deeplink/compose');
-    expect(url.searchParams.get('rru')).toBe('addevent');
-    expect(url.searchParams.get('subject')).toBe('Find your focus with Sam Coach');
-    expect(url.searchParams.get('startdt')).toBe('2026-11-20T19:30:00.000Z');
-    expect(url.searchParams.get('enddt')).toBe('2026-11-20T20:30:00.000Z');
-    expect(url.searchParams.get('location')).toBe('https://meet.google.com/abc-defg-hij');
-    expect(url.searchParams.get('body')).toContain('https://revie.example/order/tx-1');
-  });
-});

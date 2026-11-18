@@ -37,10 +37,14 @@ const { lookupEventId } = require('./eventIdBackfill');
 const postmark = require('../../email/postmark');
 const { buildSessionEmailModel } = require('./sessionEmailModel');
 const { TEMPLATE_ALIASES } = require('../../email/templates');
-const { buildIcs, icsAttachment, outlookCalendarUrl } = require('../../email/calendarFile');
+const { buildIcs, icsAttachment } = require('../../email/calendarFile');
 
 const HOUR = 60 * 60 * 1000;
 const REMINDER_LEAD_MS = 24 * HOUR;
+// The client's earlier reminder, with the date and when it is free to cancel or move until.
+const REMINDER_60H_LEAD_MS = 60 * HOUR;
+// Transactions that mean the session is still on (not cancelled, declined, expired or refunded).
+const LIVE_TRANSITIONS = ['transition/operator-accept', 'transition/update-booking'];
 // Too close to the session for a reminder to still be a reminder.
 const TOO_LATE_MS = 2 * HOUR;
 // A reschedule confirmation that has waited this long (sending was off, or down) is no longer news.
@@ -121,6 +125,30 @@ const queueConfirmation = async ({ bookingId, sessionStart, now = Date.now() }) 
 };
 
 /**
+ * Queue the client's 60-hour reminder: once per booking and session time (the key carries the start,
+ * so a move queues a fresh one). Not queued when the 60-hour mark has already passed, which is also
+ * what leaves out a booking made inside 60 hours: its "You're booked" already says when it is free
+ * to cancel or move until.
+ *
+ * @returns {Promise<{queued: number, skipped?: string}>}
+ */
+const schedule60hReminder = async ({ bookingId, sessionStart, now = Date.now() }) => {
+  const start = new Date(sessionStart);
+  if (!Number.isFinite(start.getTime())) return { queued: 0, skipped: 'no-start-time' };
+  const sendAt = new Date(start.getTime() - REMINDER_60H_LEAD_MS);
+  if (sendAt.getTime() <= now) return { queued: 0, skipped: 'under-60h' };
+  const added = await db.queueSessionEmail({
+    dedupeKey: `reminder60:${bookingId}:client:${iso(start)}`,
+    kind: 'reminder60',
+    nylasBookingId: bookingId,
+    recipient: 'client',
+    sendAt,
+    sessionStart: start,
+  });
+  return { queued: added ? 1 : 0 };
+};
+
+/**
  * The session moved: drop the pending reminders, queue new ones from the new time, and queue a
  * confirmation to each person.
  */
@@ -132,8 +160,9 @@ const rescheduleEmails = async ({
   newEnd,
   now = Date.now(),
 }) => {
-  await db.cancelSessionEmails(bookingId, ['reminder']);
+  await db.cancelSessionEmails(bookingId, ['reminder', 'reminder60']);
   const reminders = await scheduleReminders({ bookingId, sessionStart: newStart, now });
+  await schedule60hReminder({ bookingId, sessionStart: newStart, now });
 
   const start = new Date(newStart);
   const sameTime = oldStart && new Date(oldStart).getTime() === start.getTime();
@@ -272,6 +301,66 @@ const meetLinkFor = async ({ bookingId, transactionId, grantId, calendarId }) =>
   }
 };
 
+const root = () => String(process.env.REACT_APP_MARKETPLACE_ROOT_URL || '').replace(/\/+$/, '');
+
+/** The same for every calendar file about one booking, so an app updates its event, not adds one. */
+const calendarUid = bookingId => `booking-${bookingId}@heyrevie.com`;
+
+/** What goes into the client's calendar event: title, the Meet link and the booking link. */
+const calendarEventFor = ({ sessionName, coachName, manageUrl, meetLink, start, end }) => ({
+  start,
+  end,
+  summary: `${sessionName} with ${coachName}`,
+  description: [
+    `Your session with ${coachName}.`,
+    meetLink && `Join on Google Meet: ${meetLink}`,
+    `Your booking: ${manageUrl}`,
+  ]
+    .filter(Boolean)
+    .join('\n'),
+  location: meetLink,
+  url: manageUrl,
+});
+
+/** The "Add to calendar" link in the client's "You're booked": the booking's own unguessable token. */
+const calendarUrlFor = async bookingId =>
+  `${root()}/api/nylas/calendar/${await db.getOrCreateCalendarToken(bookingId)}/revie-session.ics`;
+
+/**
+ * The booking's calendar file as it stands now: the session's current time (a reschedule shows), the
+ * Meet link as it is now, the same UID as the file attached to the email, and a SEQUENCE one higher
+ * for each move, so a calendar updates the event it has. Served by calendarLinkEndpoint.js.
+ *
+ * @param {object} params
+ * @param {object} params.mapping the nylas_bookings row
+ * @returns {Promise<string>} the .ics text
+ */
+const buildBookingCalendar = async ({ mapping, now = Date.now() }) => {
+  const { tx, listing, provider } = await integration.loadTransactionAsOperator(
+    mapping.sharetribe_transaction_id
+  );
+  const meetLink = await meetLinkFor({
+    bookingId: mapping.nylas_booking_id,
+    transactionId: mapping.sharetribe_transaction_id,
+    grantId: mapping.nylas_grant_id,
+    calendarId: listing?.attributes?.publicData?.nylasCalendarId,
+  });
+  const event = calendarEventFor({
+    sessionName: listing?.attributes?.title || 'your session',
+    coachName: provider?.attributes?.profile?.displayName || 'your coach',
+    manageUrl: `${root()}/order/${tx.id.uuid || tx.id}`,
+    meetLink,
+    start: mapping.booking_start,
+    end: mapping.booking_end,
+  });
+  return buildIcs({
+    uid: calendarUid(mapping.nylas_booking_id),
+    sequence: await db.countRescheduleEmails(mapping.nylas_booking_id),
+    ...event,
+    now,
+  });
+};
+
 /** Everything needed to write one email: who, what and when. */
 const loadEmailContext = async ({ row, mapping, now }) => {
   const { tx, listing, customer, provider } = await integration.loadTransactionAsOperator(
@@ -279,7 +368,6 @@ const loadEmailContext = async ({ row, mapping, now }) => {
   );
   const publicData = listing?.attributes?.publicData || {};
   const providerPrivate = provider?.attributes?.profile?.privateData || {};
-  const root = String(process.env.REACT_APP_MARKETPLACE_ROOT_URL || '').replace(/\/+$/, '');
   const txId = tx.id.uuid || tx.id;
 
   const details = row.details || {};
@@ -297,32 +385,27 @@ const loadEmailContext = async ({ row, mapping, now }) => {
 
   const sessionName = listing?.attributes?.title || 'your session';
   const coachName = provider?.attributes?.profile?.displayName || 'your coach';
-  const manageUrl = `${root}/${row.recipient === 'coach' ? 'sale' : 'order'}/${txId}`;
+  const manageUrl = `${root()}/${row.recipient === 'coach' ? 'sale' : 'order'}/${txId}`;
 
-  // The client's calendar: a file for any app (Apple Calendar, Outlook...) and a link for Outlook.
-  // Google Calendar users already have the event. The same UID goes in every file about this booking,
-  // with a higher SEQUENCE after each move, so an app updates its event instead of adding another.
+  // The client's calendar: a file attached for any app, and (in "You're booked") an "Add to calendar"
+  // link that serves the same file. Google Calendar users already have the event. The same UID goes in
+  // every file about this booking, with a higher SEQUENCE after each move, so an app updates its event
+  // instead of adding another.
   const wantsCalendar =
     row.recipient === 'client' && (row.kind === 'confirmed' || row.kind === 'rescheduled');
-  const calendarEvent = {
+  const calendarEvent = calendarEventFor({
+    sessionName,
+    coachName,
+    manageUrl,
+    meetLink,
     start,
     end,
-    summary: `${sessionName} with ${coachName}`,
-    description: [
-      `Your session with ${coachName}.`,
-      meetLink && `Join on Google Meet: ${meetLink}`,
-      `Your booking: ${manageUrl}`,
-    ]
-      .filter(Boolean)
-      .join('\n'),
-    location: meetLink,
-    url: manageUrl,
-  };
+  });
   const attachments = wantsCalendar
     ? [
         icsAttachment(
           buildIcs({
-            uid: `booking-${mapping.nylas_booking_id}@heyrevie.com`,
+            uid: calendarUid(mapping.nylas_booking_id),
             sequence: row.kind === 'rescheduled' ? Number(details.sequence) || 1 : 0,
             ...calendarEvent,
             now,
@@ -330,6 +413,8 @@ const loadEmailContext = async ({ row, mapping, now }) => {
         ),
       ]
     : [];
+  const calendarUrl =
+    row.kind === 'confirmed' ? await calendarUrlFor(mapping.nylas_booking_id) : undefined;
 
   const model = buildSessionEmailModel({
     recipient: row.recipient,
@@ -346,11 +431,17 @@ const loadEmailContext = async ({ row, mapping, now }) => {
     meetLink,
     manageUrl,
     payinTotal: row.kind === 'confirmed' ? tx?.attributes?.payinTotal : undefined,
-    outlookUrl: row.kind === 'confirmed' ? outlookCalendarUrl(calendarEvent) : undefined,
+    calendarUrl,
     now,
   });
 
-  return { to: recipientUser?.attributes?.email, model, attachments, now };
+  return {
+    to: recipientUser?.attributes?.email,
+    model,
+    attachments,
+    lastTransition: tx?.attributes?.lastTransition,
+    now,
+  };
 };
 
 const templateAliasFor = row => TEMPLATE_ALIASES[`${row.kind}-${row.recipient}`];
@@ -404,6 +495,9 @@ const processDueSessionEmails = async ({
         else if (row.recipient === 'client' && (await confirmationJustSent(row))) {
           skip = 'confirmation-just-sent';
         }
+      } else if (row.kind === 'reminder60') {
+        const start = new Date(row.session_start).getTime();
+        if (start !== new Date(mapping.booking_start).getTime()) skip = 'moved';
       } else if (row.kind === 'confirmed') {
         // Sent any time until the session starts: a late "You're booked" is still the only
         // confirmation the client gets. Only a session already under way is too late.
@@ -425,8 +519,28 @@ const processDueSessionEmails = async ({
       }
 
       // eslint-disable-next-line no-await-in-loop
-      const { to, model, attachments } = await loadEmailContext({ row, mapping, now });
+      const { to, model, attachments, lastTransition } = await loadEmailContext({
+        row,
+        mapping,
+        now,
+      });
       if (!to) throw new Error('the recipient has no email address on record');
+
+      // The 60-hour reminder goes only to a session that is still on, and while the free window it
+      // describes is still open (sending can have been off, or late, for hours).
+      if (row.kind === 'reminder60') {
+        const reason = !LIVE_TRANSITIONS.includes(lastTransition)
+          ? 'not-accepted'
+          : !model.freeUntilOpen
+          ? 'free-window-closed'
+          : null;
+        if (reason) {
+          // eslint-disable-next-line no-await-in-loop
+          await db.finishSessionEmail(row.dedupe_key, 'skipped', reason);
+          summary.skipped += 1;
+          continue; // eslint-disable-line no-continue
+        }
+      }
       domain = postmark.domainOf(to);
 
       // "You're booked" waits for the Meet link (Google adds it a moment after the event). A wait is
@@ -491,6 +605,9 @@ const processDueSessionEmails = async ({
         // eslint-disable-next-line no-await-in-loop
         await db.finishSessionEmail(row.dedupe_key, 'failed', e.message).catch(() => {});
         summary.failed += 1;
+        if (row.kind === 'reminder60') {
+          log.error(e, 'postmark-reminder-60h-failed', { bookingId, domain });
+        }
         if (row.kind === 'confirmed') {
           // Once Sharetribe's booked email is switched off, this is the client's only confirmation.
           log.error(e, 'postmark-confirmation-failed', { bookingId, domain });
@@ -510,12 +627,15 @@ module.exports = {
   backfillConfirmations,
   reportOverdueConfirmations,
   scheduleReminders,
+  schedule60hReminder,
   rescheduleEmails,
   cancelBookingEmails,
   backfillReminders,
   processDueSessionEmails,
   // For bookingSync: the same calls that cannot throw.
+  buildBookingCalendar,
   safeScheduleReminders: safely('queue reminders', scheduleReminders),
+  safeSchedule60hReminder: safely('queue the 60-hour reminder', schedule60hReminder),
   safeQueueConfirmation: safely('queue the booked email', queueConfirmation),
   safeRescheduleEmails: safely('queue reschedule emails', rescheduleEmails),
   safeCancelBookingEmails: safely('cancel session emails', cancelBookingEmails),

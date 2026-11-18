@@ -19,6 +19,7 @@ jest.mock('./integration', () => ({
 jest.mock('./sessionEmails', () => ({
   safeScheduleReminders: jest.fn(async () => ({})),
   safeQueueConfirmation: jest.fn(async () => ({})),
+  safeSchedule60hReminder: jest.fn(async () => ({})),
   safeRescheduleEmails: jest.fn(async () => ({})),
   safeCancelBookingEmails: jest.fn(async () => 0),
 }));
@@ -39,6 +40,7 @@ const { applyBookingTime } = require('./bookingTimeSync');
 const {
   safeScheduleReminders,
   safeQueueConfirmation,
+  safeSchedule60hReminder,
   safeRescheduleEmails,
   safeCancelBookingEmails,
 } = require('./sessionEmails');
@@ -699,6 +701,24 @@ describe('session emails (Postmark)', () => {
     cancelIfDeclined.mockResolvedValue(true);
     await handleBookingWebhook(created);
     expect(safeQueueConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('queues the 60-hour reminder once the booking is confirmed, and not for an orphan or a booking that could not be confirmed', async () => {
+    await handleBookingWebhook(created);
+    expect(safeSchedule60hReminder).toHaveBeenCalledTimes(1);
+    expect(new Date(safeSchedule60hReminder.mock.calls[0][0].sessionStart).toISOString()).toBe(
+      '2026-12-01T15:00:00.000Z'
+    );
+
+    jest.clearAllMocks();
+    applyTransition.mockResolvedValue({ ok: false, alreadyApplied: true });
+    cancelIfDeclined.mockResolvedValue(true);
+    await handleBookingWebhook(created);
+    expect(safeSchedule60hReminder).not.toHaveBeenCalled();
+
+    applyTransition.mockResolvedValue({ ok: false, error: new Error('stripe down') });
+    await expect(handleBookingWebhook(created)).rejects.toThrow('stripe down');
+    expect(safeSchedule60hReminder).not.toHaveBeenCalled();
   });
 
   it('queues no "You\'re booked" for a booking that is only pending, or that could not be confirmed', async () => {

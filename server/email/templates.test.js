@@ -25,6 +25,7 @@ describe('Postmark templates', () => {
   it('has one template per email the code sends, under the aliases the code uses', () => {
     expect(Object.values(TEMPLATE_ALIASES).sort()).toEqual([
       'booking-confirmed-client',
+      'session-reminder-60h-client',
       'session-reminder-client',
       'session-reminder-coach',
       'session-rescheduled-client',
@@ -75,10 +76,10 @@ describe('Postmark templates', () => {
     });
   });
 
-  it('every one links to the Meet call and to the booking page', () => {
-    Object.values(TEMPLATES).forEach(t => {
-      expect(t.html).toMatch(/\{\{#meetLink\}\}/);
+  it('every one links to the booking page, and (but for the 60-hour reminder, which is a date and a button) to the Meet call', () => {
+    Object.entries(TEMPLATES).forEach(([alias, t]) => {
       expect(t.html).toMatch(/\{\{manageUrl\}\}/);
+      if (alias !== 'session-reminder-60h-client') expect(t.html).toMatch(/\{\{#meetLink\}\}/);
     });
   });
 
@@ -95,11 +96,12 @@ describe('Postmark templates', () => {
       });
     });
 
-    it('has Join on Google Meet, Add to Outlook and See your booking, as buttons, in maroon', () => {
+    it('has Join on Google Meet, Add to calendar and See your booking, as buttons, in maroon', () => {
       expect(t.html).toContain('Join on Google Meet');
-      expect(t.html).toContain('Add to Outlook');
+      expect(t.html).toContain('Add to calendar');
+      expect(t.html).not.toContain('Add to Outlook');
       expect(t.html).toContain('See your booking');
-      expect(t.html).toMatch(/\{\{#outlookCalendarUrl\}\}/);
+      expect(t.html).toMatch(/\{\{#calendarUrl\}\}/);
       expect(t.html).toContain(`background-color:${MAROON}`);
     });
 
@@ -107,7 +109,7 @@ describe('Postmark templates', () => {
       [t.html, t.text].forEach(body => {
         expect(body).not.toMatch(/Add to Google Calendar/i);
         expect(body).toContain("Using Google Calendar? It's already there.");
-        expect(body).toMatch(/attached calendar file/);
+        expect(body).toContain('Apple Calendar or Outlook? Tap Add to calendar.');
       });
     });
 
@@ -187,10 +189,10 @@ describe('Postmark templates', () => {
       meetLink: 'https://meet.google.com/abc-defg-hij',
       manageUrl: 'https://heyrevie.com/order/x',
       payinTotal: { amount: 5000, currency: 'USD' },
-      outlookUrl: 'https://outlook.live.com/calendar/0/deeplink/compose?subject=x',
+      calendarUrl: 'https://heyrevie.com/api/nylas/calendar/tok_123/revie-session.ics',
     });
 
-    it('the booked email shows what was paid, the free-until time, the Meet link and the Outlook link', () => {
+    it('the booked email shows what was paid, the free-until time, the Meet link and the Add to calendar link', () => {
       const t = TEMPLATES['booking-confirmed-client'];
       [t.html, t.text].forEach(body => {
         const out = render(body, model);
@@ -199,7 +201,7 @@ describe('Postmark templates', () => {
           /Free to cancel or move until \w+ \d+ \w+, [\d:]+ [ap]m \(Pacific Time\)\. After that/
         );
         expect(out).toContain('https://meet.google.com/abc-defg-hij');
-        expect(out).toContain('https://outlook.live.com/calendar/0/deeplink/compose?subject=x');
+        expect(out).toContain('https://heyrevie.com/api/nylas/calendar/tok_123/revie-session.ics');
         expect(out).not.toMatch(/Total paid: *(<|\n)|until \./);
       });
     });
@@ -245,9 +247,59 @@ describe('Postmark templates', () => {
         meetLink: 'https://meet.google.com/abc-defg-hij',
         manageUrl: 'https://heyrevie.com/order/x',
       });
-      Object.values(TEMPLATES).forEach(t => {
-        expect(render(t.html, withMove)).toContain('https://meet.google.com/abc-defg-hij');
-        expect(render(t.text, withMove)).toContain('https://meet.google.com/abc-defg-hij');
+      Object.entries(TEMPLATES).forEach(([alias, t]) => {
+        const out = render(t.html, withMove) + render(t.text, withMove);
+        expect(out).toContain('https://heyrevie.com/order/x'); // the booking link
+        expect(out).toContain(withMove.sessionDate);
+        // The 60-hour reminder is a date and one button: no Meet link by design.
+        if (alias !== 'session-reminder-60h-client') {
+          expect(out).toContain('https://meet.google.com/abc-defg-hij');
+        }
+      });
+    });
+
+    describe('the 60-hour reminder', () => {
+      const t = TEMPLATES['session-reminder-60h-client'];
+      const reminderModel = buildSessionEmailModel({
+        recipient: 'client',
+        sessionName: 'Find your focus',
+        coachName: 'Sam Coach',
+        clientName: 'Alex Client',
+        start: Date.now() + 60 * 3600000,
+        end: Date.now() + 61 * 3600000,
+        coachTimeZone: 'Europe/London',
+        clientTimeZone: 'America/Los_Angeles',
+        manageUrl: 'https://heyrevie.com/order/x',
+      });
+
+      it("says when the session is, in the client's zone, and when it is free to cancel or move until, with the zone name", () => {
+        [t.html, t.text].forEach(body => {
+          const out = render(body, reminderModel);
+          expect(out).toContain('Your session with Sam Coach is on ');
+          expect(out).toContain(
+            `${reminderModel.sessionDate}, ${reminderModel.sessionTime} (Pacific Time).`
+          );
+          expect(out).toMatch(
+            /Free to cancel or move until \w+ \d+ \w+, [\d:]+ [ap]m \(Pacific Time\)\. After that, it's charged in full\./
+          );
+          expect(out).not.toMatch(/until \./);
+        });
+      });
+
+      it('has one button, See your booking, in maroon, and does not suggest messaging the coach', () => {
+        expect(t.html.match(/<a href=/g)).toHaveLength(1);
+        expect(t.html).toContain('See your booking');
+        expect(t.html).toContain(`background-color:${MAROON}`);
+        [t.html, t.text, t.subject].forEach(body => {
+          expect(body).not.toMatch(/message|write to (your )?coach|contact (your )?coach/i);
+        });
+      });
+
+      it('prints no policy line when the free window has closed (it is not sent then, but must not print a blank)', () => {
+        const closed = { ...reminderModel, freeUntilOpen: '', freeWindowOpen: false };
+        const out = render(t.text, closed);
+        expect(out).not.toMatch(/Free to cancel/);
+        expect(out).not.toMatch(/until \./);
       });
     });
 

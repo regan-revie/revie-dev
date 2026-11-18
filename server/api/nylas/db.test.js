@@ -181,6 +181,25 @@ describe('calendar event ids', () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("makes a booking's calendar token once (random, the same for every email) and finds the booking by it", async () => {
+    const db = loadDb(URL);
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ token: 'tok-1' }] });
+    expect(await db.getOrCreateCalendarToken('bk-1')).toBe('tok-1');
+    const [insertSql, insertParams] = mockQuery.mock.calls[0];
+    expect(insertSql).toMatch(/INSERT INTO nylas_calendar_links/);
+    expect(insertSql).toMatch(/ON CONFLICT \(nylas_booking_id\) DO NOTHING/);
+    // 24 random bytes as base64url: unguessable, and not derived from the booking or transaction id.
+    expect(insertParams[0]).toMatch(/^[A-Za-z0-9_-]{32}$/);
+    expect(insertParams[1]).toBe('bk-1');
+
+    mockQuery.mockResolvedValueOnce({ rows: [{ nylas_booking_id: 'bk-1' }] });
+    expect(await db.findBookingByCalendarToken('tok-1')).toEqual({ nylas_booking_id: 'bk-1' });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    expect(await db.findBookingByCalendarToken('nope')).toBeNull();
+  });
+
   it('returns null for an event that is not a booking', async () => {
     mockQuery.mockResolvedValue({ rows: [] });
     expect(await loadDb(URL).findBookingByEvent('g1', 'someone-elses-meeting')).toBeNull();

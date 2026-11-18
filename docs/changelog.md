@@ -19,6 +19,31 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-18 (60-hour reminder, "Add to calendar" link, Postmark switched on in render.yaml)
+
+**Branch / PR:** `reminder-60h-calendar-link`, one PR against `main`, not merged.
+
+**What changed**
+1. **60-hour reminder to clients** (`session-reminder-60h-client`): "Your session with {coach} is on {date}, {time} ({zone})." + "Free to cancel or move until {free-until in the client's zone with its name}. After that, it's charged in full." + one "See your booking" button. Queued with "You're booked", due 60 hours before the start, once per booking and start time; none for a booking made inside 60 hours; follows a reschedule (none if the new time's 60-hour mark has passed); never sent for a cancelled, declined, expired, late-cancelled or refunded transaction, nor if the session moved or the free window has closed. Sentry: `postmark-reminder-60h-failed`. Values printed with `{{.}}` and covered by the scoping test.
+2. **"Add to calendar"** replaces "Add to Outlook" in "You're booked": a Revie link, `/api/nylas/calendar/<token>/revie-session.ics`, serving the same `.ics` as the attachment (kept). Unguessable per-booking token (24 random bytes, new table `nylas_calendar_links`, created automatically on deploy); 404 once the booking is cancelled or 7 days after the session; after a reschedule it serves the new time with the same UID and a higher SEQUENCE. Help lines: "Using Google Calendar? It's already there." / "Apple Calendar or Outlook? Tap Add to calendar."
+3. **`render.yaml`: `POSTMARK_SENDING_ENABLED` is now `"true"`** (a Blueprint sync had reset it to `"false"` and silently stopped all emails). No other env var touched.
+
+**For Regan, in this order**
+1. Merge; Render redeploys (the new table is created on boot).
+2. In the Render Shell of the Dev service:
+   `node scripts/postmark-create-templates.js --dry-run`
+   then `node scripts/postmark-create-templates.js --overwrite`
+   **`--overwrite` is needed**: the "You're booked" template changed (button and help lines), and `--overwrite` also creates the new 60-hour template. It replaces all five templates with the repo's wording; any hand edits in Postmark are lost. (Without `--overwrite` only the new 60-hour template would be created and "You're booked" would keep the Add to Outlook button, which would now be blank.)
+3. Check `POSTMARK_SENDING_ENABLED` shows `true` in the Render dashboard after the deploy.
+4. **Test, 60-hour reminder:** book a session about **61 hours** out. "You're booked" arrives at once; the 60-hour email should arrive about an hour later (within a sweeper minute of the mark): date and time in your zone, the free-until line, one button. Booking inside 60 hours must send no 60-hour email.
+5. **Test, Add to calendar:** on an iPhone, open "You're booked" and tap **Add to calendar**; the event sheet should open with the title, time and Meet link; add it. Also try the attached file.
+6. **Test, reschedule:** reschedule that session (3+ days out), then tap the **same** Add to calendar link in the old email: it should show the **new** time. Add it: the calendar should update the existing event rather than add a second (Apple Calendar normally does; not guaranteed everywhere). The old 60-hour email should not arrive; a new one follows the new time if its mark is still ahead.
+7. Cancel the session, then tap the link again: it should say "Not found".
+
+**Not verified:** nothing sent through Postmark (no token here), so the new template is verified against the scoping stand-in only; the iPhone and calendar-update behaviour is untested.
+
+---
+
 ## HANDOFF — 2026-11-17 (booked email blanks fixed; release-7 on Dev)
 
 **Branch / PR:** `booked-email-fixes-release-7`, one PR against `main`, not merged. Release-7 is already pushed to Dev (below), not Test or Live.

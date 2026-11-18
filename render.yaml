@@ -74,12 +74,13 @@ services:
       - key: BOOKING_PROCESS_ALIAS
         value: default-booking/release-7
 
-      # Postmark sends the session reminders and reschedule confirmations (server/email/postmark.js);
-      # everything else is Sharetribe's. Nothing is sent unless this is exactly "true", so it stays off
-      # until you switch it on in the Render dashboard (and then it survives Blueprint syncs only if
-      # you change the value here too).
+      # Postmark sends the client's "You're booked", the session reminders and the reschedule
+      # confirmations (server/email/postmark.js); everything else is Sharetribe's. Nothing is sent
+      # unless this is exactly "true". It is "true" here because a Blueprint sync puts this value back:
+      # it was "false" here once, and a sync silently stopped every email. Switch it off in the
+      # dashboard only for a moment, never for good.
       - key: POSTMARK_SENDING_ENABLED
-        value: "false"
+        value: "true"
 
       # Set in the Render dashboard after the first deploy, to the service's own
       # public URL (https://<service>.onrender.com), with no trailing slash.
