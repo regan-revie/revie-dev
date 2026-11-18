@@ -21,7 +21,7 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ## HANDOFF — 2026-11-18 (session outcomes: three short fields replace the free-text "walk away with")
 
-**Branch / PR:** `session-outcomes-fields`, one PR against `main`, not merged. Independent of PR #42 (the 60-hour reminder); no shared files except `docs/changelog.md`, so expect a trivial conflict there whichever merges second.
+**Branch / PR:** `session-outcomes-fields`, one PR against `main`, not merged. Rebased on `main` after PR #42 merged; the only conflict was this file, resolved by keeping both entries.
 
 **What the "old field" turned out to be.** There is no field called "You'll walk away with" anywhere: not in the repo, not in Dev's hosted listing fields (`identity`, `communication_style`, `structure`, `language`, `coachlocation`, `pre_work`), and not in a hosted translation. On Live, coaches wrote it inside the **listing description**. So nothing was replaced or removed: the description stays as it is and stays required, and there is **no fallback**. You move the Live text by hand.
 
