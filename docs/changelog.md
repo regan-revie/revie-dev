@@ -19,6 +19,68 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-18 (onboarding tidy, second pass: lighter client sign-up, no gender question, private client answers, search never empty, field clean-up)
+
+**Branch / PR:** `onboarding-tidy-search-fallback`, one PR against `main`, not merged. Field reference: `docs/onboarding-fields.md` (updated; the session categories "How do you want to grow?" are now listed next to the client support options at the end, with a first alignment table).
+
+**What changed**
+1. **Client sign-up is now: account type, first name, last name, email, password, age check, terms.** Five client-only questions (previous experience, support, intent, budget, other details) leave sign-up through Console flags (below); `location` leaves it through code, because Console can only switch a field for everyone and coaches are still asked it. Fields and stored answers are kept; clients can answer them later on their profile or account page. **Location is required of coaches in code**, at sign-up and on the profile (same mechanism as the other coach traits, now also applied to the sign-up and Google confirm forms).
+2. **Gender ("How do you identify?", the private `identity`) is asked nowhere**: not at sign-up, not on the profile, not on the account page, for coaches or clients. Done in code (`src/util/userFieldPolicy.js`), so it holds even if Console still has it on. Stored answers are kept: they still load into the account form and are saved back unchanged (a test covers that). The public listing `identity` tags are a different thing and untouched.
+3. **A client's `support`, `work` and `client_wants` never show on their public profile page** (code, same file). Still asked, still stored.
+4. **Search never ends on an empty page.** If a search finds fewer than 3 sessions, the matches show first, then a section "Other coaches you might like" with "Only a few coaches match that right now. Here are others you might like." and up to 6 other published, bookable sessions (bookable = the coach has calendar booking switched on for the session), never repeating a match. Works in the map and grid layouts. With zero matches the "couldn't find any listings" sentence is replaced by this (the "Reset filters" button stays); if there are no other sessions to offer, the old message stays.
+5. **New options, same keys on both sides, mapped in `server/api/coachTraits/traits.js`** (with tests): identity `perimenopause`, `disabled`, `caregiver`; location `australia-nz`. `emcc` added to certifications needs no code.
+6. **`sociallink` left as long text, on purpose:** Console's short text is capped at 70 characters by the stock input, and a coach who already has a longer profile link would be unable to save their profile until they shortened it. I also could not confirm Console lets a field's type be edited. Cosmetic gain, real risk, so no.
+7. **Tests:** 28 client, 1 server, all new; both suites and the format check are clean (client 1342, server 901).
+
+**Judgement calls for you**
+- **Option labels:** I wrote "First generation" on both sides (your wording); "First-generation" is the more usual spelling if you prefer it. I also capitalised three labels you did not list, so the two sides match: "Chronic illness" (both sides), "Expat / immigrant" (profile side), and removed a stray trailing space from the listing's neurodivergent label.
+- **The new profile label shows publicly.** Console has one label per field, so "Lived experience (clients can filter by this)" is also the heading on the coach's public profile page. The parenthetical reads oddly there. Say if you want a shorter public label and I will split them in code.
+- **Console's `required` is turned off for `location`**, so a client is not forced to answer it on their profile; coaches are required in code. Same for the four other client questions, otherwise a client could not save their account page without answering them.
+
+**Live may be exposing client answers right now.** Live runs Sharetribe's hosted frontend, which has no code rule, so unless Live's Console has "show on profile page" off for `support`, `work` and `client_wants`, those three are public on client profiles today. Worth checking in Live's Console now (I have no access to Live); I did not touch it.
+
+**Console steps for you (Dev only; Test and Live are logged in `docs/go-live-plan.md`).** Users, user fields. Key names and option keys are exact; menu names are from memory. If you already did yesterday's steps 2 and 3 (certifications, othercerts, gender, display name off sign-up), skip those lines. **Merge the PR and let Render deploy first** (see order note below).
+
+*A. User fields: sign-up and required.* "Show in sign-up" and "Required" are the two switches per field.
+1. `previous_experience`, `support`, `intent`, `budget`: turn **show in sign-up OFF** and **required OFF**.
+2. `other_details`, `identity` (the gender one, label "How do you identify?"), and if not yet done `certifications`, `othercerts`: **show in sign-up OFF**.
+3. `location`: **required OFF**; leave **show in sign-up ON** (the code hides it from clients, and still asks coaches).
+4. Leave `ageverification` as it is.
+5. Optional, belt and braces (the code already does this): `support`, `work`, `client_wants`: turn the "show on profile page" switch OFF.
+
+*B. User fields: options and labels.*
+6. `location`: add an option, key `australia-nz`, label "Australia & New Zealand".
+7. `personality_identifier`: change the field label from "More about me..." to "Lived experience (clients can filter by this)". Add three options, key then label: `perimenopause` "Perimenopause / menopause", `disabled` "Disabled", `caregiver` "Caregiver". Relabel `chronic-illness` to "Chronic illness", `immigrant` to "Expat / immigrant", `first-generation` to "First generation". Do not change any key.
+8. `certifications`: add an option, key `emcc`, label "EMCC accredited coach".
+
+*C. Listing fields (the Listings section, not Users).*
+9. `coachlocation`: add an option, key `australia-nz`, label "Australia & New Zealand".
+10. `identity` ("Identity & Background"): add three options, same keys as the profile side: `perimenopause` "Perimenopause / menopause", `disabled` "Disabled", `caregiver` "Caregiver". Relabel `single-parent` to "Single parent" (it is "Single Parent" now), `chronically-ill` to "Chronic illness", and `first-gen` stays "First generation". Remove the trailing space after "ADHD / Autism / Neurodivergence" on `neurdivergent`.
+11. `communication_style`: relabel to "Direct", "Empathetic", "Analytical", "Supportive", "Challenging", "Intuitive" (keys unchanged: `direct`, `empathetic`, `analytical`, `supportive`, `challenging`, `intuitive`).
+12. `structure`: relabel `highly-structured` to "Highly structured", `flexible` to "Flexible / adaptive", `client-led` to "Led by you" (it says "entirely led by you" now).
+13. Do not remove or rename any option key anywhere.
+
+**Order:** merge and deploy first, then B6, B7 and C9, C10. If a coach picks a new option in the window between adding it and the deploy, that option is left off their listings (never an error) until the next 60-second pass after the deploy.
+
+**Test steps on Dev** (after the Console steps; hard-refresh once). Dev has only a few sessions, so for step 6 note how many there are.
+1. **Client sign-up** with a new email: only account type, first name, last name, email, password, age check, terms. No location, gender, previous experience, growth goals, readiness, budget or "anything else". Sign up and verify. On that client's profile settings the optional questions are there; saving without answering them works.
+2. **Coach sign-up** with a new email: the same plus location, and location cannot be left empty. No certifications, other certifications or gender. After that, the coach's profile settings has no gender question; it has "Lived experience (clients can filter by this)" with the three new options, "Australia & New Zealand" under location, and "EMCC accredited coach" under certifications.
+3. **A client with support, work and ideal-coach answers:** open their public profile page (`/u/...`, logged in as someone else): none of the three show, but your own profile settings still has your answers.
+4. **Account page of a user who had answered gender before** (Account, personal details): the question is gone and nothing else changed.
+5. **New options end to end:** as a coach choose "Australia & New Zealand" and the three new identity options and save. Within about a minute filter the marketplace by them: that coach's published sessions appear, and the filter labels read as in step C (capitalised).
+6. **Search with few matches:** pick filters that match one or two sessions. You see them first, then "Other coaches you might like" with the sentence from item 4, other sessions below, none repeated and only ones with calendar booking on. Try phone width too.
+7. **Search with no match:** filters that match nothing show no "couldn't find any listings" sentence, just "Reset filters" and the other sessions. A broad search (3 or more matches) shows no extra section.
+8. **Session editor:** the structure choices read "Highly structured", "Flexible / adaptive", "Led by you".
+
+**Not verified:** nothing was exercised in a browser or against Dev data (the private marketplace needs a login); all of it is covered by tests with fakes and by reading Dev's real config. Specifically unverified: Console's exact menu and switch names; that Console will let `required` be turned off on a field while a coach-only requirement lives in code (it should); how the other-sessions section looks on your real listing cards; whether the 24 newest sessions always include enough bookable ones on a bigger marketplace (fine at Dev's size; it is one number to raise in `SearchPage.duck.js` if not). Live's fields, labels and options were not checked.
+
+**What's next**
+- Align session categories with the client support options (table at the end of `docs/onboarding-fields.md`), when the matching quiz is built.
+- Still left alone on purpose: photo fallback, pricing/`startTimeInterval`, folding the age check into terms.
+- At cutover: the new item in `docs/go-live-plan.md`. Check Live's "show on profile page" for the three client fields before that.
+
+---
+
 ## HANDOFF — 2026-11-18 (coach onboarding: traits asked once on the profile, copied to listings; slimmer coach sign-up)
 
 **Branch / PR:** `coach-traits-sync`, one PR against `main`, not merged. Field reference for the whole onboarding: `docs/onboarding-fields.md`.

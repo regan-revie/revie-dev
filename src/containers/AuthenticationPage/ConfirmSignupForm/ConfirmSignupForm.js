@@ -7,6 +7,7 @@ import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { propTypes } from '../../../util/types';
 import * as validators from '../../../util/validators';
 import { getPropsForCustomUserFieldInputs } from '../../../util/userHelpers';
+import { withCoachTraitsRequired } from '../../../util/coachTraits';
 
 import { Form, PrimaryButton, FieldTextInput, CustomExtendedDataField } from '../../../components';
 
@@ -58,7 +59,12 @@ const ConfirmSignupFormComponent = props => (
 
       // Custom user fields. Since user types are not supported here,
       // only fields with no user type id limitation are selected.
-      const userFieldProps = getPropsForCustomUserFieldInputs(userFields, userType);
+      // Revie: a coach's location (and the other coach traits, if asked here) is required of
+      // coaches only; Console's required flag would hit clients too.
+      const userFieldProps = getPropsForCustomUserFieldInputs(userFields, userType).map(props => ({
+        ...props,
+        fieldConfig: withCoachTraitsRequired(props.fieldConfig, userType),
+      }));
 
       const noUserTypes = !userType && !(userTypes?.length > 0);
       const userTypeConfig = userTypes.find(config => config.userType === userType);

@@ -12,7 +12,7 @@ import { manageDisableScrolling, isScrollingDisabled } from '../../ducks/ui.duck
 import { ModalInMobile, Page } from '../../components';
 import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer';
 
-import { setActiveListing } from './SearchPage.duck';
+import { setActiveListing, FEW_RESULTS_LIMIT } from './SearchPage.duck';
 import {
   initialValues,
   validUrlQueryParamsFromProps,
@@ -213,6 +213,7 @@ export class SearchPageComponent extends Component {
     const {
       intl,
       listings = [],
+      otherListings = [],
       location,
       onManageDisableScrolling,
       pagination,
@@ -301,6 +302,7 @@ export class SearchPageComponent extends Component {
         location={location}
         resetAll={this.resetAll}
         showCreateListingsLink={showCreateListingsLink}
+        hasOtherSessions={otherListings.length > 0}
       />
     );
 
@@ -447,6 +449,9 @@ export class SearchPageComponent extends Component {
                 <SearchResultsPanel
                   className={css.searchListingsPanel}
                   listings={listings}
+                  otherListings={
+                    listingsAreLoaded && totalItems < FEW_RESULTS_LIMIT ? otherListings : []
+                  }
                   pagination={listingsAreLoaded ? pagination : null}
                   search={parse(location.search)}
                   setActiveListing={onActivateListing}
@@ -513,6 +518,9 @@ const SearchPage = props => {
   const listings = useSelector(state =>
     selectListingsById(state, state.SearchPage.currentPageResultIds)
   );
+  const otherListings = useSelector(state =>
+    selectListingsById(state, state.SearchPage.otherSessionIds || [])
+  );
   const scrollingDisabled = useSelector(state => isScrollingDisabled(state));
 
   const onManageDisableScrolling = useCallback(
@@ -530,6 +538,7 @@ const SearchPage = props => {
       PageComponent={SearchPageComponent}
       currentUser={currentUser}
       listings={listings}
+      otherListings={otherListings}
       pagination={pagination}
       scrollingDisabled={scrollingDisabled}
       searchInProgress={searchInProgress}

@@ -12,7 +12,7 @@ import {
   dispatchedActions,
 } from '../../util/testHelpers';
 
-import { loadData } from './SearchPage.duck';
+import reducer, { loadData, pickOtherSessions } from './SearchPage.duck';
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 import SearchPageWithGrid from './SearchPageWithGrid';
 import SearchPageWithMap from './SearchPageWithMap';
@@ -619,6 +619,68 @@ describe('SearchPage', () => {
   });
 });
 
+describe('SearchPage: other sessions below few matches', () => {
+  const commonProps = {
+    scrollingDisabled: false,
+    onActivateListing: noop,
+    onManageDisableScrolling: noop,
+  };
+  const other = createListing('other1', {
+    title: 'Another coach session',
+    publicData: { calendarBookingEnabled: true },
+  });
+  const stateWith = (totalItems, matchIds) => ({
+    SearchPage: {
+      ...initialState.SearchPage,
+      currentPageResultIds: matchIds,
+      pagination: { page: 1, perPage: 24, totalItems, totalPages: 1 },
+      otherSessionIds: [other.id],
+    },
+    marketplaceData: { entities: { listing: { l1, l2, other1: other } } },
+  });
+
+  ['grid', 'map'].forEach(variant => {
+    describe(`${variant} layout`, () => {
+      const renderPage = state => {
+        const config = getConfig(variant);
+        const routeConfiguration = getRouteConfiguration(config.layout);
+        const SearchPage = getConnectedSearchPageForTests(config.layout);
+        return render(<SearchPage {...commonProps} />, {
+          initialState: state,
+          config,
+          routeConfiguration,
+        });
+      };
+
+      it('offers other sessions under a search with fewer than 3 matches', async () => {
+        renderPage(stateWith(2, [l1.id, l2.id]));
+        await waitFor(() => {
+          expect(screen.getByText('SearchResultsPanel.otherSessionsHeading')).toBeInTheDocument();
+        });
+        expect(screen.getByText('SearchResultsPanel.otherSessionsIntro')).toBeInTheDocument();
+        expect(screen.getByText('Another coach session')).toBeInTheDocument();
+      });
+
+      it('still offers them, and not a dead end, when nothing matches', async () => {
+        renderPage(stateWith(0, []));
+        await waitFor(() => {
+          expect(screen.getByText('Another coach session')).toBeInTheDocument();
+        });
+        expect(screen.queryByText('SearchPage.noResults')).toBeNull();
+      });
+
+      it('shows nothing extra from 3 matches up', async () => {
+        renderPage(stateWith(3, [l1.id, l2.id]));
+        await waitFor(() => {
+          expect(screen.getAllByText('l1 title').length).toBeGreaterThan(0);
+        });
+        expect(screen.queryByText('SearchResultsPanel.otherSessionsHeading')).toBeNull();
+        expect(screen.queryByText('Another coach session')).toBeNull();
+      });
+    });
+  });
+});
+
 describe('Duck', () => {
   const defaultConfig = getConfig('map');
 
@@ -651,9 +713,11 @@ describe('Duck', () => {
       auth: { isAuthenticated: true },
     });
 
+    // Many matches (the meta is what Sharetribe sends), so no other sessions are offered.
+    const response = { data: { data: [l1, l2], include: [], meta: { totalItems: 24 } } };
     const sdk = {
       currentUser: { show: sdkFn(fakeResponse(currentUser)) },
-      listings: { query: sdkFn(fakeResponse([l1, l2])) },
+      listings: { query: sdkFn(response) },
       authInfo: sdkFn({}),
     };
 
@@ -675,11 +739,116 @@ describe('Duck', () => {
       expect(actions[0].meta.arg.searchParams).toEqual(searchParams);
 
       // Second action should be addMarketplaceEntities
-      expect(actions[1]).toEqual(addMarketplaceEntities(fakeResponse([l1, l2]), sanitizeConfig));
+      expect(actions[1]).toEqual(addMarketplaceEntities(response, sanitizeConfig));
 
       // Third action should be searchListings.fulfilled
       expect(actions[2].type).toBe('SearchPage/searchListings/fulfilled');
-      expect(actions[2].payload).toEqual(fakeResponse([l1, l2]));
+      expect(actions[2].payload).toEqual(response);
+    });
+  });
+
+  describe('other sessions when a search has few matches', () => {
+    const bookable = id => createListing(id, { publicData: { calendarBookingEnabled: true } });
+    const getState = () => ({
+      ...initialState,
+      user: { currentUser },
+      auth: { isAuthenticated: true },
+    });
+    const respond = (listings, totalItems = listings.length) => ({
+      data: { data: listings, include: [], meta: { totalItems } },
+    });
+    const run = query => {
+      const sdk = {
+        currentUser: { show: sdkFn(fakeResponse(currentUser)) },
+        listings: { query },
+        authInfo: sdkFn({}),
+      };
+      const dispatch = createFakeDispatch(getState, sdk);
+      return loadData(null, null, config)(dispatch, getState, sdk).then(() =>
+        dispatchedActions(dispatch)
+      );
+    };
+    const types = actions => actions.map(a => a.type);
+
+    it('fetches others when fewer than 3 sessions match, and leaves out the matches', async () => {
+      const match = bookable('m1');
+      const query = jest
+        .fn()
+        .mockResolvedValueOnce(respond([match]))
+        .mockResolvedValueOnce(respond([match, bookable('o1'), bookable('o2')]));
+      const actions = await run(query);
+
+      expect(query).toHaveBeenCalledTimes(2);
+      const fulfilled = actions.find(a => a.type === 'SearchPage/fetchOtherSessions/fulfilled');
+      expect(fulfilled.payload.map(id => id.uuid)).toEqual(['o1', 'o2']);
+    });
+
+    it('also fetches others when nothing matches at all', async () => {
+      const query = jest
+        .fn()
+        .mockResolvedValueOnce(respond([]))
+        .mockResolvedValueOnce(respond([bookable('o1')]));
+      const actions = await run(query);
+      const fulfilled = actions.find(a => a.type === 'SearchPage/fetchOtherSessions/fulfilled');
+      expect(fulfilled.payload.map(id => id.uuid)).toEqual(['o1']);
+    });
+
+    it('does not fetch others from 3 matches up', async () => {
+      const query = jest.fn().mockResolvedValue(respond([l1, l2], 3));
+      const actions = await run(query);
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(types(actions)).not.toContain('SearchPage/fetchOtherSessions/pending');
+    });
+
+    it('keeps the search itself working when the other-sessions query fails', async () => {
+      const query = jest
+        .fn()
+        .mockResolvedValueOnce(respond([bookable('m1')]))
+        .mockRejectedValueOnce(new Error('boom'));
+      const actions = await run(query);
+      expect(types(actions)).toContain('SearchPage/searchListings/fulfilled');
+      expect(types(actions)).not.toContain('SearchPage/searchListings/rejected');
+      const fulfilled = actions.find(a => a.type === 'SearchPage/fetchOtherSessions/fulfilled');
+      expect(fulfilled.payload).toEqual([]);
+    });
+
+    it('the reducer keeps the offered ids and drops them when the next search starts', () => {
+      const offered = reducer(undefined, {
+        type: 'SearchPage/fetchOtherSessions/fulfilled',
+        payload: [bookable('o1').id],
+      });
+      expect(offered.otherSessionIds).toHaveLength(1);
+      const cleared = reducer(offered, {
+        type: 'SearchPage/searchListings/pending',
+        meta: { arg: { searchParams: {} } },
+      });
+      expect(cleared.otherSessionIds).toEqual([]);
+    });
+  });
+
+  describe('pickOtherSessions', () => {
+    const published = (id, publicData = { calendarBookingEnabled: true }, attrs = {}) =>
+      createListing(id, { publicData, ...attrs });
+
+    it('keeps published, bookable sessions only', () => {
+      const picked = pickOtherSessions([
+        published('ok'),
+        published('not-bookable', {}),
+        published('flag-off', { calendarBookingEnabled: false }),
+        published('closed', { calendarBookingEnabled: true }, { state: 'closed' }),
+        published('deleted', { calendarBookingEnabled: true }, { deleted: true }),
+      ]);
+      expect(picked.map(l => l.id.uuid)).toEqual(['ok']);
+    });
+
+    it('never repeats a match or itself', () => {
+      const picked = pickOtherSessions([published('a'), published('a'), published('b')], ['b']);
+      expect(picked.map(l => l.id.uuid)).toEqual(['a']);
+    });
+
+    it('shows at most six', () => {
+      const many = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(id => published(id));
+      expect(pickOtherSessions(many)).toHaveLength(6);
     });
   });
 

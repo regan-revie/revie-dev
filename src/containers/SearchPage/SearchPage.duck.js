@@ -31,6 +31,33 @@ const resultIds = data => {
     .map(l => l.id);
 };
 
+// Revie: when a search finds fewer than this many sessions, other sessions are offered below them
+// so a visitor never lands on an empty page.
+export const FEW_RESULTS_LIMIT = 3;
+const OTHER_SESSIONS_FETCHED = 24;
+export const OTHER_SESSIONS_SHOWN = 6;
+
+/**
+ * The sessions worth offering instead: published, deleted-free, bookable (the coach has connected a
+ * calendar and the session is switched on), and not already among the search results.
+ */
+export const pickOtherSessions = (listings, excludeIds = [], limit = OTHER_SESSIONS_SHOWN) => {
+  const excluded = new Set(excludeIds);
+  const seen = new Set();
+  return (listings || [])
+    .filter(l => {
+      const id = l?.id?.uuid;
+      if (!id || excluded.has(id) || seen.has(id)) return false;
+      seen.add(id);
+      return (
+        !l.attributes?.deleted &&
+        l.attributes?.state === 'published' &&
+        l.attributes?.publicData?.calendarBookingEnabled === true
+      );
+    })
+    .slice(0, limit);
+};
+
 // ================ Async Thunks ================ //
 
 /////////////////////
@@ -333,6 +360,17 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
       dispatch(addMarketplaceEntities(response, sanitizeConfig));
       return response;
     })
+    .then(response => {
+      // Revie: a search with only a few matches also fetches other sessions to show below them.
+      const totalItems = response.data.meta?.totalItems ?? response.data.data.length;
+      if (totalItems >= FEW_RESULTS_LIMIT) {
+        return response;
+      }
+      const matchIds = resultIds(response.data);
+      return dispatch(fetchOtherSessions({ excludeIds: matchIds.map(id => id.uuid), config })).then(
+        () => response
+      );
+    })
     .catch(e => {
       const error = storableError(e);
       if (!(isErrorUserPendingApproval(error) || isForbiddenError(error))) {
@@ -341,6 +379,26 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
       return rejectWithValue(error);
     });
 };
+
+// Revie: other sessions to offer when a search has few matches. A failure here must never break
+// the search itself, so it resolves to an empty list instead of rejecting.
+const fetchOtherSessionsPayloadCreator = ({ excludeIds = [], config }, thunkAPI) => {
+  const { dispatch, extra: sdk } = thunkAPI;
+  return sdk.listings
+    .query({ perPage: OTHER_SESSIONS_FETCHED, minStock: 1, stockMode: 'match-undefined' })
+    .then(response => {
+      const others = pickOtherSessions(response.data.data, excludeIds);
+      const listingFields = config?.listing?.listingFields;
+      dispatch(addMarketplaceEntities(response, { listingFields }));
+      return others.map(l => l.id);
+    })
+    .catch(() => []);
+};
+
+export const fetchOtherSessions = createAsyncThunk(
+  'SearchPage/fetchOtherSessions',
+  fetchOtherSessionsPayloadCreator
+);
 
 export const searchListings = createAsyncThunk(
   'SearchPage/searchListings',
@@ -357,6 +415,7 @@ const searchPageSlice = createSlice({
     searchInProgress: false,
     searchListingsError: null,
     currentPageResultIds: [],
+    otherSessionIds: [],
     activeListingId: null,
   },
   reducers: {
@@ -371,11 +430,16 @@ const searchPageSlice = createSlice({
         state.searchParams = action.meta.arg.searchParams;
         state.searchInProgress = true;
         state.searchListingsError = null;
+        // Revie: the sessions offered for the previous search do not belong to this one.
+        state.otherSessionIds = [];
       })
       .addCase(searchListings.fulfilled, (state, action) => {
         state.currentPageResultIds = resultIds(action.payload.data);
         state.pagination = action.payload.data.meta;
         state.searchInProgress = false;
+      })
+      .addCase(fetchOtherSessions.fulfilled, (state, action) => {
+        state.otherSessionIds = action.payload || [];
       })
       .addCase(searchListings.rejected, (state, action) => {
         console.error(action.payload);

@@ -68,3 +68,17 @@
   margin-top: auto;
   background-color: transparent;
 }
+
+/* Revie: other sessions offered below a search with only a few matches. */
+.otherSessions {
+  margin-top: 24px;
+}
+
+.otherSessionsHeading {
+  margin: 0 0 4px;
+}
+
+.otherSessionsIntro {
+  margin: 0 0 16px;
+  color: var(--colorGrey700);
+}

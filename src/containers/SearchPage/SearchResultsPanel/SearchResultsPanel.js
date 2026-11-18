@@ -1,6 +1,7 @@
 import React from 'react';
 import classNames from 'classnames';
 
+import { FormattedMessage } from '../../../util/reactIntl';
 import { propTypes } from '../../../util/types';
 import { ListingCard, PaginationLinks } from '../../../components';
 
@@ -18,6 +19,8 @@ import css from './SearchResultsPanel.module.css';
  * @param {Object} props.search - The search
  * @param {Function} props.setActiveListing - The function to handle the active listing
  * @param {boolean} [props.isMapVariant] - Whether the map variant is enabled
+ * @param {Array<propTypes.listing>} [props.otherListings] - Revie: other sessions offered below a
+ *   search with only a few matches (never repeats a match)
  * @returns {JSX.Element}
  */
 const SearchResultsPanel = props => {
@@ -30,6 +33,7 @@ const SearchResultsPanel = props => {
     setActiveListing,
     isMapVariant = true,
     listingTypeParam,
+    otherListings = [],
     intl,
   } = props;
   const classes = classNames(rootClassName || css.root, className);
@@ -72,6 +76,9 @@ const SearchResultsPanel = props => {
     }
   };
 
+  const matchIds = new Set(listings.map(l => l.id.uuid));
+  const others = otherListings.filter(l => !matchIds.has(l.id.uuid));
+
   return (
     <div className={classes}>
       <ul className={isMapVariant ? css.listingCardsMapVariant : css.listingCards}>
@@ -88,6 +95,27 @@ const SearchResultsPanel = props => {
         {props.children}
       </ul>
       {paginationLinks}
+      {others.length > 0 ? (
+        <section className={css.otherSessions} data-testid="otherSessions">
+          <h2 className={css.otherSessionsHeading}>
+            <FormattedMessage id="SearchResultsPanel.otherSessionsHeading" />
+          </h2>
+          <p className={css.otherSessionsIntro}>
+            <FormattedMessage id="SearchResultsPanel.otherSessionsIntro" />
+          </p>
+          <ul className={isMapVariant ? css.listingCardsMapVariant : css.listingCards}>
+            {others.map(l => (
+              <li key={l.id.uuid} className={css.resultItem}>
+                <ListingCard
+                  className={css.listingCard}
+                  listing={l}
+                  renderSizes={cardRenderSizes(isMapVariant)}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 };

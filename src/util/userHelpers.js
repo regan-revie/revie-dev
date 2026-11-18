@@ -1,5 +1,6 @@
 import { EXTENDED_DATA_SCHEMA_TYPES } from './types';
 import { getFieldValue } from './fieldHelpers';
+import { isRetiredUserField, isHiddenAtSignUp } from './userFieldPolicy';
 
 /**
  * Get the namespaced attribute key based on the specified extended data scope and attribute key
@@ -115,7 +116,13 @@ export const getPropsForCustomUserFieldInputs = (
         !userTypeConfig?.limitToUserTypeIds || userTypeConfig?.userTypeIds?.includes(userType);
       const isUserScope = ['public', 'private', 'protected'].includes(scope);
 
-      return isKnownSchemaType && isTargetUserType && isUserScope && showField
+      // Revie: retired fields (gender) are not asked anywhere; stored answers are left alone.
+      return isKnownSchemaType &&
+        isTargetUserType &&
+        isUserScope &&
+        showField &&
+        !isRetiredUserField(fieldConfig) &&
+        !(isSignup && isHiddenAtSignUp(fieldConfig, userType))
         ? [
             ...pickedFields,
             {

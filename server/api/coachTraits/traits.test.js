@@ -44,6 +44,16 @@ describe('coach traits: profile -> listing', () => {
     );
   });
 
+  it('the options added in November 2026 use the same key on both sides', () => {
+    const { traits, unmapped } = listingTraitsFromProfile({
+      personality_identifier: ['perimenopause', 'disabled', 'caregiver'],
+      location: 'australia-nz',
+    });
+    expect(unmapped).toEqual([]);
+    expect(traits.identity).toEqual(['perimenopause', 'disabled', 'caregiver']);
+    expect(traits.coachlocation).toBe('australia-nz');
+  });
+
   it('every option on every profile field has a listing counterpart (no silent drops)', () => {
     // The user-side option lists, as configured in Console on Dev.
     const userOptions = {
@@ -63,6 +73,9 @@ describe('coach traits: profile -> listing', () => {
         'immigrant',
         'ex-corporate',
         'first-generation',
+        'perimenopause',
+        'disabled',
+        'caregiver',
       ],
       languages: [
         'english',
@@ -85,6 +98,7 @@ describe('coach traits: profile -> listing', () => {
         'asia',
         'latin-america',
         'south-america',
+        'australia-nz',
       ],
       communication_style: [
         'direct',

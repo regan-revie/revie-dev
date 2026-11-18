@@ -1079,6 +1079,8 @@
   "SearchPage.detailNo": "No",
   "SearchPage.detailYes": "Yes",
   "SearchPage.invalidDatesFilter": "Invalid date range filter values in URL. The filter was ignored.",
+  "SearchResultsPanel.otherSessionsHeading": "Other coaches you might like",
+  "SearchResultsPanel.otherSessionsIntro": "Only a few coaches match that right now. Here are others you might like.",
   "SearchPage.noResults": "Couldn't find any listings that match your search criteria.",
   "SearchPage.resetAllFilters": "Reset filters",
   "SearchPage.schemaDescription": "Showing search results",

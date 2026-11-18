@@ -20,6 +20,7 @@ import {
   onSortBy,
 } from './SearchPage.shared';
 
+import { FEW_RESULTS_LIMIT } from './SearchPage.duck';
 import FilterComponent from './FilterComponent';
 import MainPanelHeader from './MainPanelHeader/MainPanelHeader';
 import SearchFiltersMobile from './SearchFiltersMobile/SearchFiltersMobile';
@@ -132,6 +133,7 @@ export class SearchPageComponent extends Component {
     const {
       intl,
       listings = [],
+      otherListings = [],
       location,
       onManageDisableScrolling,
       pagination,
@@ -197,6 +199,7 @@ export class SearchPageComponent extends Component {
         location={location}
         resetAll={this.resetAll}
         showCreateListingsLink={showCreateListingsLink}
+        hasOtherSessions={otherListings.length > 0}
       />
     );
 
@@ -315,6 +318,9 @@ export class SearchPageComponent extends Component {
                 <SearchResultsPanel
                   className={css.searchListingsPanel}
                   listings={listings}
+                  otherListings={
+                    listingsAreLoaded && totalItems < FEW_RESULTS_LIMIT ? otherListings : []
+                  }
                   pagination={listingsAreLoaded ? pagination : null}
                   search={parse(location.search)}
                   isMapVariant={false}
@@ -349,6 +355,9 @@ const SearchPage = props => {
   const listings = useSelector(state =>
     selectListingsById(state, state.SearchPage.currentPageResultIds)
   );
+  const otherListings = useSelector(state =>
+    selectListingsById(state, state.SearchPage.otherSessionIds || [])
+  );
   const scrollingDisabled = useSelector(state => isScrollingDisabled(state));
 
   const onManageDisableScrolling = useCallback(
@@ -363,6 +372,7 @@ const SearchPage = props => {
       PageComponent={SearchPageComponent}
       currentUser={currentUser}
       listings={listings}
+      otherListings={otherListings}
       pagination={pagination}
       scrollingDisabled={scrollingDisabled}
       searchInProgress={searchInProgress}
