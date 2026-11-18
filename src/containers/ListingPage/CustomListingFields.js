@@ -9,6 +9,8 @@ import {
   pickCustomFieldProps,
 } from '../../util/fieldHelpers.js';
 
+import { OUTCOME_KEYS } from '../../util/sessionOutcomes';
+
 import CustomExtendedDataSection from '../../components/CustomExtendedDataSection/CustomExtendedDataSection.js';
 
 /**
@@ -28,8 +30,12 @@ const CustomListingFields = props => {
   const currentCategories = Object.values(categoriesObj);
 
   // Fields are shown by default. Set showConfig.displayOnListingPage to false to explicitly hide a field.
+  // Revie: the session's outcomes have their own numbered section (SessionOutcomesSection). Console
+  // shows a short-text field as a detail by default, so without this they would be listed twice.
   const displayableFieldConfigs = listingFieldConfigs.filter(
-    fieldConfig => fieldConfig.showConfig?.displayOnListingPage !== false
+    fieldConfig =>
+      fieldConfig.showConfig?.displayOnListingPage !== false &&
+      !OUTCOME_KEYS.includes(fieldConfig.key)
   );
 
   const isFieldForSelectedCategories = fieldConfig => {

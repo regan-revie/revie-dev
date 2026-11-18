@@ -22,6 +22,7 @@ const nylasCallback = require('./api/nylas/callback');
 const nylasAvailability = require('./api/nylas/availabilityEndpoint');
 const nylasEnableListing = require('./api/nylas/enableListing');
 const nylasSyncMe = require('./api/nylas/syncMe');
+const coachTraitsSyncMe = require('./api/coachTraits/syncMe');
 const nylasCreateBooking = require('./api/nylas/createBookingEndpoint');
 const nylasCancelBooking = require('./api/nylas/cancelBookingEndpoint');
 const nylasRescheduleBooking = require('./api/nylas/rescheduleBookingEndpoint');
@@ -102,6 +103,8 @@ router.post('/nylas/enable-listing', nylasEnableListing);
 // The server keeps session listings bookable by itself (server/api/nylas/reconcile.js); this makes
 // the logged-in coach's own listings catch up immediately, e.g. after saving working hours.
 router.post('/nylas/sync-me', nylasSyncMe);
+// Copies the coach's profile traits (language, location, ...) onto their listings so search can filter on them.
+router.post('/coach-traits/sync-me', coachTraitsSyncMe);
 
 // The call that actually creates the Nylas booking, once a client's payment is confirmed. See
 // server/api/nylas/createBookingEndpoint.js for why this exists at all.

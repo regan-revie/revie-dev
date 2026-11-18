@@ -10,6 +10,7 @@ import {
   SCHEMA_TYPE_MULTI_ENUM,
 } from '../../../../util/types';
 import { LISTING_PAGE_PARAM_TYPE_NEW } from '../../../../util/urlHelpers';
+import { COACH_TRAIT_LISTING_KEYS } from '../../../../util/coachTraits';
 import {
   isFieldForCategory,
   isFieldForListingType,
@@ -111,7 +112,7 @@ const hasSetListingType = publicData => {
  * @param {Object} listingFieldConfigs an extended data configurtions for listing fields.
  * @returns Array of picked extended data fields from submitted data.
  */
-const pickListingFieldsData = (
+export const pickListingFieldsData = (
   data,
   targetScope,
   targetListingType,
@@ -124,6 +125,13 @@ const pickListingFieldsData = (
     const { key, scope = 'public', schemaType } = fieldConfig || {};
     const namespacePrefix = scope === 'public' ? `pub_` : `priv_`;
     const namespacedKey = `${namespacePrefix}${key}`;
+
+    // Revie: the coach's traits are written by the server from their profile. This form never shows
+    // them, so it must not send them either: a missing value below becomes null, which would blank
+    // the listing's traits on every save and take it out of search.
+    if (scope === 'public' && COACH_TRAIT_LISTING_KEYS.includes(key)) {
+      return fields;
+    }
 
     const isKnownSchemaType = EXTENDED_DATA_SCHEMA_TYPES.includes(schemaType);
     const isTargetScope = scope === targetScope;

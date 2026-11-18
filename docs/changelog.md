@@ -19,6 +19,58 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-18 (coach onboarding: traits asked once on the profile, copied to listings; slimmer coach sign-up)
+
+**Branch / PR:** `coach-traits-sync`, one PR against `main`, not merged. Field reference for the whole onboarding: `docs/onboarding-fields.md`.
+
+**What changed**
+1. **A coach's language, location, identity tags and communication style are asked once, on the profile, and copied onto every one of their session listings by the server**, because search can only filter on listing data. Mapping: `personality_identifier`→`identity`, `languages`→`language`, `location`→`coachlocation`, new `communication_style`→`communication_style`. Public fields only; the private gender `identity` is never read. Option keys that differ (5 for identity, 3 for location) are translated in code, nothing renamed in Console. An empty profile value never clears a listing value. Code: `server/api/coachTraits/`.
+2. **Three triggers, one function:** saving the profile (coaches only) calls `POST /api/coach-traits/sync-me` so listings update in seconds; a loop every 60 seconds covers every published listing (so publishing a session fills it in, and anything the first trigger missed), calendar connected or not; and `scripts/coach-traits-backfill.js` for everyone at once.
+3. **The session editor no longer asks the four** and its Details save no longer sends them (the stock code would have written `null` over them on every save). `structure` stays per session. The wizard also stops treating them as required for the Details tab to count as complete: the server only fills published listings, so a Console "required" flag would have kept a new session stuck on Details.
+4. **The four profile fields are required for coaches** (in code; Console's required flag would hit clients too). The coach setup card gets a third row, "Finish your profile" (button to the profile, ticked when all four are answered). A coach with any missing is "not finished", but a session that is already bookable stays bookable: the card then says "Clients can book this session, but can't find it yet". In an environment where none of the four user fields exist, the row does not appear.
+5. **Coach sign-up slimmed** (Console only, steps below): name, email, password, location, age check, terms. Certifications, other certifications and gender identity move to the profile. Display name leaves sign-up; Sharetribe is documented to show "First L." instead.
+6. **Reverse backfill for cutover** (listing values into EMPTY profile fields; never overwrites an answer; a location that a coach's listings disagree on is left and reported).
+7. **A bug from my outcomes PR, fixed here:** Console shows a short-text field in the page's Details list by default, so each outcome appeared twice on the session page (the numbered list and again as "Outcome 1: ..."). `CustomListingFields.js` now leaves them out of that list; no Console setting needed. My earlier HANDOFF told you to avoid "show as detail", which was wrong, since it is on by default.
+8. **Tests:** 27 client, 31 server, all new; both suites and the format check are clean.
+
+**Console steps for you (Dev only; I did not use flex-cli: its `assets pull` hung earlier, and a push replaces the whole asset set, so I did not want to risk it).** Nothing on Test or Live; they are logged in `docs/go-live-plan.md`. The Console menu names below are from memory, so use the same screens where you added the outcome fields; the key names are exact.
+1. **Add a user field.** Key `communication_style`. Label "My communication style..." (matches "More about me..."). Type multiple choice. Scope public. Applies to the user type "I'm a coach looking for clients" only. Not in sign-up. Not required. Options, key then label: `direct` Direct, `empathetic` Empathetic, `analytical` Analytical, `supportive` Supportive, `challenging` Challenging, `intuitive` Intuitive. Keys must be exactly these, they match the listing field.
+2. **Take three user fields out of sign-up** (turn off "show in sign-up", leave everything else): `certifications` ("Your certifications"), `othercerts` ("Other diplomas / certifications"), `identity` ("How do you identify?").
+3. **User type "I'm a coach looking for clients": turn off display name in sign-up.**
+4. **Make four listing fields optional** (turn "required" off, leave their filter settings alone): `identity`, `communication_style`, `language`, `coachlocation`. The code already ignores their required flag, so this is only to keep Console telling the truth.
+5. **Nothing to change on the profile fields' required flags.** `location` stays required at sign-up (everyone); `personality_identifier`, `languages` and `communication_style` stay optional in Console because clients share them. Coaches are required in code.
+6. Code works in any order, but do 1 before testing the profile: until the field exists it is not asked and not counted.
+
+**Render Shell commands (Dev service), after the PR is merged and deployed.** Each needs one of `--dry-run` or `--apply`; there is no default, so it cannot write by accident. The output is user and listing ids and option keys only.
+```
+node scripts/coach-traits-backfill.js reverse --dry-run
+node scripts/coach-traits-backfill.js reverse --apply
+node scripts/coach-traits-backfill.js forward --dry-run
+node scripts/coach-traits-backfill.js forward --apply
+```
+`reverse` first: it fills coaches' empty profile answers from what their listings already say (this is the cutover rehearsal on Dev data). Read the dry run before each apply. `forward` then copies profile answers onto listings; once `reverse` has run it should mostly report nothing to change. Both are safe to run again.
+
+**Test steps on Dev** (after the Console steps; hard-refresh once)
+1. **Sign up as a new coach** (new email): the form has account type, name, email, password, location, age check, terms. No display name, certifications, gender. After verifying, the name shows as "First L." on the profile and the session page. *If it shows something else, tell me: that is the one thing I could not check (every existing Dev user has a display name).*
+2. **Setup card:** open one of that coach's sessions: three rows (Connect your calendar, Add payout details, Finish your profile).
+3. **Profile settings:** the four questions are there ("More about me...", languages, location, "My communication style...") plus certifications, gender, pronouns. Leave one empty: Save stays disabled. Answer all four and save.
+4. **Within a few seconds**, search the marketplace filtering by that coach's language and location: their published sessions appear. The card's third row is ticked after a refresh.
+5. **New session:** the Details tab no longer has identity, language, location or communication style; you can complete Details and publish without them. After about a minute the session shows up in filters.
+6. **Edit an existing session** (change the description, save): it must still appear in the filters, which proves the save did not blank the traits.
+7. **A coach whose profile is empty but whose session is already bookable:** the card reads "Clients can book this session, but can't find it yet" with the profile row; a client can still book it.
+8. **Session page:** the outcomes appear once, as the numbered list, not also as "Outcome 1: ..." in the details.
+9. **Client sign-up and profile are unchanged**, and clients can save a profile without answering those four.
+10. Run the four backfill commands above.
+
+**Not verified:** nothing was exercised in a browser or against Dev data (the private marketplace needs a login): the sync is covered by tests with a fake Sharetribe, and by reading Dev's real config. In particular unverified: the "First L." default, how long Sharetribe's search index takes to reflect a listing update, and Console's exact menu names. Live's user fields were not checked at all.
+
+**What's next**
+- Session page redesign: show `focusareas` as "tools"; the four traits still appear in the listing Details list as before.
+- Left alone on purpose: photo fallback, pricing/`startTimeInterval`, folding the age check into terms.
+- At cutover: the order is in `docs/go-live-plan.md`.
+
+---
+
 ## HANDOFF — 2026-11-18 (session outcomes: three short fields replace the free-text "walk away with")
 
 **Branch / PR:** `session-outcomes-fields`, one PR against `main`, not merged. Rebased on `main` after PR #42 merged; the only conflict was this file, resolved by keeping both entries.

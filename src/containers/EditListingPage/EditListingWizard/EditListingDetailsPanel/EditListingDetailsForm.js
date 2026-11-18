@@ -15,6 +15,7 @@ import {
 } from '../../../../util/fieldHelpers';
 import { maxLength, required, composeValidators } from '../../../../util/validators';
 import { OUTCOME_KEYS } from '../../../../util/sessionOutcomes';
+import { COACH_TRAIT_LISTING_KEYS } from '../../../../util/coachTraits';
 
 // Import shared components
 import {
@@ -261,6 +262,12 @@ const AddListingFields = props => {
   const fields = listingFieldsConfig.reduce((pickedFields, fieldConfig) => {
     const { key, schemaType, scope } = fieldConfig || {};
     const namespacedKey = scope === 'public' ? `pub_${key}` : `priv_${key}`;
+
+    // Revie: identity, language, coachlocation and communication_style are the coach's, asked once on
+    // their profile and copied onto their listings by the server (server/api/coachTraits/).
+    if (COACH_TRAIT_LISTING_KEYS.includes(key)) {
+      return pickedFields;
+    }
 
     // Revie: outcome_1..3 are drawn together as one block, at the position of outcome_1. Outcomes 2
     // and 3 are skipped here. Nothing shows until outcome_1 exists in Console for this listing type.

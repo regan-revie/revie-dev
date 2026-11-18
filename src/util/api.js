@@ -160,6 +160,12 @@ export const nylasSyncMe = () => {
   return post('/api/nylas/sync-me', {});
 };
 
+// Copies the coach's profile traits (language, location, ...) onto their session listings so
+// search can filter on them. See server/api/coachTraits/syncMe.js.
+export const coachTraitsSyncMe = () => {
+  return post('/api/coach-traits/sync-me', {});
+};
+
 // The session time to actually display: our own database once a reschedule has moved it,
 // Sharetribe's original booking record otherwise. See bookingStatusEndpoint.js.
 export const nylasBookingStatus = ({ transactionId }) => {

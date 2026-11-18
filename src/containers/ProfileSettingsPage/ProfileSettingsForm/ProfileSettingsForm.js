@@ -23,6 +23,7 @@ import {
   CustomExtendedDataField,
 } from '../../../components';
 
+import { withCoachTraitsRequired } from '../../../util/coachTraits';
 import css from './ProfileSettingsForm.module.css';
 
 const ACCEPT_IMAGES = 'image/*';
@@ -263,11 +264,17 @@ class ProfileSettingsFormComponent extends Component {
           const submitDisabled =
             invalid || pristine || pristineSinceLastSubmit || uploadInProgress || submitInProgress;
 
+          // Revie: a coach's language, location, identity tags and communication style are what
+          // their session listings are searched by, so they are required of coaches only (Console
+          // cannot do that: these fields are shared with clients).
           const userFieldProps = getPropsForCustomUserFieldInputs(
             userFields,
             userTypeConfig?.userType,
             false
-          );
+          ).map(props => ({
+            ...props,
+            fieldConfig: withCoachTraitsRequired(props.fieldConfig, userTypeConfig?.userType),
+          }));
 
           return (
             <Form

@@ -6,6 +6,7 @@ import { useConfiguration } from '../../../context/configurationContext';
 import { useRouteConfiguration } from '../../../context/routeConfigurationContext';
 import { FormattedMessage, intlShape, useIntl } from '../../../util/reactIntl';
 import { displayDescription } from '../../../util/configHelpers.js';
+import { COACH_TRAIT_LISTING_KEYS } from '../../../util/coachTraits';
 import {
   displayDeliveryPickup,
   displayDeliveryShipping,
@@ -184,7 +185,7 @@ const tabLabelAndSubmit = (intl, tab, isNewListingFlow, isPriceDisabled, process
  * @param {Object} publicData
  * @param {Object} privateData
  */
-const hasValidListingFieldsInExtendedData = (publicData, privateData, config) => {
+export const hasValidListingFieldsInExtendedData = (publicData, privateData, config) => {
   const isValidField = (fieldConfig, fieldData) => {
     const { key, schemaType, enumOptions = [], saveConfig = {} } = fieldConfig;
 
@@ -203,7 +204,12 @@ const hasValidListingFieldsInExtendedData = (publicData, privateData, config) =>
 
     const isTargetListingType = isFieldForListingType(publicData?.listingType, fieldConfig);
     const isTargetCategory = isFieldForCategory(currentCategories, fieldConfig);
-    const isRequired = !!saveConfig.isRequired && isTargetListingType && isTargetCategory;
+    // Revie: the coach's traits are not asked in this wizard. The server copies them from the
+    // profile, but only onto published listings, so a Console "required" flag on them would leave a
+    // new session's Details tab incomplete forever.
+    const isCoachTrait = COACH_TRAIT_LISTING_KEYS.includes(key);
+    const isRequired =
+      !!saveConfig.isRequired && isTargetListingType && isTargetCategory && !isCoachTrait;
 
     if (isRequired) {
       const savedListingField = fieldData[key];

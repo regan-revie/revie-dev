@@ -699,4 +699,123 @@ describe('OrderPanel', () => {
       expect(getByText('OrderPanel.ctaButtonMessageInquiry')).toBeInTheDocument();
     });
   });
+
+  // "Finish your profile": the third row of the coach's setup card. The coach's language, location,
+  // identity tags and communication style are what their sessions are searched by.
+  describe('Booking: fixed, own listing: the profile row', () => {
+    const traitField = (key, schemaType = 'multi-enum') => ({
+      key,
+      label: key,
+      scope: 'public',
+      schemaType,
+      showConfig: { label: key },
+      saveConfig: { label: key },
+      enumOptions: [{ option: 'x', label: 'X' }],
+      userTypeConfig: { limitToUserTypeIds: true, userTypeIds: ['coach'] },
+    });
+    // Console's shape (hosted asset), which the test provider merges into the app config.
+    const withTraitFields = {
+      ...config,
+      userTypes: {
+        userTypes: [
+          { id: 'coach', label: 'Coach', roles: { provider: true, customer: false } },
+          { id: 'client', label: 'Client', roles: { provider: false, customer: true } },
+        ],
+      },
+      userFields: {
+        userFields: [
+          ...(config.userFields?.userFields || []),
+          traitField('personality_identifier'),
+          traitField('languages'),
+          traitField('location', 'enum'),
+          traitField('communication_style'),
+        ],
+      },
+    };
+    const ALL = {
+      personality_identifier: ['x'],
+      languages: ['x'],
+      location: 'x',
+      communication_style: ['x'],
+    };
+    const coachWith = traits => ({
+      user: {
+        currentUser: createCurrentUser('coach1', {
+          stripeConnected: true,
+          profile: {
+            publicData: { calendarConnected: true, userType: 'coach', ...traits },
+            privateData: { nylasGrantId: 'g' },
+          },
+        }),
+      },
+    });
+    const PROFILE = 'OrderPanel.setupFinishProfile';
+    const button = name => screen.queryByRole('button', { name });
+
+    it('calendar and payouts done but the profile not: still the card, with a button to the profile', async () => {
+      renderFixed(
+        { listing: fixedListing({ calendarBookingEnabled: true }), isOwnListing: true },
+        { initialState: coachWith({ languages: ['x'] }), config: withTraitFields }
+      );
+      await waitFor(() => {
+        expect(screen.getByText('OrderPanel.setupCardHeadingFindable')).toBeInTheDocument();
+      });
+      expect(button(PROFILE)).toBeInTheDocument();
+      expect(button('OrderPanel.setupConnectCalendar')).not.toBeInTheDocument();
+      expect(button('OrderPanel.setupAddPayoutDetails')).not.toBeInTheDocument();
+      expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+    });
+
+    it('any one of the four missing counts as not finished', async () => {
+      const { location, ...withoutLocation } = ALL;
+      renderFixed(
+        { listing: fixedListing({ calendarBookingEnabled: true }), isOwnListing: true },
+        { initialState: coachWith(withoutLocation), config: withTraitFields }
+      );
+      await waitFor(() => {
+        expect(button(PROFILE)).toBeInTheDocument();
+      });
+    });
+
+    it('all four answered: the row is ticked and, with the rest done, the card is gone', async () => {
+      renderFixed(
+        { listing: fixedListing({ calendarBookingEnabled: true }), isOwnListing: true },
+        { initialState: coachWith(ALL), config: withTraitFields }
+      );
+      await waitFor(() => {
+        expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+      });
+      expect(screen.queryByText('OrderPanel.setupCardHeadingFindable')).not.toBeInTheDocument();
+      expect(button(PROFILE)).not.toBeInTheDocument();
+    });
+
+    it('with nothing else done, the profile is the third row in the usual card', async () => {
+      renderFixed(
+        { listing: fixedListing(), isOwnListing: true },
+        {
+          initialState: {
+            user: { currentUser: createCurrentUser('coach1', { stripeConnected: false }) },
+          },
+          config: withTraitFields,
+        }
+      );
+      await waitFor(() => {
+        expect(screen.getByText('OrderPanel.setupCardHeading')).toBeInTheDocument();
+      });
+      expect(button('OrderPanel.setupConnectCalendar')).toBeInTheDocument();
+      expect(button('OrderPanel.setupAddPayoutDetails')).toBeInTheDocument();
+      expect(button(PROFILE)).toBeInTheDocument();
+    });
+
+    it('where Console has none of the four profile fields, there is no profile row at all', async () => {
+      renderFixed(
+        { listing: fixedListing(), isOwnListing: true },
+        { initialState: coachWith({}), config }
+      );
+      await waitFor(() => {
+        expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+      });
+      expect(button(PROFILE)).not.toBeInTheDocument();
+    });
+  });
 });
