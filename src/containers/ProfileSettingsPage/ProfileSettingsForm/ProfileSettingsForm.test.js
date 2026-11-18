@@ -467,3 +467,47 @@ describe('ProfileSettingsForm', () => {
     expect(screen.getByRole('button', { name: 'ProfileSettingsForm.saveChanges' })).toBeEnabled();
   });
 });
+
+describe('ProfileSettingsForm: coach-level traits are required of coaches only', () => {
+  const traitField = {
+    key: 'languages',
+    scope: 'public',
+    schemaType: 'multi-enum',
+    enumOptions: [{ option: 'english', label: 'English' }, { option: 'french', label: 'French' }],
+    // Console has it optional: it is shared with clients, so the requirement lives in code.
+    saveConfig: { label: 'Languages', displayInSignUp: false, isRequired: false },
+  };
+  const renderFor = userType =>
+    render(
+      <ProfileSettingsForm
+        intl={fakeIntl}
+        onSubmit={noop}
+        uploadInProgress={false}
+        updateInProgress={false}
+        currentUser={createCurrentUser('userId', attributes)}
+        profileImage={{}}
+        userFields={[traitField]}
+        userTypeConfig={{ userType, label: userType, defaultUserFields: {} }}
+        initialValues={{ firstName: 'First', lastName: 'Last', bio: 'Hello' }}
+      />
+    );
+
+  const saveButton = () => screen.getByRole('button', { name: 'ProfileSettingsForm.saveChanges' });
+
+  it('a coach cannot save without answering', async () => {
+    const user = userEvent.setup();
+    renderFor('coach');
+    await user.type(screen.getByLabelText('ProfileSettingsForm.bioLabel'), ' there');
+    expect(saveButton()).toBeDisabled();
+
+    await user.click(screen.getByLabelText('English'));
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it('a client can save without answering, as Console has it', async () => {
+    const user = userEvent.setup();
+    renderFor('client');
+    await user.type(screen.getByLabelText('ProfileSettingsForm.bioLabel'), ' there');
+    expect(saveButton()).toBeEnabled();
+  });
+});

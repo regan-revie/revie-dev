@@ -27,6 +27,8 @@ import { formatMoney } from '../../util/currency';
 import { createSlug, parse, stringify } from '../../util/urlHelpers';
 import { userDisplayNameAsString } from '../../util/data';
 import { getCalendarConnection } from '../../util/calendarConnection';
+import { missingCoachTraits, requiredCoachTraitKeys } from '../../util/coachTraits';
+import { useConfiguration } from '../../context/configurationContext';
 import {
   OFFER,
   REQUEST,
@@ -356,12 +358,18 @@ const OrderPanel = props => {
   // is still to do (connect a calendar, add payout details) until both are done; everyone else sees
   // that the coach is not taking bookings yet. None of this needs a timezone, since a listing the
   // server has not reached has no availability plan yet.
+  const config = useConfiguration();
   const currentUser = useSelector(state => state.user?.currentUser);
   const calendarConnected = getCalendarConnection(currentUser).connected;
   const payoutDetailsSet = !!currentUser?.attributes?.stripeConnected;
+  // The profile answers a coach's sessions are searched by. Unfinished counts as not finished, but
+  // it does not stop the session being booked, so it never shows the "setting up" notice below.
+  const traitsAsked = requiredCoachTraitKeys(config?.user?.userFields).length > 0;
+  const profileFinished =
+    !traitsAsked || missingCoachTraits(currentUser, config?.user?.userFields).length === 0;
   const isOpenSession = mounted && shouldHaveFixedBookingDuration && !isClosed;
   const showSessionSetupCard =
-    isOpenSession && isOwnListing && !(calendarConnected && payoutDetailsSet);
+    isOpenSession && isOwnListing && !(calendarConnected && payoutDetailsSet && profileFinished);
   const showSettingUpNotice =
     isOpenSession &&
     isOwnListing &&
@@ -516,6 +524,8 @@ const OrderPanel = props => {
           <SessionSetupCard
             calendarConnected={calendarConnected}
             payoutDetailsSet={payoutDetailsSet}
+            profileFinished={traitsAsked ? profileFinished : undefined}
+            bookable={calendarConnected && payoutDetailsSet}
           />
         ) : showNylasBookingForm ? (
           <NylasBookingForm

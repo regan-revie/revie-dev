@@ -1,7 +1,7 @@
 import { mergeConfig } from '../../../util/configHelpers';
 import { getDefaultConfiguration, getHostedConfiguration } from '../../../util/testHelpers';
 
-import { tabsForListingType } from './EditListingWizard';
+import { hasValidListingFieldsInExtendedData, tabsForListingType } from './EditListingWizard';
 import { AVAILABILITY, DETAILS, PHOTOS, PRICING } from './EditListingWizardTab';
 
 // The listing type exactly as Console serves it for Dev (hosted asset listings/listing-types.json),
@@ -67,5 +67,40 @@ describe('wizard tabs for a booking listing, from the config Dev actually serves
   it('do not change anything for the other processes', () => {
     const [session] = processedTypes([HOSTED_SESSION_TYPE]);
     expect(tabsForListingType('default-purchase', session)).not.toContain(AVAILABILITY);
+  });
+});
+
+describe('Details tab completeness and the coach-level traits', () => {
+  // Console has the four traits as required listing fields; the editor no longer asks for them and
+  // the server fills them in only after publish, so they must never hold the Details tab open.
+  const required = (key, schemaType) => ({
+    key,
+    scope: 'public',
+    schemaType,
+    enumOptions: [{ option: 'a', label: 'A' }],
+    saveConfig: { isRequired: true },
+  });
+  const config = {
+    categoryConfiguration: { key: 'categoryLevel', categories: [] },
+    listing: {
+      listingFields: [
+        required('identity', 'multi-enum'),
+        required('communication_style', 'multi-enum'),
+        required('language', 'multi-enum'),
+        required('coachlocation', 'enum'),
+        required('structure', 'enum'),
+      ],
+    },
+  };
+  const publicData = { listingType: 'signature-session' };
+
+  it('does not wait for identity, communication style, language or location', () => {
+    expect(hasValidListingFieldsInExtendedData({ ...publicData, structure: 'a' }, {}, config)).toBe(
+      true
+    );
+  });
+
+  it('still waits for a required field that is asked per session', () => {
+    expect(hasValidListingFieldsInExtendedData(publicData, {}, config)).toBe(false);
   });
 });

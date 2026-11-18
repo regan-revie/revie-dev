@@ -2,6 +2,8 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { denormalisedResponseEntities } from '../../util/data';
 import { storableError } from '../../util/errors';
 import { setCurrentUser } from '../../ducks/user.duck';
+import { coachTraitsSyncMe } from '../../util/api';
+import { COACH_USER_TYPE } from '../../util/coachTraits';
 
 // ================ Async Thunks ================ //
 
@@ -58,6 +60,13 @@ export const updateProfileThunk = createAsyncThunk(
 
         // Update current user in state.user.currentUser through user.duck.js
         dispatch(setCurrentUser(currentUser));
+
+        // Revie: a coach's language, location etc. are searched on their listings, so copy the
+        // new answers there now. Fire and forget: the server loop does the same within a minute,
+        // so a failure here must never turn a saved profile into an error.
+        if (currentUser?.attributes?.profile?.publicData?.userType === COACH_USER_TYPE) {
+          coachTraitsSyncMe().catch(() => null);
+        }
         return response;
       })
       .catch(e => {

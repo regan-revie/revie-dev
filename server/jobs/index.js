@@ -8,6 +8,7 @@
 
 const { runBookingSweep } = require('./bookingSweeper');
 const { runReconcile } = require('../api/nylas/reconcile');
+const { runTraitSync } = require('../api/coachTraits/reconcileTraits');
 const { resolveMissingEventIds } = require('../api/nylas/eventIdBackfill');
 const { processDueEventCancellations } = require('../api/nylas/calendarEventSync');
 const {
@@ -101,11 +102,32 @@ const start = () => {
     }
   };
 
+  // Coach traits (language, location, ...) from the profile onto each published listing
+  // (server/api/coachTraits/reconcileTraits.js). Its own flag and timer: it needs no calendar and no
+  // database, so a Nylas problem must not stop it and it must not slow the reconcile loop.
+  let syncingTraits = false;
+  const traitsTick = async () => {
+    if (syncingTraits) return;
+    syncingTraits = true;
+    try {
+      const result = await runTraitSync();
+      if (result.listingsUpdated > 0 || result.failed > 0) {
+        console.log('[jobs] coach traits', JSON.stringify(result)); // eslint-disable-line no-console
+      }
+    } catch (e) {
+      log.error(e, 'coach-traits-loop-failed', {});
+    } finally {
+      syncingTraits = false;
+    }
+  };
+
   // unref(): these timers must never be the reason the process stays alive.
   setTimeout(tick, FIRST_SWEEP_AFTER_MS).unref();
   setInterval(tick, SWEEP_EVERY_MS).unref();
   setTimeout(reconcileTick, FIRST_SWEEP_AFTER_MS + 15 * 1000).unref();
   setInterval(reconcileTick, SWEEP_EVERY_MS).unref();
+  setTimeout(traitsTick, FIRST_SWEEP_AFTER_MS + 30 * 1000).unref();
+  setInterval(traitsTick, SWEEP_EVERY_MS).unref();
 };
 
 module.exports = { start };

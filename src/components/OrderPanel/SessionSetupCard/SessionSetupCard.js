@@ -51,22 +51,38 @@ const Step = ({ done, labelId, routeName }) => {
 };
 
 /**
- * What the coach still has to do before clients can book a session, shown to the listing's author
- * in the sidebar in place of the booking form. Two steps, each either done (a tick, no button) or
- * not (a button to where it is done). Rendered by OrderPanel only while at least one is outstanding;
- * once both are done the server finishes the setup by itself (server/api/nylas/reconcile.js).
+ * What the coach still has to do, shown to the listing's author in the sidebar in place of the
+ * booking form. Three steps, each either done (a tick, no button) or not (a button to where it is
+ * done). Rendered by OrderPanel only while at least one is outstanding; once the calendar and
+ * payouts are done the server finishes the booking setup by itself (server/api/nylas/reconcile.js).
+ *
+ * The profile step is about being found, not about booking: a session can already be bookable while
+ * the profile is unfinished, and then the card says so rather than claiming it cannot be booked.
  *
  * @param {Object} props
  * @param {boolean} props.calendarConnected
  * @param {boolean} props.payoutDetailsSet
+ * @param {boolean} [props.profileFinished] the coach has answered the profile questions that their
+ *   sessions are searched by (language, location, ...). Leave undefined where there are none to
+ *   answer (no such user fields in Console), and the row is not shown.
+ * @param {boolean} [props.bookable=false] the session can already be booked, so only the profile is left
  */
-const SessionSetupCard = ({ calendarConnected, payoutDetailsSet }) => (
+const SessionSetupCard = ({
+  calendarConnected,
+  payoutDetailsSet,
+  profileFinished,
+  bookable = false,
+}) => (
   <section className={css.card} aria-labelledby="sessionSetupHeading">
     <H4 as="h2" id="sessionSetupHeading" className={css.heading}>
-      <FormattedMessage id="OrderPanel.setupCardHeading" />
+      <FormattedMessage
+        id={bookable ? 'OrderPanel.setupCardHeadingFindable' : 'OrderPanel.setupCardHeading'}
+      />
     </H4>
     <p className={css.intro}>
-      <FormattedMessage id="OrderPanel.setupCardIntro" />
+      <FormattedMessage
+        id={bookable ? 'OrderPanel.setupCardIntroFindable' : 'OrderPanel.setupCardIntro'}
+      />
     </p>
     <ul className={css.steps}>
       <Step
@@ -79,6 +95,13 @@ const SessionSetupCard = ({ calendarConnected, payoutDetailsSet }) => (
         labelId="OrderPanel.setupAddPayoutDetails"
         routeName="StripePayoutPage"
       />
+      {profileFinished === undefined ? null : (
+        <Step
+          done={profileFinished}
+          labelId="OrderPanel.setupFinishProfile"
+          routeName="ProfileSettingsPage"
+        />
+      )}
     </ul>
   </section>
 );
