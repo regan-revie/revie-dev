@@ -19,6 +19,28 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-19 (fix: "Other coaches you might like" cards had no image or coach name)
+
+**Branch / PR:** `fallback-card-include-author-images`, one PR against `main`, not merged. My bug, from PR #45.
+
+**What changed**
+1. **Cause, as you suspected:** the fallback query asked Sharetribe for the listings but not for their author, their images or the image variants the card uses (and no `include`). So the response held bare listings: the card had nothing to draw an image or "by Coach Name" from, and showed "No image" until you opened a session, which loaded the full listing into the store from elsewhere.
+2. **Fix:** the search results and the fallback now build their card query from one function, `listingCardQueryParams(config)` in `src/containers/SearchPage/SearchPage.duck.js` (author and images included, the card's image variants, the card's listing fields). The fallback adds one extra field, `publicData.calendarBookingEnabled`, which it filters on (fields are sparse, so it has to be asked for by name). The main search's query is unchanged, byte for byte (its existing test still passes). If the cards' fields or image sizes change, change that one function and both follow.
+3. **Tests** (4 new, in `SearchPage.fallbackCards.test.js`): the fallback query carries the same include, user fields, image fields and limit as the search, plus the booking flag; with an empty store, a fallback card renders its image (the card's own variant, not the "no image" placeholder) and "by Coach Casey" from the fallback response alone; a control that shows what the old response produced (no image, no name). I checked the first two fail when the old query is put back.
+
+**Console steps for you:** none.
+
+**Test steps on Dev** (after deploy; hard-refresh)
+1. Search with filters that match fewer than 3 sessions. The "Other coaches you might like" cards show their photo and "by <coach name>" straight away, without opening any session first. Do it in a fresh tab so nothing is cached in the page.
+2. Same on phone width.
+
+**Not verified:** not exercised in a browser or on Dev data. The test uses a fake API that returns the author and images only when the query asks for them, which is how the real one behaves, but I have not seen the real response.
+
+**What's next**
+- Nothing queued from this fix.
+
+---
+
 ## HANDOFF — 2026-11-19 (lived experience: ADHD and Autistic options)
 
 **Branch / PR:** `lived-experience-adhd-autistic`, one PR against `main` (PR #45 had merged), not merged.

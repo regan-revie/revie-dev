@@ -385,7 +385,18 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
 const fetchOtherSessionsPayloadCreator = ({ excludeIds = [], config }, thunkAPI) => {
   const { dispatch, extra: sdk } = thunkAPI;
   return sdk.listings
-    .query({ perPage: OTHER_SESSIONS_FETCHED, minStock: 1, stockMode: 'match-undefined' })
+    .query({
+      perPage: OTHER_SESSIONS_FETCHED,
+      minStock: 1,
+      stockMode: 'match-undefined',
+      // The same author, images, image variants and fields as the search results, so the cards
+      // render from this response alone. Fields are sparse, so the flag we filter on is added.
+      ...listingCardQueryParams(config),
+      'fields.listing': [
+        ...listingCardQueryParams(config)['fields.listing'],
+        'publicData.calendarBookingEnabled',
+      ],
+    })
     .then(response => {
       const others = pickOtherSessions(response.data.data, excludeIds);
       const listingFields = config?.listing?.listingFields;
@@ -456,6 +467,54 @@ export default searchPageSlice.reducer;
 
 // ================ Load data ================ //
 
+/**
+ * What a listing card needs from the API: the author (for the name on the card), the first image
+ * and the image variants the card uses, and the few listing fields it shows. The search results and
+ * the "other coaches" fallback must ask for exactly the same, or a card renders without its image
+ * and author name until the listing happens to be in the store from somewhere else.
+ *
+ * @param {Object} config the marketplace config (for the listing image aspect ratio and variants)
+ */
+export const listingCardQueryParams = config => {
+  const {
+    aspectWidth = 1,
+    aspectHeight = 1,
+    variantPrefix = 'listing-card',
+  } = config.layout.listingImage;
+  const aspectRatio = aspectHeight / aspectWidth;
+
+  return {
+    include: ['author', 'images'],
+    'fields.listing': [
+      'title',
+      'geolocation',
+      'price',
+      'deleted',
+      'state',
+      'publicData.listingType',
+      'publicData.transactionProcessAlias',
+      'publicData.unitType',
+      'publicData.cardStyle',
+      // These help rendering of 'purchase' listings,
+      // when transitioning from search page to listing page
+      'publicData.pickupEnabled',
+      'publicData.shippingEnabled',
+      'publicData.priceVariationsEnabled',
+      'publicData.priceVariants',
+    ],
+    'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
+    'fields.image': [
+      'variants.scaled-small',
+      'variants.scaled-medium',
+      `variants.${variantPrefix}`,
+      `variants.${variantPrefix}-2x`,
+    ],
+    ...createImageVariantConfig(`${variantPrefix}`, 400, aspectRatio),
+    ...createImageVariantConfig(`${variantPrefix}-2x`, 800, aspectRatio),
+    'limit.images': 1,
+  };
+};
+
 export const loadData = (params, search, config) => (dispatch, getState, sdk) => {
   // In private marketplace mode, this page won't fetch data if the user is unauthorized
   const { listingType: listingTypePathParam } = params || {};
@@ -482,13 +541,6 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
     ? { listingTypePathParam, isListingTypeVariant: true }
     : {};
 
-  const {
-    aspectWidth = 1,
-    aspectHeight = 1,
-    variantPrefix = 'listing-card',
-  } = config.layout.listingImage;
-  const aspectRatio = aspectHeight / aspectWidth;
-
   const searchListingsCall = searchListings({
     searchParams: {
       ...rest,
@@ -496,34 +548,7 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
       ...listingTypeVariantMaybe,
       page,
       perPage: RESULT_PAGE_SIZE,
-      include: ['author', 'images'],
-      'fields.listing': [
-        'title',
-        'geolocation',
-        'price',
-        'deleted',
-        'state',
-        'publicData.listingType',
-        'publicData.transactionProcessAlias',
-        'publicData.unitType',
-        'publicData.cardStyle',
-        // These help rendering of 'purchase' listings,
-        // when transitioning from search page to listing page
-        'publicData.pickupEnabled',
-        'publicData.shippingEnabled',
-        'publicData.priceVariationsEnabled',
-        'publicData.priceVariants',
-      ],
-      'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
-      'fields.image': [
-        'variants.scaled-small',
-        'variants.scaled-medium',
-        `variants.${variantPrefix}`,
-        `variants.${variantPrefix}-2x`,
-      ],
-      ...createImageVariantConfig(`${variantPrefix}`, 400, aspectRatio),
-      ...createImageVariantConfig(`${variantPrefix}-2x`, 800, aspectRatio),
-      'limit.images': 1,
+      ...listingCardQueryParams(config),
     },
     config,
   });
