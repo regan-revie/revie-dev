@@ -19,13 +19,37 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-19 (gender question comes back: optional, private, on the account page)
+
+**Branch / PR:** added to PR #45 (`onboarding-tidy-search-fallback`, still open), not a new PR: it reverses that PR's own "gender is asked nowhere" rule and the file it changes, `src/util/userFieldPolicy.js`, only exists on that branch.
+
+**What changed**
+1. **The gender question ("How do you identify?", user field `identity`, private) is asked again, for coaches and clients, on the Account page** (personal details), optional. It is **still never asked at sign-up**, enforced in code, so it holds whatever Console says. I put it on the account page rather than the profile settings page because private answers can only be saved there: the profile settings page saves public fields only, so a private question on it would silently not save.
+2. **Help text under it:** "Optional. Only Revie sees this. It helps us match you with the right coach." It lives in code (`UserField.genderHelpText` in `en.json`); if Console ever has its own help text for the field, Console's wins.
+3. **Private and never copied:** stored in `privateData`, so no page shows it to anyone; the public profile page now also refuses any field that is not public, so this holds even if a value ever lands in the wrong place (a test found that gap and it is closed); and the coach-traits sync reads only the public `personality_identifier` (existing test: it never reads this field).
+4. **Stored answers are kept:** anyone who answered it before sees their answer selected again. The test that stored answers survive is kept.
+5. **Tests** (client 1348, server 901, format check clean): shown on the account form for both user types with its help text; asked at sign-up for neither; private-only, optional, saved back unchanged (the stored-answers test is kept); never shown on the public profile page.
+
+**Console steps for you:** none new. If you have not yet turned **show in sign-up OFF** for `identity` (the gender one), do; the code keeps it out of sign-up either way. Leave **required OFF**. `docs/go-live-plan.md` is updated so Test and Live get the same.
+
+**Test steps on Dev**
+1. **Sign up as a client and as a coach** (new emails): no gender question at sign-up for either.
+2. **Account page** (Account, personal details) as a coach and as a client: "How do you identify?" with the help text under it, optional (you can save without answering). Answer, save, reload: it stays.
+3. **A user who answered gender earlier** (before 2026-11-18): their answer is selected.
+4. **Public profile page** (`/u/...`, logged in as someone else) of someone who answered it: not shown.
+5. **Listings:** the coach's sessions' identity tags are unchanged by it (it never reaches filters).
+
+**Not verified:** not exercised in a browser or on Dev data; the layout of the help text under the dropdown is the stock one.
+
+---
+
 ## HANDOFF — 2026-11-18 (onboarding tidy, second pass: lighter client sign-up, no gender question, private client answers, search never empty, field clean-up)
 
 **Branch / PR:** `onboarding-tidy-search-fallback`, one PR against `main`, not merged. Field reference: `docs/onboarding-fields.md` (updated; the session categories "How do you want to grow?" are now listed next to the client support options at the end, with a first alignment table).
 
 **What changed**
 1. **Client sign-up is now: account type, first name, last name, email, password, age check, terms.** Five client-only questions (previous experience, support, intent, budget, other details) leave sign-up through Console flags (below); `location` leaves it through code, because Console can only switch a field for everyone and coaches are still asked it. Fields and stored answers are kept; clients can answer them later on their profile or account page. **Location is required of coaches in code**, at sign-up and on the profile (same mechanism as the other coach traits, now also applied to the sign-up and Google confirm forms).
-2. **Gender ("How do you identify?", the private `identity`) is asked nowhere**: not at sign-up, not on the profile, not on the account page, for coaches or clients. Done in code (`src/util/userFieldPolicy.js`), so it holds even if Console still has it on. Stored answers are kept: they still load into the account form and are saved back unchanged (a test covers that). The public listing `identity` tags are a different thing and untouched.
+2. **(Reversed on 2026-11-19, see the entry above: gender is back on the account page.) Gender ("How do you identify?", the private `identity`) is asked nowhere**: not at sign-up, not on the profile, not on the account page, for coaches or clients. Done in code (`src/util/userFieldPolicy.js`), so it holds even if Console still has it on. Stored answers are kept: they still load into the account form and are saved back unchanged (a test covers that). The public listing `identity` tags are a different thing and untouched.
 3. **A client's `support`, `work` and `client_wants` never show on their public profile page** (code, same file). Still asked, still stored.
 4. **Search never ends on an empty page.** If a search finds fewer than 3 sessions, the matches show first, then a section "Other coaches you might like" with "Only a few coaches match that right now. Here are others you might like." and up to 6 other published, bookable sessions (bookable = the coach has calendar booking switched on for the session), never repeating a match. Works in the map and grid layouts. With zero matches the "couldn't find any listings" sentence is replaced by this (the "Reset filters" button stays); if there are no other sessions to offer, the old message stays.
 5. **New options, same keys on both sides, mapped in `server/api/coachTraits/traits.js`** (with tests): identity `perimenopause`, `disabled`, `caregiver`; location `australia-nz`. `emcc` added to certifications needs no code.
@@ -64,9 +88,9 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 **Test steps on Dev** (after the Console steps; hard-refresh once). Dev has only a few sessions, so for step 6 note how many there are.
 1. **Client sign-up** with a new email: only account type, first name, last name, email, password, age check, terms. No location, gender, previous experience, growth goals, readiness, budget or "anything else". Sign up and verify. On that client's profile settings the optional questions are there; saving without answering them works.
-2. **Coach sign-up** with a new email: the same plus location, and location cannot be left empty. No certifications, other certifications or gender. After that, the coach's profile settings has no gender question; it has "Lived experience (clients can filter by this)" with the three new options, "Australia & New Zealand" under location, and "EMCC accredited coach" under certifications.
+2. **Coach sign-up** with a new email: the same plus location, and location cannot be left empty. No certifications, other certifications or gender. After that, the coach's profile settings has no gender question (it is on the account page, see the 2026-11-19 entry); it has "Lived experience (clients can filter by this)" with the three new options, "Australia & New Zealand" under location, and "EMCC accredited coach" under certifications.
 3. **A client with support, work and ideal-coach answers:** open their public profile page (`/u/...`, logged in as someone else): none of the three show, but your own profile settings still has your answers.
-4. **Account page of a user who had answered gender before** (Account, personal details): the question is gone and nothing else changed.
+4. **Account page of a user who had answered gender before** (Account, personal details): superseded by the 2026-11-19 entry, where the question is back and their answer is still selected.
 5. **New options end to end:** as a coach choose "Australia & New Zealand" and the three new identity options and save. Within about a minute filter the marketplace by them: that coach's published sessions appear, and the filter labels read as in step C (capitalised).
 6. **Search with few matches:** pick filters that match one or two sessions. You see them first, then "Other coaches you might like" with the sentence from item 4, other sessions below, none repeated and only ones with calendar booking on. Try phone width too.
 7. **Search with no match:** filters that match nothing show no "couldn't find any listings" sentence, just "Reset filters" and the other sessions. A broad search (3 or more matches) shows no extra section.

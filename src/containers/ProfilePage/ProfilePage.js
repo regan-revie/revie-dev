@@ -212,7 +212,17 @@ export const CustomUserFields = props => {
     const metadataValue = getFieldValue(metadata, key);
     const value = publicDataValue !== null ? publicDataValue : metadataValue;
 
-    if (displayInProfile && isTargetUserType && value !== null && !isNeverPublicUserField(config)) {
+    // Revie: only public (or metadata) fields can appear here, so a private field such as the gender
+    // question is never shown, whatever ends up in publicData.
+    const isPublicScope = ['public', 'metadata'].includes(config.scope);
+
+    if (
+      displayInProfile &&
+      isTargetUserType &&
+      isPublicScope &&
+      value !== null &&
+      !isNeverPublicUserField(config)
+    ) {
       const detailValue = getDetailCustomFieldValue(
         enumOptions,
         value,

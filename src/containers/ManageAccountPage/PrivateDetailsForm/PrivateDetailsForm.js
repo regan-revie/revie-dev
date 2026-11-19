@@ -9,6 +9,7 @@ import { FormattedMessage, intlShape, useIntl } from '../../../util/reactIntl';
 import { ensureCurrentUser } from '../../../util/data';
 import { propTypes } from '../../../util/types';
 import { getPropsForCustomUserFieldInputs } from '../../../util/userHelpers';
+import { defaultHelpTextId } from '../../../util/userFieldPolicy';
 
 import { Form, Button, CustomExtendedDataField } from '../../../components';
 
@@ -73,7 +74,19 @@ const PrivateDetailsForm = props => {
           userFields,
           userTypeConfig?.userType,
           false
-        );
+        ).map(props => {
+          // Revie: help text for the gender question, unless Console has its own.
+          const helpTextId = defaultHelpTextId(props.fieldConfig);
+          return helpTextId
+            ? {
+                ...props,
+                fieldConfig: {
+                  ...props.fieldConfig,
+                  helpText: intl.formatMessage({ id: helpTextId }),
+                },
+              }
+            : props;
+        });
 
         return (
           <Form

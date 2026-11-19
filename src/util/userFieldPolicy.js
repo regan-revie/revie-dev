@@ -3,17 +3,21 @@
  * Sharetribe environment whatever its Console config says (Dev, Test and Live drift).
  */
 
-// Gender ("How do you identify?", private `identity`) is no longer asked of anyone: not at sign-up,
-// not on the profile, not in account settings. Answers already stored are kept, untouched. Only the
-// private field is retired; the listing `identity` tags and the profile's `personality_identifier`
-// are a different question.
-export const RETIRED_USER_FIELDS = [{ key: 'identity', scope: 'private' }];
+// Gender ("How do you identify?", the private `identity`) is optional and private: asked on the
+// account page (where private fields are saved), for coaches and clients alike, and never at
+// sign-up. It is stored in `privateData`, so it is shown to nobody, and it is never copied to
+// listings (server/api/coachTraits only ever reads the public `personality_identifier`). Only the
+// private field is meant: the listing `identity` tags and the profile's `personality_identifier`
+// are a different question that shares the name.
+export const GENDER_FIELD = { key: 'identity', scope: 'private' };
 
-export const isRetiredUserField = fieldConfig =>
-  RETIRED_USER_FIELDS.some(
-    retired =>
-      retired.key === fieldConfig?.key && retired.scope === (fieldConfig?.scope || 'public')
-  );
+export const isGenderField = fieldConfig =>
+  GENDER_FIELD.key === fieldConfig?.key && GENDER_FIELD.scope === (fieldConfig?.scope || 'public');
+
+// Help text for fields that Console has none for. Console's own help text wins when it has one.
+// Message ids, so the wording lives in en.json.
+export const defaultHelpTextId = fieldConfig =>
+  isGenderField(fieldConfig) && !fieldConfig?.helpText ? 'UserField.genderHelpText' : null;
 
 // A client's personal answers. They may be asked and stored (they help matching later) but are never
 // shown on a public profile page, whatever Console says.
@@ -28,4 +32,4 @@ export const isNeverPublicUserField = fieldConfig =>
 const HIDDEN_AT_SIGNUP_FOR = { client: ['location'] };
 
 export const isHiddenAtSignUp = (fieldConfig, userType) =>
-  (HIDDEN_AT_SIGNUP_FOR[userType] || []).includes(fieldConfig?.key);
+  isGenderField(fieldConfig) || (HIDDEN_AT_SIGNUP_FOR[userType] || []).includes(fieldConfig?.key);

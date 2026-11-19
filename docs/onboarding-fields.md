@@ -4,7 +4,7 @@ Every question coaches and clients answer, taken from Dev's hosted Console confi
 
 Where a field is stored: **user** fields live on the person (`publicData` is visible to everyone, `privateData` only to them); **listing** fields live on each session (`publicData`). Search can filter only on listing fields marked as search filters, never on user fields. That is why a coach's language, location, identity tags and communication style are asked once on the profile and **copied onto every listing by the server** (`server/api/coachTraits/`).
 
-**Second tidy (2026-11-18, `onboarding-tidy-search-fallback`):** client sign-up cut to the essentials; gender (private `identity`) retired everywhere; a client's `support`, `work` and `client_wants` never shown publicly; new options and label fixes. Where a line below says "after the Console steps", the Console steps are in the HANDOFF of that day and in `go-live-plan.md`.
+**Second tidy (2026-11-18, `onboarding-tidy-search-fallback`):** client sign-up cut to the essentials; gender (private `identity`) kept off sign-up but asked again, optionally and privately, on the account page (reversed on 2026-11-19); a client's `support`, `work` and `client_wants` never shown publicly; new options and label fixes. Where a line below says "after the Console steps", the Console steps are in the HANDOFF of that day and in `go-live-plan.md`.
 
 No field has help text in Console today (`helpText` is empty everywhere); the only help text is in code: the outcomes block in the session editor.
 
@@ -41,7 +41,7 @@ Never copied: the user's private `identity` ("How do you identify?", gender). It
 | Sign-up | Account type ("I'm looking for a coach" / "I'm a coach looking for clients") | all | yes | |
 | Sign-up | First name, last name, email, password | all | yes | |
 | Sign-up | Custom questions: **client** | client | | After the second tidy: only the age check. Location, gender, previous experience, support, intent, budget and other details are no longer asked at sign-up (fields and stored answers kept; clients can answer them on their profile or account page). |
-| Sign-up | Custom questions: **coach** | coach | | Location (required, in code) and the age check. Certifications, other certifications and gender moved to the profile. |
+| Sign-up | Custom questions: **coach** | coach | | Location (required, in code) and the age check. Certifications and other certifications moved to the profile; gender is on the account page. |
 | Sign-up | Display name | coach | no | **Dropped from sign-up** (Console step). Sharetribe is documented to show "First L." when there is none (to be confirmed with a test sign-up, see the HANDOFF). Existing coaches keep theirs. |
 | Sign-up | Terms of service and privacy checkbox | all | yes | |
 | Profile | Profile photo, bio | all | no | Public profile page |
@@ -98,9 +98,9 @@ Never copied: the user's private `identity` ("How do you identify?", gender). It
 - **Type / stored:** single choice, user `privateData`
 - **Who:** coach and client
 - **Required (Console):** no
-- **In sign-up (Console now):** yes ; **no, after the Console steps**
-- **Help text:** none
-- **Where it is shown or used:** **Retired: asked nowhere** (not at sign-up, not on the profile, not in account settings; enforced in code, `userFieldPolicy.js`, so it holds whatever Console says). Stored answers are kept, untouched. Private: shown nowhere. **Never copied to listings.** Not the same question as the listing `identity` tags.
+- **In sign-up (Console now):** yes ; **no, after the Console steps** (the code keeps it out of sign-up either way)
+- **Help text:** "Optional. Only Revie sees this. It helps us match you with the right coach." (in code, `UserField.genderHelpText`; Console's own help text wins if it ever has one)
+- **Where it is shown or used:** **Account page** ("Account", personal details; this is where private answers are saved), for coaches and clients, optional. **Never at sign-up** (code, `userFieldPolicy.js`, so it holds whatever Console says). Private (`privateData`): shown to nobody, on no public page (the public profile only ever shows public fields), and **never copied to listings** (the coach-traits code reads only the public `personality_identifier`; a test covers it). Stored answers are kept. Not the same question as the listing `identity` tags. History: asked at sign-up until 2026-11-18, taken out of everything that day, brought back on the account page on 2026-11-19.
 - **Options (7):**
   - `woman`: Woman
   - `man`: Man

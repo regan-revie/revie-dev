@@ -52,3 +52,27 @@ describe('public profile page: a client’s personal answers', () => {
     expect(screen.queryByText('My ideal coach will')).toBeNull();
   });
 });
+
+describe('public profile page: gender', () => {
+  it('never shows the private identity question or its answer', async () => {
+    const gender = {
+      ...enumField('identity', 'How do you identify?', ['woman']),
+      scope: 'private',
+    };
+    await act(async () => {
+      render(
+        <CustomUserFields
+          intl={fakeIntl}
+          userFieldConfig={[enumField('pronouns', 'Pronouns', ['they-them']), gender]}
+          // Even if the value somehow reached the page's public data, a private field is not shown.
+          publicData={{ userType: 'client', pronouns: 'they-them', identity: 'woman' }}
+          metadata={{}}
+        />
+      );
+    });
+
+    expect(screen.getByText('Pronouns')).toBeInTheDocument();
+    expect(screen.queryByText('How do you identify?')).toBeNull();
+    expect(screen.queryByText('Woman')).toBeNull();
+  });
+});

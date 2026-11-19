@@ -1622,6 +1622,7 @@
   "UserCard.viewProfileLink": "View profile",
   "UserDisplayName.banned": "Banned user",
   "UserDisplayName.deleted": "Deleted user",
+  "UserField.genderHelpText": "Optional. Only Revie sees this. It helps us match you with the right coach.",
   "UserNav.accountSettings": "Account settings",
   "UserNav.profileSettings": "Profile settings",
   "UserNav.screenreader.userNav": "User profile navigation",

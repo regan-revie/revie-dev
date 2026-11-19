@@ -320,4 +320,43 @@ describe('PrivateDetailsForm', () => {
     expect(screen.queryByText('Long Field')).toBeNull();
     expect(screen.queryByDisplayValue(123)).toBeNull();
   });
+
+  describe('the gender question (private identity)', () => {
+    const genderConfig = {
+      key: 'identity',
+      scope: 'private',
+      schemaType: 'enum',
+      enumOptions: [
+        { option: 'woman', label: 'Woman' },
+        { option: 'none', label: 'I would rather not say.' },
+      ],
+      saveConfig: { label: 'How do you identify?', displayInSignUp: false, isRequired: false },
+      userTypeConfig: { limitToUserTypeIds: false },
+    };
+
+    ['a', 'c'].forEach(userType => {
+      it(`is on the account form for user type ${userType}, optional, with its help text`, () => {
+        const u1 = createCurrentUser('userId', { profile: { privateData: { identity: 'woman' } } });
+        render(
+          <PrivateDetailsForm
+            intl={fakeIntl}
+            onSubmit={noop}
+            updateInProgress={false}
+            currentUser={u1}
+            userFields={[genderConfig]}
+            userTypeConfig={{ ...userTypeConfig, userType }}
+            initialValues={initialValuesForUserFields({ identity: 'woman' }, 'private', userType, [
+              genderConfig,
+            ])}
+          />
+        );
+
+        expect(screen.getByRole('combobox', { name: 'How do you identify?' })).toBeInTheDocument();
+        // The stored answer is what the form starts from.
+        expect(screen.getByRole('option', { name: 'Woman' }).selected).toBe(true);
+        // Optional: the form is not invalid with the field empty.
+        expect(screen.getByText('UserField.genderHelpText')).toBeInTheDocument();
+      });
+    });
+  });
 });

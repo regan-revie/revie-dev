@@ -1,4 +1,4 @@
-import { isRetiredUserField, isNeverPublicUserField } from './userFieldPolicy';
+import { isGenderField, isNeverPublicUserField, defaultHelpTextId } from './userFieldPolicy';
 import {
   getPropsForCustomUserFieldInputs,
   initialValuesForUserFields,
@@ -20,35 +20,56 @@ const gender = field('identity', 'private');
 const tags = field('identity', 'public');
 const location = field('location', 'public');
 
-describe('retired user fields (gender)', () => {
+describe('gender (private identity): optional, on the account page, never at sign-up', () => {
   it('recognises only the private identity field', () => {
-    expect(isRetiredUserField(gender)).toBe(true);
-    expect(isRetiredUserField(tags)).toBe(false);
-    expect(isRetiredUserField(location)).toBe(false);
+    expect(isGenderField(gender)).toBe(true);
+    expect(isGenderField(tags)).toBe(false);
+    expect(isGenderField(location)).toBe(false);
   });
 
-  it('is asked nowhere: not at sign-up, not on the profile or in account settings', () => {
+  it('is not asked at sign-up, for coaches or clients, even if Console shows it there', () => {
     const configs = [gender, location];
-    ['client', 'coach'].forEach(userType =>
-      [true, false].forEach(isSignup => {
-        const keys = getPropsForCustomUserFieldInputs(configs, userType, isSignup).map(p => p.key);
-        expect(keys).not.toContain('priv_identity');
-      })
-    );
+    ['client', 'coach'].forEach(userType => {
+      const keys = getPropsForCustomUserFieldInputs(configs, userType, true).map(p => p.key);
+      expect(keys).not.toContain('priv_identity');
+    });
     // A coach still gets location at sign-up, so the list is not simply empty.
     expect(getPropsForCustomUserFieldInputs(configs, 'coach', true).map(p => p.key)).toEqual([
       'pub_location',
     ]);
   });
 
-  it('keeps a stored answer: it still loads into the form values and is saved back unchanged', () => {
+  it('is asked on the profile / account form, for coaches and clients', () => {
+    const configs = [gender, location];
+    ['client', 'coach'].forEach(userType => {
+      const keys = getPropsForCustomUserFieldInputs(configs, userType, false).map(p => p.key);
+      expect(keys).toContain('priv_identity');
+    });
+  });
+
+  it('is private and optional, so it is saved only to privateData and never required', () => {
+    const configs = [gender, location];
+    const values = { priv_identity: 'woman', pub_location: 'uk' };
+    expect(pickUserFieldsData(values, 'private', 'client', configs)).toEqual({
+      identity: 'woman',
+    });
+    expect(pickUserFieldsData(values, 'public', 'client', configs)).toEqual({ location: 'uk' });
+    expect(gender.saveConfig.isRequired).toBe(false);
+  });
+
+  it('keeps a stored answer: it loads into the form values and is saved back unchanged', () => {
     const configs = [gender, location];
     const initial = initialValuesForUserFields({ identity: 'woman' }, 'private', 'client', configs);
     expect(initial).toEqual({ priv_identity: 'woman' });
-    // Account settings saves private fields from the form's values, which carry the stored answer.
     expect(pickUserFieldsData(initial, 'private', 'client', configs)).toEqual({
       identity: 'woman',
     });
+  });
+
+  it('has default help text unless Console supplies its own', () => {
+    expect(defaultHelpTextId(gender)).toBe('UserField.genderHelpText');
+    expect(defaultHelpTextId({ ...gender, helpText: 'From Console' })).toBeNull();
+    expect(defaultHelpTextId(tags)).toBeNull();
   });
 });
 
