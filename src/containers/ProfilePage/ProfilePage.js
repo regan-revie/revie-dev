@@ -46,6 +46,8 @@ import {
   CustomExtendedDataSection,
 } from '../../components';
 
+import { isNeverPublicUserField } from '../../util/userFieldPolicy';
+
 import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer';
 import FooterContainer from '../../containers/FooterContainer/FooterContainer';
 import NotFoundPage from '../../containers/NotFoundPage/NotFoundPage';
@@ -186,9 +188,11 @@ export const DesktopReviews = props => {
 export const CustomUserFields = props => {
   const { publicData, metadata, userFieldConfig, intl } = props;
 
+  // Revie: a client's personal answers (support, work, client_wants) are never shown publicly.
   const shouldPickUserField = fieldConfig =>
     ['public', 'metadata'].includes(fieldConfig?.scope) &&
-    fieldConfig?.showConfig?.displayInProfile !== false;
+    fieldConfig?.showConfig?.displayInProfile !== false &&
+    !isNeverPublicUserField(fieldConfig);
   const propsForCustomFields =
     pickCustomFieldProps(
       { publicData, metadata },
@@ -208,7 +212,17 @@ export const CustomUserFields = props => {
     const metadataValue = getFieldValue(metadata, key);
     const value = publicDataValue !== null ? publicDataValue : metadataValue;
 
-    if (displayInProfile && isTargetUserType && value !== null) {
+    // Revie: only public (or metadata) fields can appear here, so a private field such as the gender
+    // question is never shown, whatever ends up in publicData.
+    const isPublicScope = ['public', 'metadata'].includes(config.scope);
+
+    if (
+      displayInProfile &&
+      isTargetUserType &&
+      isPublicScope &&
+      value !== null &&
+      !isNeverPublicUserField(config)
+    ) {
       const detailValue = getDetailCustomFieldValue(
         enumOptions,
         value,

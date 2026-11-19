@@ -50,6 +50,10 @@ const TRAITS = [
       'expat',
       'ex-corporate',
       'first-gen',
+      // Added Nov 2026: same key on the profile and the listing, so no entry in optionMap.
+      'perimenopause',
+      'disabled',
+      'caregiver',
     ],
   },
   {
@@ -88,6 +92,8 @@ const TRAITS = [
       'asia',
       'latam',
       'southam',
+      // Added Nov 2026: same key on the profile and the listing.
+      'australia-nz',
     ],
   },
   {
