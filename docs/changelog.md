@@ -19,6 +19,34 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-19 (lived experience: ADHD and Autistic options)
+
+**Branch / PR:** `lived-experience-adhd-autistic`, one PR against `main` (PR #45 had merged), not merged.
+
+**What changed**
+1. **Two new lived-experience options, same key on both sides:** `adhd` "ADHD" and `autistic` "Autistic", on the profile field `personality_identifier` and the listing field `identity`. They are in the coach-traits mapping (`server/api/coachTraits/traits.js`), so a coach who picks them has them copied onto their listings, and the cutover reverse backfill reads them back. No translation is needed.
+2. **Existing keys unchanged:** `neurodivergent` on the profile and `neurdivergent` (that spelling) on the listing. Only their label changes, to "Neurodivergent". Coaches who already picked it keep it.
+3. **No AuDHD option:** a coach who is both picks both; the test covers `adhd` + `autistic` + `neurodivergent` together.
+4. **Tests:** 1 new server test (both keys map unchanged in both directions, next to the old key), and the "every profile option has a listing counterpart" test now includes them. Server 902, client unchanged, format check clean.
+
+**Console steps for you (Dev only; Test and Live are logged in `docs/go-live-plan.md`).** Key names are exact; menu names are from memory. **Merge and let Render deploy first**, then do these; if a coach picks a new option before the deploy it is left off their listings (never an error) until the next 60-second pass after it.
+1. **User field `personality_identifier`** (label "Lived experience (clients can filter by this)"): add two options, key then label: `adhd` "ADHD", `autistic` "Autistic". Relabel `neurodivergent` from "ADHD / Autism / Neurodivergence" to "Neurodivergent". Do not change its key.
+2. **Listing field `identity`** ("Identity & Background"): add the same two options, `adhd` "ADHD", `autistic` "Autistic". Relabel `neurdivergent` (the misspelt key is correct, keep it) to "Neurodivergent". Do not change its key.
+3. Do not remove or rename any option key anywhere.
+
+**Test steps on Dev** (after the Console steps; hard-refresh once)
+1. **Coach profile settings:** "Lived experience" now lists ADHD, Autistic and Neurodivergent (no AuDHD). Pick ADHD and Autistic, save.
+2. **Within about a minute**, filter the marketplace by Identity: ADHD, then Autistic: that coach's published sessions appear under both.
+3. **An existing coach who had picked the old option:** their sessions still match the filter "Neurodivergent", which now carries the new label.
+4. **Session editor:** still has no identity question (unchanged).
+
+**Not verified:** not exercised in a browser or on Dev data; covered by tests with fakes. The sync handles the new keys exactly like the three added on 2026-11-18, which is the part worth looking at in step 2.
+
+**What's next**
+- Nothing queued from this change. Unchanged: align session categories with client support options, at cutover see `docs/go-live-plan.md`.
+
+---
+
 ## HANDOFF — 2026-11-19 (gender question comes back: optional, private, on the account page)
 
 **Branch / PR:** added to PR #45 (`onboarding-tidy-search-fallback`, still open), not a new PR: it reverses that PR's own "gender is asked nowhere" rule and the file it changes, `src/util/userFieldPolicy.js`, only exists on that branch.

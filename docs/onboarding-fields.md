@@ -30,7 +30,7 @@ Option keys differ in a few places, translated in code (`server/api/coachTraits/
 | location | `latin-america` | `latam` |
 | location | `south-america` | `southam` |
 
-New options added in the second tidy use the **same key on both sides**, so they need no translation: identity `perimenopause`, `disabled`, `caregiver`; location `australia-nz`.
+New options added since use the **same key on both sides**, so they need no translation: identity `perimenopause`, `disabled`, `caregiver`, `adhd`, `autistic` (the last two on 2026-11-19; there is deliberately no AuDHD option, a coach who is both picks both); location `australia-nz`.
 
 Never copied: the user's private `identity` ("How do you identify?", gender). It shares a key name with the listing `identity` tags but is a different question.
 
@@ -218,8 +218,8 @@ Never copied: the user's private `identity` ("How do you identify?", gender). It
 - **In sign-up (Console now):** no
 - **Help text:** none
 - **Where it is shown or used:** Profile ("More about me..."). Public profile page. **Copied to listings as `identity`** (search filter).
-- **Options (18; three added in the second tidy; labels as they will read after the Console steps):**
-  - `neurodivergent`: ADHD / Autism / Neurodivergence
+- **Options (20; five added since the first version; labels as they will read after the Console steps):**
+  - `neurodivergent`: Neurodivergent (was "ADHD / Autism / Neurodivergence"; key unchanged)
   - `introvert`: Introvert
   - `extrovert`: Extrovert
   - `ambivert`: Ambivert (both introverted & extroverted)
@@ -237,6 +237,8 @@ Never copied: the user's private `identity` ("How do you identify?", gender). It
   - `perimenopause`: Perimenopause / menopause (new)
   - `disabled`: Disabled (new)
   - `caregiver`: Caregiver (new)
+  - `adhd`: ADHD (new, 2026-11-19)
+  - `autistic`: Autistic (new, 2026-11-19)
 
 ### `budget`: What's your budget per session?
 
@@ -363,8 +365,8 @@ Never copied: the user's private `identity` ("How do you identify?", gender). It
 - **Search:** search filter, secondary group, indexed
 - **Help text:** none
 - **Where it is shown or used:** Search filter (secondary). Listing page details. **Filled by the server from the coach's profile `personality_identifier`; not asked in the session editor.**
-- **Options (18; three added in the second tidy; labels as they will read after the Console steps):**
-  - `neurdivergent`: ADHD / Autism / Neurodivergence (stray trailing space removed)
+- **Options (20; five added since the first version; labels as they will read after the Console steps):**
+  - `neurdivergent`: Neurodivergent (was "ADHD / Autism / Neurodivergence "; key unchanged, spelling and all)
   - `introvert`: Introvert
   - `extrovert`: Extrovert
   - `ambivert`: Ambivert (both introverted / extroverted)
@@ -382,6 +384,8 @@ Never copied: the user's private `identity` ("How do you identify?", gender). It
   - `perimenopause`: Perimenopause / menopause (new)
   - `disabled`: Disabled (new)
   - `caregiver`: Caregiver (new)
+  - `adhd`: ADHD (new, 2026-11-19)
+  - `autistic`: Autistic (new, 2026-11-19)
 
   Not aligned, only noted: the profile's "Mental health cycles (anxiety, depression, etc)" and "Ambivert (both introverted & extroverted)" read slightly differently from this side. Left alone; the keys map correctly.
 
