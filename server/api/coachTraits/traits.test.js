@@ -54,6 +54,20 @@ describe('coach traits: profile -> listing', () => {
     expect(traits.coachlocation).toBe('australia-nz');
   });
 
+  it('adhd and autistic use the same key on both sides, next to the unchanged neurodivergent', () => {
+    const { traits, unmapped } = listingTraitsFromProfile({
+      personality_identifier: ['adhd', 'autistic', 'neurodivergent'],
+    });
+    expect(unmapped).toEqual([]);
+    // A coach who is both ADHD and autistic picks both; neurodivergent keeps its own old spelling.
+    expect(traits.identity.sort()).toEqual(['adhd', 'autistic', 'neurdivergent']);
+
+    const { traits: back } = profileTraitsFromListings({}, [
+      { identity: ['adhd', 'autistic', 'neurdivergent'] },
+    ]);
+    expect(back.personality_identifier.sort()).toEqual(['adhd', 'autistic', 'neurodivergent']);
+  });
+
   it('every option on every profile field has a listing counterpart (no silent drops)', () => {
     // The user-side option lists, as configured in Console on Dev.
     const userOptions = {
@@ -76,6 +90,8 @@ describe('coach traits: profile -> listing', () => {
         'perimenopause',
         'disabled',
         'caregiver',
+        'adhd',
+        'autistic',
       ],
       languages: [
         'english',

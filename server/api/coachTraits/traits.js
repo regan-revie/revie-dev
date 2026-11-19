@@ -54,6 +54,10 @@ const TRAITS = [
       'perimenopause',
       'disabled',
       'caregiver',
+      // Added Nov 2026: same key on the profile and the listing. There is deliberately no AuDHD
+      // option: a coach who is both picks both.
+      'adhd',
+      'autistic',
     ],
   },
   {
