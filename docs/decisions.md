@@ -7,6 +7,12 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Revie-funded promo codes come out of Revie's commission only
+**Date:** Nov 23, 2026
+**Decision:** A promo code takes a percentage off what the client pays, as a customer-only negative line item. The coach is always paid on the full, undiscounted price (80%). The ceiling is 15% in code (below the 20% commission, because Stripe's fee also comes out of what Revie keeps). A use is reserved when the booking starts and counts against the caps; it is counted as paid when the booking is accepted, and released when payment expires, the booking is declined or expires, or the client is refunded in full. A late cancellation stays consumed. Each code allows 1 use per client unless set otherwise. One code per booking. Codes are created by script (`scripts/promo-codes.js`); there is no admin screen.
+**Why:** A launch promo funded by Revie must never cost a coach anything, and must not be able to cost Revie more than it earns.
+**Affects:** `server/api-util/lineItems.js`, `server/api/promo/`, the checkout page, the order breakdown, the client's "You're booked" email, Postgres (`promo_codes`, `promo_redemptions`). No Sharetribe Console or transaction-process change.
+
 ### DECISION: Late cancellations have their own state (release-4)
 **Date:** Nov 5, 2026
 **Decision:** A client cancellation inside 48 hours runs transition/late-cancel: the session leaves the calendar, the client is charged, the coach is paid by a time-triggered payout at booking end + 2 days, no review prompts or review emails are sent, and both sides get a late-cancellation email from Sharetribe. Console shows the late-cancelled state.

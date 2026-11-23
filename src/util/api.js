@@ -160,6 +160,14 @@ export const nylasSyncMe = () => {
   return post('/api/nylas/sync-me', {});
 };
 
+// "Is this promo code good for me?" Asked when the client presses Apply at checkout, so the answer
+// (or a friendly reason) comes at once. Answers { ok: true, code, percentOff } or
+// { ok: false, reason }. Reserves nothing: the real booking checks again. See
+// server/api/promo/checkEndpoint.js.
+export const promoCheck = ({ code }) => {
+  return post('/api/promo/check', { code });
+};
+
 // Copies the coach's profile traits (language, location, ...) onto their session listings so
 // search can filter on them. See server/api/coachTraits/syncMe.js.
 export const coachTraitsSyncMe = () => {

@@ -183,6 +183,43 @@ describe('the booking confirmation fields', () => {
     expect(confirmed({ payinTotal: { amount: 5000, currency: 'JPY' } }).totalPaid).toBe('¥5,000');
   });
 
+  describe('a promo discount', () => {
+    const lineItems = [
+      { code: 'line-item/fixed', lineTotal: { amount: 10000, currency: 'GBP' } },
+      { code: 'line-item/promo-discount', lineTotal: { amount: -1500, currency: 'GBP' } },
+    ];
+    const paid = { amount: 8500, currency: 'GBP' };
+
+    it('shows the full price, the discount with its code, and what was paid', () => {
+      const model = confirmed({ payinTotal: paid, lineItems, promoCode: 'NEWYEAR15' });
+      expect(model.fullPriceText).toBe('Session price: £100.00');
+      expect(model.discountText).toBe('Promo discount (NEWYEAR15): -£15.00');
+      expect(model.totalPaid).toBe('£85.00');
+    });
+
+    it('still shows the discount when the code is not named', () => {
+      expect(confirmed({ payinTotal: paid, lineItems }).discountText).toBe(
+        'Promo discount: -£15.00'
+      );
+    });
+
+    it('shows nothing without a discount line, so the email is unchanged', () => {
+      const model = confirmed({
+        payinTotal: { amount: 10000, currency: 'GBP' },
+        lineItems: [lineItems[0]],
+      });
+      expect(model.fullPriceText).toBe('');
+      expect(model.discountText).toBe('');
+      expect(confirmed({ payinTotal: paid }).discountText).toBe('');
+    });
+
+    it('ignores a reversed discount (the booking was refunded) and unusable amounts', () => {
+      const reversed = [{ ...lineItems[1], reversal: true }];
+      expect(confirmed({ payinTotal: paid, lineItems: reversed }).discountText).toBe('');
+      expect(confirmed({ payinTotal: { amount: 8500 }, lineItems }).discountText).toBe('');
+    });
+  });
+
   it('shows no paid line when there is no amount (or it has been refunded to zero)', () => {
     expect(confirmed().hasTotalPaid).toBe(false);
     expect(confirmed({ payinTotal: { amount: 0, currency: 'USD' } }).hasTotalPaid).toBe(false);

@@ -2,9 +2,13 @@ const {
   calculateQuantityFromDates,
   calculateQuantityFromHours,
   calculateShippingFee,
+  calculateTotalFromLineItems,
+  calculateTotalForCustomer,
+  calculateTotalForProvider,
   getProviderCommissionMaybe,
   getCustomerCommissionMaybe,
 } = require('./lineItemHelpers');
+const { MAX_PERCENT_OFF, isAllowedPercent } = require('../api/promo/rules');
 const { types } = require('sharetribe-flex-sdk');
 const { assertValidBookingVariant } = require('./bookingVariantCheck');
 const { Money } = types;
@@ -116,6 +120,52 @@ const getDateRangeQuantityAndLineItems = (orderData, code) => {
 };
 
 /**
+ * Revie promo code: a discount line for the CUSTOMER ONLY.
+ *
+ * `includeFor: ['customer']` is the whole trick. The client's total (payin) goes down, the coach's
+ * total (payout) does not move, and the provider commission is calculated from the full session
+ * price as always, so the coach is still paid 80% of the undiscounted price. What Sharetribe calls
+ * Revie's commission is payin minus payout, so the discount comes out of that and nowhere else.
+ *
+ * The percentage is applied to the session line only (not to extras such as shipping).
+ *
+ * @param {{code: string, percentOff: number}|null} promo
+ * @param {Object} order the session line item
+ * @returns {Array} zero or one line item
+ */
+const getPromoDiscountMaybe = (promo, order) => {
+  if (!promo) return [];
+  return [
+    {
+      code: 'line-item/promo-discount',
+      unitPrice: calculateTotalFromLineItems([order]),
+      percentage: -promo.percentOff,
+      includeFor: ['customer'],
+    },
+  ];
+};
+
+/**
+ * Refuse a set of line items in which the discount would take more than Revie's commission. Sharetribe
+ * itself needs payin >= payout, and Revie's own ceiling is lower still; this is the last check
+ * before the numbers are sent, after rounding.
+ */
+const assertPromoIsAffordable = (lineItems, promo, providerCommission) => {
+  const commissionPercent = providerCommission ? providerCommission.percentage : undefined;
+  const tooMuch =
+    !isAllowedPercent(promo.percentOff, commissionPercent) ||
+    calculateTotalForCustomer(lineItems).amount < calculateTotalForProvider(lineItems).amount;
+  if (tooMuch) {
+    const message = `Promo discount of ${promo.percentOff}% is not allowed (ceiling ${MAX_PERCENT_OFF}%, and it cannot exceed the provider commission).`;
+    const error = new Error(message);
+    error.status = 400;
+    error.statusText = 'promo-invalid';
+    error.data = { errors: [{ status: 400, code: 'promo-invalid', title: message }] };
+    throw error;
+  }
+};
+
+/**
  * Returns collection of lineItems (max 50)
  *
  * All the line-items dedicated to _customer_ define the "payin total".
@@ -142,9 +192,17 @@ const getDateRangeQuantityAndLineItems = (orderData, code) => {
  * @param {Money} [orderData.offer] - The offer for the offer (if transition intent is "make-offer")
  * @param {Object} providerCommission
  * @param {Object} customerCommission
+ * @param {{code: string, percentOff: number}} [promo] Revie: a validated promo code (see
+ *   server/api/promo/), already judged by the caller; this only turns it into a line item
  * @returns {Array} lineItems
  */
-exports.transactionLineItems = (listing, orderData, providerCommission, customerCommission) => {
+exports.transactionLineItems = (
+  listing,
+  orderData,
+  providerCommission,
+  customerCommission,
+  promo
+) => {
   // Revie: refuse a booking whose price variant is missing/unknown or doesn't match its length,
   // instead of silently charging the base (lowest) price. See bookingVariantCheck.js.
   assertValidBookingVariant(listing, orderData);
@@ -247,9 +305,12 @@ exports.transactionLineItems = (listing, orderData, providerCommission, customer
   const lineItems = [
     order,
     ...extraLineItems,
+    ...getPromoDiscountMaybe(promo, order),
     ...getProviderCommissionMaybe(providerCommission, order, currency),
     ...getCustomerCommissionMaybe(customerCommission, order, currency),
   ];
+
+  if (promo) assertPromoIsAffordable(lineItems, promo, providerCommission);
 
   return lineItems;
 };

@@ -30,6 +30,7 @@ import LineItemProviderCommissionRefundMaybe from './LineItemProviderCommissionR
 import LineItemRefundMaybe from './LineItemRefundMaybe';
 import LineItemTotalPrice from './LineItemTotalPrice';
 import LineItemUnknownItemsMaybe from './LineItemUnknownItemsMaybe';
+import LineItemPromoDiscountMaybe from './LineItemPromoDiscountMaybe';
 
 import css from './OrderBreakdown.module.css';
 
@@ -82,6 +83,8 @@ export const OrderBreakdownComponent = props => {
    * LineItemBasePriceMaybe: prints the base price calculation for the listing, e.g.
    * "$150.00 * 2 nights $300"
    *
+   * LineItemPromoDiscountMaybe: Revie's promo code discount, a negative line for the customer only
+   *
    * LineItemUnknownItemsMaybe: prints the line items that are unknown. In ideal case there
    * should not be unknown line items. If you are using custom pricing, you should create
    * new custom line items if you need them.
@@ -116,6 +119,11 @@ export const OrderBreakdownComponent = props => {
       <LineItemBasePriceMaybe lineItems={lineItems} code={lineItemUnitType} intl={intl} />
       <LineItemShippingFeeMaybe lineItems={lineItems} intl={intl} />
       <LineItemPickupFeeMaybe lineItems={lineItems} intl={intl} />
+      <LineItemPromoDiscountMaybe
+        lineItems={lineItems}
+        metadata={transaction.attributes.metadata}
+        intl={intl}
+      />
       <LineItemUnknownItemsMaybe lineItems={lineItems} isProvider={isProvider} intl={intl} />
 
       <LineItemSubTotalMaybe

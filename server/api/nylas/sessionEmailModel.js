@@ -90,6 +90,35 @@ const formatMoney = money => {
   }
 };
 
+/**
+ * Revie promo code: the lines "You're booked" shows when the client used one. Whole texts, because
+ * a Postmark section prints its own value with {{.}} (see server/email/templates.js). Both are ''
+ * when there was no discount, so the email is exactly as before.
+ *
+ * The full price is worked back from what was paid and the discount: the discount is a negative
+ * line for the client only, so paid + discount = the session's price.
+ *
+ * @param {Array} lineItems the transaction's line items (Integration API shape)
+ * @param {{amount: number, currency: string}} payinTotal what the client paid
+ * @param {string} [promoCode] the code, from the transaction's metadata
+ */
+const promoLines = (lineItems, payinTotal, promoCode) => {
+  const discount = (lineItems || []).find(
+    item => item && item.code === 'line-item/promo-discount' && !item.reversal
+  );
+  const amount = discount && discount.lineTotal ? discount.lineTotal.amount : 0;
+  if (!(amount < 0) || !payinTotal || !payinTotal.currency) {
+    return { fullPriceText: '', discountText: '' };
+  }
+  const off = formatMoney({ amount: -amount, currency: payinTotal.currency });
+  const full = formatMoney({ amount: payinTotal.amount - amount, currency: payinTotal.currency });
+  if (!off || !full) return { fullPriceText: '', discountText: '' };
+  return {
+    fullPriceText: `Session price: ${full}`,
+    discountText: `Promo discount${promoCode ? ` (${promoCode})` : ''}: -${off}`,
+  };
+};
+
 /** The first word of a display name. */
 const firstNameOf = name =>
   String(name || '')
@@ -130,6 +159,8 @@ const zoneFor = ({ recipient, coachTimeZone, clientTimeZone }) => {
  * @param {string} [params.meetLink]
  * @param {string} params.manageUrl the booking page for this recipient
  * @param {{amount: number, currency: string}} [params.payinTotal] what the client paid (minor units)
+ * @param {Array} [params.lineItems] the transaction's line items, to show a promo discount
+ * @param {string} [params.promoCode] the promo code used, if any
  * @param {string} [params.calendarUrl] the "Add to calendar" link (the booking's calendar file)
  * @param {number} [params.now] injectable clock, for "free until"
  * @returns {object} the template model
@@ -148,6 +179,8 @@ const buildSessionEmailModel = ({
   meetLink,
   manageUrl,
   payinTotal,
+  lineItems,
+  promoCode,
   calendarUrl,
   now = Date.now(),
 }) => {
@@ -178,6 +211,7 @@ const buildSessionEmailModel = ({
     hasCalendarLink: Boolean(calendarUrl),
     totalPaid: formatMoney(payinTotal),
     hasTotalPaid: Boolean(formatMoney(payinTotal)),
+    ...promoLines(lineItems, payinTotal, promoCode),
   };
 
   // Free to cancel or move until 48 hours before the start, in the recipient's zone. Each value that

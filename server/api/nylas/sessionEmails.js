@@ -431,6 +431,9 @@ const loadEmailContext = async ({ row, mapping, now }) => {
     meetLink,
     manageUrl,
     payinTotal: row.kind === 'confirmed' ? tx?.attributes?.payinTotal : undefined,
+    // Revie promo code: the client's confirmation shows the discount as its own line.
+    lineItems: row.kind === 'confirmed' ? tx?.attributes?.lineItems : undefined,
+    promoCode: row.kind === 'confirmed' ? tx?.attributes?.metadata?.promo?.code : undefined,
     calendarUrl,
     now,
   });

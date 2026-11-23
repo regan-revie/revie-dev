@@ -11,6 +11,8 @@
  *   --dry-run     check every template with Postmark's own validator, create nothing
  *   --overwrite   replace templates that already exist with the wording in the repo. Without it a
  *                 template that exists is left alone, so wording edited in Postmark is never lost.
+ *   --only ALIAS  act on that one template only (e.g. --only booking-confirmed-client), so a
+ *                 change to one email does not replace the wording of the others.
  *
  * Each template is validated against a sample model before anything is created or changed; one that
  * Postmark rejects stops the run. Prints template aliases and results only, never the token.
@@ -23,6 +25,8 @@ const API = 'https://api.postmarkapp.com';
 const token = process.env.POSTMARK_SERVER_TOKEN;
 const dryRun = process.argv.includes('--dry-run');
 const overwrite = process.argv.includes('--overwrite');
+const onlyIndex = process.argv.indexOf('--only');
+const only = onlyIndex === -1 ? null : process.argv[onlyIndex + 1];
 
 if (!token) {
   console.error('POSTMARK_SERVER_TOKEN is not set.');
@@ -58,13 +62,22 @@ const sampleModel = recipient =>
     clientTimeZone: null,
     meetLink: 'https://meet.google.com/abc-defg-hij',
     manageUrl: 'https://heyrevie.com/order/example',
-    payinTotal: { amount: 5000, currency: 'USD' },
+    payinTotal: { amount: 4250, currency: 'USD' },
+    // A promo discount, so the validator renders the discount lines too.
+    lineItems: [{ code: 'line-item/promo-discount', lineTotal: { amount: -750, currency: 'USD' } }],
+    promoCode: 'NEWYEAR15',
     calendarUrl: 'https://heyrevie.com/api/nylas/calendar/example-token/revie-session.ics',
   });
 
+if (only && !TEMPLATES[only]) {
+  console.error(`No template with the alias ${only}. Known: ${Object.keys(TEMPLATES).join(', ')}`);
+  process.exit(1);
+}
+const wanted = Object.entries(TEMPLATES).filter(([alias]) => !only || alias === only);
+
 (async () => {
   // 1. Validate everything first.
-  for (const [alias, t] of Object.entries(TEMPLATES)) {
+  for (const [alias, t] of wanted) {
     const recipient = alias.endsWith('-coach') ? 'coach' : 'client';
     const { status, payload } = await call('POST', '/templates/validate', {
       Subject: t.subject,
@@ -89,7 +102,7 @@ const sampleModel = recipient =>
   }
 
   // 2. Create what is missing (and replace only when asked to).
-  for (const [alias, t] of Object.entries(TEMPLATES)) {
+  for (const [alias, t] of wanted) {
     const existing = await call('GET', `/templates/${alias}`);
     const body = { Name: t.name, Subject: t.subject, HtmlBody: t.html, TextBody: t.text };
     if (existing.status === 200) {

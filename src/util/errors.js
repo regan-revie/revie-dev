@@ -380,3 +380,13 @@ export const storableError = err => {
     apiErrors,
   };
 };
+
+/**
+ * Revie promo codes: the server refuses a code with an API error whose code is `promo-<reason>`
+ * (server/api/promo/rules.js). Returns the reason ('expired', 'first-session-only', ...) or null.
+ */
+export const promoRefusalReason = error => {
+  const apiErrors = error?.apiErrors || error?.data?.errors || [];
+  const found = apiErrors.find(e => typeof e?.code === 'string' && e.code.startsWith('promo-'));
+  return found ? found.code.replace(/^promo-/, '') : null;
+};

@@ -1054,6 +1054,56 @@ describe('"You\'re booked" (the client\'s confirmation)', () => {
       expect(sent[0].model.totalPaid).toBe('$50.00');
       expect(sent[0].model.freeUntil).not.toBe('');
     });
+
+    it('shows a promo discount in the client\'s "You\'re booked": the full price, the discount, the total paid', async () => {
+      integration.loadTransactionAsOperator.mockImplementation(async () => ({
+        tx: {
+          id: { uuid: TX },
+          attributes: {
+            protectedData: { clientTimeZone: 'America/New_York' },
+            payinTotal: { amount: 8500, currency: 'USD' },
+            lineItems: [
+              { code: 'line-item/fixed', lineTotal: { amount: 10000, currency: 'USD' } },
+              { code: 'line-item/promo-discount', lineTotal: { amount: -1500, currency: 'USD' } },
+              {
+                code: 'line-item/provider-commission',
+                lineTotal: { amount: -2000, currency: 'USD' },
+              },
+            ],
+            metadata: { promo: { code: 'NEWYEAR15', percentOff: 15 } },
+            lastTransition: mockTxState.last,
+          },
+        },
+        listing: {
+          attributes: {
+            title: 'Find your focus',
+            availabilityPlan: { timezone: 'Europe/London' },
+            publicData: { nylasCalendarId: 'cal-1' },
+          },
+        },
+        customer: {
+          attributes: { email: 'alex@client.example', profile: { displayName: 'Alex Client' } },
+        },
+        provider: {
+          attributes: {
+            email: 'sam@coach.example',
+            profile: { displayName: 'Sam Coach', privateData: {} },
+          },
+        },
+      }));
+      await queue(72);
+      await emails.processDueSessionEmails({ send });
+      expect(sent[0].model.fullPriceText).toBe('Session price: $100.00');
+      expect(sent[0].model.discountText).toBe('Promo discount (NEWYEAR15): -$15.00');
+      expect(sent[0].model.totalPaid).toBe('$85.00');
+    });
+
+    it('leaves the discount lines empty when no code was used, so the email is as before', async () => {
+      await queue(72);
+      await emails.processDueSessionEmails({ send });
+      expect(sent[0].model.fullPriceText).toBe('');
+      expect(sent[0].model.discountText).toBe('');
+    });
   });
 
   describe('when it fails', () => {

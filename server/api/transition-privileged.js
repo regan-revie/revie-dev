@@ -1,5 +1,6 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
 const { transactionLineItems } = require('../api-util/lineItems');
+const { promoError } = require('./promo/rules');
 const {
   addOfferToMetadata,
   getAmountFromPreviousOffer,
@@ -116,6 +117,13 @@ const getUpdatedMetadata = (orderData, transition, existingMetadata) => {
 
 module.exports = (req, res) => {
   const { isSpeculative, orderData, bodyParams, queryParams } = req.body || {};
+
+  // Revie: promo codes apply to a new booking only (initiate-privileged.js). This path is the
+  // inquiry route (request-payment-after-inquiry), which Revie does not use for bookings.
+  if (orderData?.promoCode || bodyParams?.params?.promoCode) {
+    handleError(res, promoError('not-supported'), { skipErrorLogging: true });
+    return;
+  }
 
   // Share one cookie token store so a refresh during transactions.show is reused for exchangeToken.
   const tokenStore = createCookieTokenStore(req, res);

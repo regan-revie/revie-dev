@@ -856,4 +856,7 @@ module.exports = {
   finishBookingAttempt,
   close,
   query,
+  // Revie promo codes (server/api/promo/store.js) share this pool and need a client of their own for
+  // a row-locking transaction.
+  getPool,
 };

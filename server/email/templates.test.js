@@ -120,6 +120,16 @@ describe('Postmark templates', () => {
       expect(t.text).toMatch(/\{\{#totalPaid\}\}[\s\S]*Total paid: \{\{\.\}\}/);
     });
 
+    it('shows the full price and the promo discount only when there is one, each as a whole text', () => {
+      expect(t.html).toMatch(
+        /\{\{#fullPriceText\}\}[\s\S]*\{\{\.\}\}[\s\S]*\{\{\/fullPriceText\}\}/
+      );
+      expect(t.html).toMatch(/\{\{#discountText\}\}[\s\S]*\{\{\.\}\}[\s\S]*\{\{\/discountText\}\}/);
+      expect(t.text).toMatch(/\{\{#discountText\}\}\s*\{\{\.\}\}\s*\{\{\/discountText\}\}/);
+      // Before the total, so it reads price, discount, total.
+      expect(t.html.indexOf('{{#discountText}}')).toBeLessThan(t.html.indexOf('{{#totalPaid}}'));
+    });
+
     it('states the refund rule in one line, and a different line when there is no free window', () => {
       [t.html, t.text].forEach(body => {
         expect(body).toContain(

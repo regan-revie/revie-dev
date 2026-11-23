@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { pick } from '../../util/common';
 import { initiatePrivileged, transitionPrivileged } from '../../util/api';
 import { denormalisedResponseEntities } from '../../util/data';
-import { storableError } from '../../util/errors';
+import { storableError, promoRefusalReason } from '../../util/errors';
 import * as log from '../../util/log';
 import { setCurrentUserHasOrders, fetchCurrentUser } from '../../ducks/user.duck';
 
@@ -23,12 +23,16 @@ const initiateOrderPayloadCreator = (
   // If we already have a transaction ID, we should transition, not initiate.
   const isTransition = !!transactionId;
 
-  const { deliveryMethod, quantity, bookingDates, ...otherOrderParams } = orderParams;
+  const { deliveryMethod, quantity, bookingDates, promoCode, ...otherOrderParams } = orderParams;
   const quantityMaybe = quantity ? { stockReservationQuantity: quantity } : {};
   const bookingParamsMaybe = bookingDates || {};
 
-  // Parameters only for client app's server
-  const orderData = deliveryMethod ? { deliveryMethod } : {};
+  // Parameters only for client app's server. Revie: a promo code is judged and applied there
+  // (server/api/initiate-privileged.js); it is never sent on to Sharetribe's own API.
+  const orderData = {
+    ...(deliveryMethod ? { deliveryMethod } : {}),
+    ...(promoCode ? { promoCode } : {}),
+  };
 
   // Parameters for Marketplace API
   const transitionParams = {
@@ -296,6 +300,7 @@ const speculateTransactionPayloadCreator = (
   const {
     deliveryMethod,
     priceVariantName,
+    promoCode,
     quantity,
     bookingDates,
     ...otherOrderParams
@@ -307,6 +312,7 @@ const speculateTransactionPayloadCreator = (
   const orderData = {
     ...(deliveryMethod ? { deliveryMethod } : {}),
     ...(priceVariantName ? { priceVariantName } : {}),
+    ...(promoCode ? { promoCode } : {}),
   };
 
   // Parameters for Marketplace API
@@ -488,6 +494,9 @@ const checkoutPageSlice = createSlice({
       .addCase(speculateTransactionThunk.pending, state => {
         state.speculateTransactionInProgress = true;
         state.speculateTransactionError = null;
+        // Revie: a refused promo code ends the booking attempt with an error; asking for a new price
+        // (with the code removed) starts it over.
+        if (promoRefusalReason(state.initiateOrderError)) state.initiateOrderError = null;
         state.speculatedTransaction = null;
       })
       .addCase(speculateTransactionThunk.fulfilled, (state, action) => {
