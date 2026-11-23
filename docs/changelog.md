@@ -19,6 +19,72 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-23 (promo codes: Revie-funded, out of Revie's commission only)
+
+**Branch / PR:** `promo-codes`, one PR against `main`, not merged. Decision recorded in `docs/decisions.md`; the detail in `docs/tech-constraints.md` ("Promo codes").
+
+**⚠️ Run the spike BEFORE merging. I could not run it myself.** You asked me to start with a no-money speculative initiate on Dev and stop if Sharetribe refused. That needs a logged-in client's session (the Marketplace API only prices a booking for a logged-in user), and I do not have one and must not create an account or type a password. So I built everything else (all of it unmerged and inert until deployed) and wrote the spike as a script for you. If it is refused, **do not merge**: tell me and the line-item shape changes. The docs say Sharetribe accepts it (negative lines are allowed; the only rule is payin and payout each >= 0 and, for Stripe, payin >= payout), but it has not been tried.
+
+**What changed**
+1. **The money.** A code adds `line-item/promo-discount`, a negative line **for the client only**. The coach's payout is untouched because the provider commission is calculated from the session line alone, so nothing needed "adjusting". £100 session, 15% off: session £100 (both), discount -£15 (client only), provider commission -£20 (coach only). **Client pays £85, coach is paid £80, Revie keeps £5** before Stripe's fee (£20 without a code).
+2. **Ceiling 15%, in code**: refused at checkout, in the line-item builder and by the script; never above the commission, compared in money so a minimum-amount commission is respected.
+3. **Codes** live in Postgres (`promo_codes`, `promo_redemptions`), created at boot and by the script: code, percent, expiry, max total uses, uses so far, max uses per customer (default 1), first-session-only, active.
+4. **Checkout:** "Have a code?" link, Apply, then an "applied" line with Remove; the order breakdown shows "Promo discount (CODE)" as its own line and the total updates before payment. Friendly errors: "That code has expired.", "This code is for your first session only.", "That code isn't valid." (always, for an unknown or switched-off code), and more. One code per booking. Hidden once a booking exists (its price is then fixed). The listing page's estimate still shows the full price.
+5. **Server decides everything**: the percentage comes from the database; the caller is identified from their own session; the code travels as server-only data, never to Sharetribe's own API. **8 wrong guesses per 10 minutes** per user, then "Too many tries". A refused code stops the booking before Sharetribe is asked. Inquiry path (`transition-privileged`) refuses codes.
+6. **First session only** is read from Sharetribe with the client's own session (their own orders only): a booking counts if it reached `confirm-payment` and was not later refunded in full (cancel, decline, expire). A late-cancelled one counts. Also covers bookings from before codes existed.
+7. **Uses:** reserved when the booking starts (counts against total and per-client caps, under a row lock so the last use cannot be taken twice), **paid** when the booking is accepted, **released** if payment expires, the booking is declined or expires, a reservation never got a booking (30 min), or the client is **refunded in full**. A late cancel stays consumed. A 60-second job does this from Sharetribe's transition history.
+8. **Cancel / late cancel / refund / reschedule unchanged**: they act on what was paid (the full refund reverses every line: £85; late cancel keeps £85 and pays the coach £80; reschedule recalculates nothing). The client's "You're booked" email and the order page show the discount.
+9. **No Console change, no transaction-process change, no new release.**
+10. **Tests:** server 1010, client 1378, format check clean (about 130 new).
+
+**Your steps, in order**
+1. **Spike (your terminal, before merging).** Needs a Dev TEST client's email and password (typed in your terminal, hidden, used once, never printed). Use the id of a Dev coach session (the uuid at the end of its page URL). It asks Sharetribe for a speculative initiate (the price check the checkout already does): no booking, no card, no money.
+```
+op run --env-file=.env -- node scripts/promo-line-item-spike.js <listing-id> 15
+```
+   Expect: "SHARETRIBE ACCEPTED IT", payin 85% of the session price, payout 80%, "Revie keeps" the difference. If it prints "REFUSED", paste me the line.
+2. **Merge, let Render deploy.** The tables are created at boot ("promo code tables ready" in the logs).
+3. **Render Shell (Dev service):**
+```
+node scripts/promo-codes.js create NEWYEAR15 --percent 15 --first-session-only --expires "2027-02-01 00:00" --tz America/Los_Angeles --max-uses 50 --per-customer 1
+```
+```
+node scripts/promo-codes.js create WELCOME10 --percent 10 --first-session-only --per-customer 1
+```
+```
+node scripts/promo-codes.js list
+```
+   `list` should show both ACTIVE, NEWYEAR15 expiring `2027-02-01T08:00:00.000Z` (midnight Los Angeles), WELCOME10 never expiring with no cap. Other commands: `show CODE` (every use), `deactivate CODE` / `activate CODE` (stops new uses; existing bookings are untouched). Any percentage above 15 is refused.
+4. **Postmark template (Dev service shell, where the Dev Postmark token is set).** Check first, then replace just this one template. **This replaces any wording you edited in Postmark for "You're booked"**; if you have, re-apply it after (or paste the two discount lines into the Postmark template instead: `{{#fullPriceText}}{{.}}{{/fullPriceText}}` and `{{#discountText}}{{.}}{{/discountText}}` above "Total paid").
+```
+node scripts/postmark-create-templates.js --dry-run --only booking-confirmed-client
+```
+```
+node scripts/postmark-create-templates.js --overwrite --only booking-confirmed-client
+```
+5. **Real codes go on Live at cutover** (logged in `docs/go-live-plan.md`, with the Live service's Postgres, the production Postmark template and the spike against Live). NEWYEAR15 and WELCOME10 here are Dev test codes.
+
+**Test steps on Dev** (after steps 1 to 4). You need two test clients: **A** with no earlier paid booking, **B** with one.
+1. **A, NEWYEAR15, a coach session (£100-ish price):** checkout, "Have a code?", type `newyear15` in lower case, Apply: "NEWYEAR15 applied: 15% off", the breakdown shows the session price, "Promo discount (NEWYEAR15)" -15%, and a total 15% lower; **before paying**. Remove: back to full price. Apply again and pay with a Stripe test card.
+2. **The money (Sharetribe Console and Stripe dashboard):** the transaction's payin is 85% of the price, payout 80%. The Stripe test payment is the discounted amount.
+3. **Order page and email:** the client's order page shows the discount line and the lower total; the "You're booked" email shows "Session price", "Promo discount (NEWYEAR15)" and "Total paid". **The coach's order page shows the full price and the usual commission**, with no discount.
+4. **`list` in Render Shell:** NEWYEAR15 shows 1 paid (about a minute after the booking is accepted), counter 1.
+5. **Refusals:** A, same code again: "You've already used this code." B, either code: "This code is for your first session only." `zzzz`: "That code isn't valid." Eight wrong codes in a row: "Too many tries". `deactivate NEWYEAR15` then apply: "That code isn't valid."; `activate` it again. After 2027-02-01 Los Angeles midnight: "That code has expired." (or create a code with `--expires` a few minutes ahead to see it).
+6. **Money paths on the discounted booking:** cancel more than 48 hours out: the refund is the discounted amount, and after about 5 minutes `show NEWYEAR15` lists the use as `released` (so A could use the code again). A late cancel (inside 48 hours): the client is not refunded, the coach is still paid 80% of the full price, and the use stays `paid`. Reschedule: amounts unchanged.
+7. **Abandoned booking:** apply a code, click Pay, then leave on the card step and wait 15 minutes: `show` lists the use as `released` within a minute after the payment expires.
+8. **Last use:** create a code with `--max-uses 1` and try it with two clients at nearly the same moment: one gets it, the other "That code has been fully used."
+9. **Without a code** a booking is exactly as before (price, payout, emails).
+
+**Judgement calls I made (change any):** the attempt limit is in memory, so a Render restart forgives it; a code applied to a client who has a booking *in progress* with it (reserved, unpaid) says "You have a booking in progress with this code. Finish it, or try again in 15 minutes."; a failed look-up of the client's orders counts as "has booked before" (it refuses rather than gives a discount by mistake).
+
+**Not verified:** nothing was run against Sharetribe, Stripe, Postgres or Postmark (they are covered by tests with fakes); the spike is the first real proof. In particular unverified: the Postgres statements against a real database (the row lock and the counts), that Sharetribe accepts `metadata.promo` on the initiate (if it refuses only that, drop the metadata and the code name leaves the order page), and how the new rows look in the real checkout.
+
+**What's next**
+- Run the spike and tell me the result.
+- Real Live codes at cutover.
+
+---
+
 ## HANDOFF — 2026-11-19 (fix: "Other coaches you might like" cards had no image or coach name)
 
 **Branch / PR:** `fallback-card-include-author-images`, one PR against `main`, not merged. My bug, from PR #45.

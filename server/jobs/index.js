@@ -9,6 +9,7 @@
 const { runBookingSweep } = require('./bookingSweeper');
 const { runReconcile } = require('../api/nylas/reconcile');
 const { runTraitSync } = require('../api/coachTraits/reconcileTraits');
+const { runPromoReconcile } = require('../api/promo/reconcile');
 const { resolveMissingEventIds } = require('../api/nylas/eventIdBackfill');
 const { processDueEventCancellations } = require('../api/nylas/calendarEventSync');
 const {
@@ -121,6 +122,24 @@ const start = () => {
     }
   };
 
+  // Promo code uses follow their bookings: counted when paid, given back when the payment never
+  // completed or the client was refunded in full (server/api/promo/reconcile.js). Its own flag.
+  let reconcilingPromos = false;
+  const promoTick = async () => {
+    if (reconcilingPromos) return;
+    reconcilingPromos = true;
+    try {
+      const result = await runPromoReconcile();
+      if (result.paid > 0 || result.released > 0 || result.failed > 0) {
+        console.log('[jobs] promo codes', JSON.stringify(result)); // eslint-disable-line no-console
+      }
+    } catch (e) {
+      log.error(e, 'promo-reconcile-loop-failed', {});
+    } finally {
+      reconcilingPromos = false;
+    }
+  };
+
   // unref(): these timers must never be the reason the process stays alive.
   setTimeout(tick, FIRST_SWEEP_AFTER_MS).unref();
   setInterval(tick, SWEEP_EVERY_MS).unref();
@@ -128,6 +147,8 @@ const start = () => {
   setInterval(reconcileTick, SWEEP_EVERY_MS).unref();
   setTimeout(traitsTick, FIRST_SWEEP_AFTER_MS + 30 * 1000).unref();
   setInterval(traitsTick, SWEEP_EVERY_MS).unref();
+  setTimeout(promoTick, FIRST_SWEEP_AFTER_MS + 45 * 1000).unref();
+  setInterval(promoTick, SWEEP_EVERY_MS).unref();
 };
 
 module.exports = { start };

@@ -367,6 +367,11 @@ const server = app.listen(PORT, () => {
     .then(ready => {
       if (!ready) return;
       console.log('[nylas-db] booking mapping table ready'); // eslint-disable-line no-console
+      // Revie promo codes live in the same database (server/api/promo/store.js).
+      require('./api/promo/store') // eslint-disable-line global-require
+        .initSchema()
+        .then(() => console.log('[promo] promo code tables ready')) // eslint-disable-line no-console
+        .catch(e => console.error('[promo] schema init failed:', e.message)); // eslint-disable-line no-console
       // The sweeper that recovers paid-but-unconfirmed bookings needs the tables above, so it only
       // starts once they exist. See server/jobs/ and server/api/nylas/bookingRecovery.js.
       require('./jobs').start(); // eslint-disable-line global-require

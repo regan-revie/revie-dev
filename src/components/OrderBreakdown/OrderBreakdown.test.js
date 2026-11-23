@@ -230,3 +230,82 @@ describe('OrderBreakdown', () => {
     expect(totalPayIn.getByText('18')).toBeInTheDocument();
   });
 });
+
+describe('OrderBreakdown with a promo code', () => {
+  const messages = {
+    'OrderBreakdown.promoDiscount': 'Promo discount',
+    'OrderBreakdown.promoDiscountWithCode': 'Promo discount ({code})',
+    'OrderBreakdown.total': 'Total price',
+    'OrderBreakdown.providerTotalDefault': 'Total price',
+  };
+  const lineItems = [
+    {
+      code: 'line-item/fixed',
+      includeFor: ['customer', 'provider'],
+      quantity: new Decimal(1),
+      unitPrice: new Money(10000, 'USD'),
+      lineTotal: new Money(10000, 'USD'),
+      reversal: false,
+    },
+    {
+      code: 'line-item/promo-discount',
+      includeFor: ['customer'],
+      unitPrice: new Money(10000, 'USD'),
+      percentage: new Decimal(-15),
+      lineTotal: new Money(-1500, 'USD'),
+      reversal: false,
+    },
+    {
+      code: 'line-item/provider-commission',
+      includeFor: ['provider'],
+      unitPrice: new Money(10000, 'USD'),
+      percentage: new Decimal(-20),
+      lineTotal: new Money(-2000, 'USD'),
+      reversal: false,
+    },
+  ];
+  const tx = (extra = {}) =>
+    exampleTransaction({
+      payinTotal: new Money(8500, 'USD'),
+      payoutTotal: new Money(8000, 'USD'),
+      lineItems,
+      ...extra,
+    });
+  const renderFor = (userRole, transaction) =>
+    render(
+      <OrderBreakdownComponent
+        userRole={userRole}
+        currency="USD"
+        marketplaceName={marketplaceName}
+        transaction={transaction}
+        intl={fakeIntl}
+      />,
+      { messages }
+    );
+
+  it('shows the client the code, the discount as its own line, and what they pay', () => {
+    renderFor('customer', tx({ metadata: { promo: { code: 'NEWYEAR15', percentOff: 15 } } }));
+    expect(screen.getByText('Promo discount (NEWYEAR15)')).toBeInTheDocument();
+    expect(screen.getByText('-15')).toBeInTheDocument();
+    // The total is what was charged (85), not the full price (100). The test intl prints bare numbers.
+    expect(screen.getByText('85')).toBeInTheDocument();
+    // Only one discount line: it is not also listed as an unrecognised item.
+    expect(screen.getAllByText(/Promo discount/)).toHaveLength(1);
+  });
+
+  it('still shows the discount when the booking does not name the code', () => {
+    renderFor('customer', tx());
+    expect(screen.getByText('Promo discount')).toBeInTheDocument();
+    expect(screen.getByText('-15')).toBeInTheDocument();
+  });
+
+  it('never shows the coach the discount: they see the full price and are paid on it', () => {
+    renderFor('provider', tx({ metadata: { promo: { code: 'NEWYEAR15', percentOff: 15 } } }));
+    expect(screen.queryByText(/Promo discount/)).toBeNull();
+    expect(screen.queryByText('-15')).toBeNull();
+    // Their line items: the full price and the usual commission, and a payout of 80.
+    expect(screen.getAllByText('100').length).toBeGreaterThan(0);
+    expect(screen.getByText('-20')).toBeInTheDocument();
+    expect(screen.getByText('80')).toBeInTheDocument();
+  });
+});

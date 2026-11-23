@@ -10,10 +10,11 @@ import {
 import { propTypes } from '../../util/types';
 import { ensureTransaction } from '../../util/data';
 import { createSlug } from '../../util/urlHelpers';
-import { nylasCreateBooking } from '../../util/api';
+import { nylasCreateBooking, promoCheck } from '../../util/api';
 import {
   isTransactionInitiateListingNotFoundError,
   isTransactionsTransitionInvalidTransition,
+  promoRefusalReason,
 } from '../../util/errors';
 import {
   getProcess,
@@ -27,7 +28,7 @@ import {
 import { H3, H4, NamedLink, OrderBreakdown, Page, TopbarSimplified } from '../../components';
 
 // Session helpers file needs to be imported before other CheckoutPage modules that use it
-import { clearData } from './CheckoutPageSessionHelpers';
+import { clearData, storeData } from './CheckoutPageSessionHelpers';
 
 import {
   bookingDatesMaybe,
@@ -48,6 +49,7 @@ import StripePaymentForm from './StripePaymentForm/StripePaymentForm';
 import DetailsSideCard from './DetailsSideCard';
 import MobileListingImage from './MobileListingImage';
 import MobileOrderBreakdown from './MobileOrderBreakdown';
+import PromoCodeSection from './PromoCodeSection/PromoCodeSection';
 
 import css from './CheckoutPage.module.css';
 
@@ -130,6 +132,9 @@ const getOrderParams = (
   // price variant data for fixed duration bookings
   const priceVariantName = pageData.orderData?.priceVariantName;
   const priceVariantNameMaybe = priceVariantName ? { priceVariantName } : {};
+  // Revie: a promo code the client applied. Judged and priced on the server only.
+  const promoCode = pageData.orderData?.promoCode;
+  const promoCodeMaybe = promoCode ? { promoCode } : {};
   const priceVariant = priceVariants?.find(pv => pv.name === priceVariantName);
   const priceVariantMaybe = priceVariant ? prefixPriceVariantProperties(priceVariant) : {};
 
@@ -163,6 +168,7 @@ const getOrderParams = (
     ...seatsMaybe,
     ...bookingDatesMaybe(pageData.orderData?.bookingDates),
     ...priceVariantNameMaybe,
+    ...promoCodeMaybe,
     ...protectedDataMaybe,
     ...optionalPaymentParams,
   };
@@ -490,6 +496,8 @@ export const CheckoutPageWithPayment = props => {
     transactionFieldConfigs = [],
     showTransactionFields,
     config,
+    sessionStorageKey,
+    setPageData,
   } = props;
 
   // Since the listing data is already given from the ListingPage
@@ -503,6 +511,38 @@ export const CheckoutPageWithPayment = props => {
     isTransactionInitiateListingNotFoundError(initiateOrderError);
 
   const { listing, transaction, orderData } = pageData;
+
+  // Revie promo code. The code lives in pageData.orderData (and so in session storage, surviving a
+  // refresh); applying or removing one stores it, then asks the server for a new price.
+  const repriceWith = nextOrderData => {
+    const next = { ...pageData, orderData: nextOrderData };
+    setPageData(next);
+    storeData(nextOrderData, next.listing, next.transaction, sessionStorageKey);
+    fetchSpeculatedTransactionIfNeeded(
+      getOrderParams(next, {}, {}, config),
+      next,
+      props.fetchSpeculatedTransaction
+    );
+  };
+  const applyPromo = async code => {
+    let result;
+    try {
+      result = await promoCheck({ code });
+    } catch (e) {
+      return { reason: 'unavailable' };
+    }
+    if (!result || !result.ok) return { reason: (result && result.reason) || 'invalid' };
+    repriceWith({ ...orderData, promoCode: result.code, promoPercent: result.percentOff });
+    return {};
+  };
+  const removePromo = () => {
+    const { promoCode, promoPercent, ...withoutPromo } = orderData || {};
+    repriceWith(withoutPromo);
+  };
+  // The server refusing the code while pricing or booking (it expired a moment ago, say). Those
+  // errors get their own message here, not the generic checkout error.
+  const promoRefusedReason =
+    promoRefusalReason(speculateTransactionError) || promoRefusalReason(initiateOrderError);
   const existingTransaction = ensureTransaction(transaction);
   const speculatedTransaction = ensureTransaction(speculatedTransactionMaybe, {}, null);
 
@@ -575,15 +615,18 @@ export const CheckoutPageWithPayment = props => {
 
   const errorMessages = getErrorMessages(
     listingNotFound,
-    initiateOrderError,
+    promoRefusedReason ? null : initiateOrderError,
     isPaymentExpired,
     retrievePaymentIntentError,
-    speculateTransactionError,
+    promoRefusedReason ? null : speculateTransactionError,
     listingLink,
     pickAnotherTimeLink
   );
 
   const isBooking = processName === BOOKING_PROCESS_NAME;
+  // Only before the booking is started: once it exists its price is fixed (the payment is made for
+  // exactly that amount), so a code can no longer be added or taken off.
+  const showPromoCode = isBooking && !(existingTransaction?.attributes?.lineItems?.length > 0);
   const isPurchase = processName === PURCHASE_PROCESS_NAME;
   const isNegotiation = processName === NEGOTIATION_PROCESS_NAME;
 
@@ -677,6 +720,16 @@ export const CheckoutPageWithPayment = props => {
             {errorMessages.speculateErrorMessage}
             {errorMessages.retrievePaymentIntentErrorMessage}
             {errorMessages.paymentExpiredMessage}
+
+            {showPromoCode ? (
+              <PromoCodeSection
+                appliedCode={orderData?.promoCode}
+                appliedPercent={orderData?.promoPercent}
+                refusedReason={promoRefusedReason}
+                onApply={applyPromo}
+                onRemove={removePromo}
+              />
+            ) : null}
 
             {showPaymentForm ? (
               <StripePaymentForm

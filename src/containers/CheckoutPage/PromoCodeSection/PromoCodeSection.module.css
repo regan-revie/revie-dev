@@ -1,0 +1,54 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  margin: 0 0 24px;
+}
+
+.linkButton {
+  font-size: 14px;
+  line-height: 24px;
+  text-decoration: underline;
+}
+
+.label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: var(--fontWeightMedium);
+}
+
+.inputRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.applyButton {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 0;
+  padding: 0 20px;
+}
+
+.appliedRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.appliedText {
+  font-weight: var(--fontWeightMedium);
+}
+
+.error {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--colorFail);
+}

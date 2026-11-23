@@ -87,6 +87,8 @@ const TEMPLATES = {
         button('{{manageUrl}}', 'See your booking'),
         small("Using Google Calendar? It's already there."),
         small('Apple Calendar or Outlook? Tap Add to calendar.'),
+        `{{#fullPriceText}}${p('{{.}}')}{{/fullPriceText}}`,
+        `{{#discountText}}${p('{{.}}')}{{/discountText}}`,
         `{{#totalPaid}}${p('Total paid: {{.}}')}{{/totalPaid}}`,
         policyLine(),
       ].join('\n')
@@ -109,6 +111,13 @@ See your booking: {{manageUrl}}
 
 Using Google Calendar? It's already there.
 Apple Calendar or Outlook? Tap Add to calendar.
+{{#fullPriceText}}
+
+{{.}}
+{{/fullPriceText}}
+{{#discountText}}
+{{.}}
+{{/discountText}}
 {{#totalPaid}}
 
 Total paid: {{.}}
