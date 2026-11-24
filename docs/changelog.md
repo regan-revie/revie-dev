@@ -19,6 +19,47 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-25 (client declines the calendar invite: told once that the session is still booked)
+
+**Branch / PR:** `declined-invite-email`, one PR against `main`, not merged.
+
+**What changed**
+1. **When a client declines the coach's calendar invite, Revie emails them once** (Postmark, new template `calendar-invite-declined-client`, subject "Your session is still booked"): "You declined the calendar invite for {session} with {coach} on {date, time, zone}. Your session is still booked. To cancel, use Revie: [See your booking]. Cancelling within 48 hours of the session is charged in full." In the client's own timezone; it does not suggest messaging the coach. **Nothing goes to the coach.**
+2. **Detection uses the `event.updated` notice we already handle** for the coach-delete logic, so there is **no new Nylas trigger to add**. It goes through the same gate first: only the booking's own coach grant and calendar count, so a guest's own copy (a client who is also a coach) and any other event are ignored. Only the booking's own client counts (matched by email, ignoring case); the coach or any other guest declining is ignored. A decline cancels and refunds nothing.
+3. **Once per booking**, however many times they decline, accept and decline again, or Nylas repeats the notice. **Not sent** if the booking is already cancelled, the session has started or passed, or the transaction is no longer a live one. A reschedule does not stop it (still booked, at the new time). It rides the existing email queue, so a failed send is retried (three tries).
+4. **Sentry:** tag `postmark-declined-invite-failed` after the third failed try, with the booking id and the address's domain only (no address, no name).
+5. **Tests:** server 1128, client unchanged (no client code touched), format check clean: a decline queues one email; a second decline queues none; guest copies, other attendees, the coach, other events, other calendars, cancelled and passed bookings are ignored; the send skips a booking cancelled in the meantime; the Sentry tag on failure.
+
+**Render Shell commands (Dev service), after merge and deploy.** The create script adds only what is missing and `--only` limits it to this template, so none of your other templates' wording is touched. Check first:
+```
+node scripts/postmark-create-templates.js --dry-run --only calendar-invite-declined-client
+```
+Expect `valid   calendar-invite-declined-client` and "Dry run: nothing created." Then create it:
+```
+node scripts/postmark-create-templates.js --only calendar-invite-declined-client
+```
+Expect `created  calendar-invite-declined-client`. **No Nylas dashboard step:** it relies on the `event.updated` trigger that is already on the webhook destination for the coach-delete refund. (If a coach deleting an event from Google already refunds on Dev, it is on.)
+
+**Dev test steps.** You need a Dev coach with a bookable session, and a **client test account whose email is a Google account** (so the invite lands in a Google Calendar you can open), with `POSTMARK_SENDING_ENABLED` on for Dev.
+1. **Book** a session as that client (more than 48 hours ahead is fine). The coach's calendar event invites the client; the invite shows in the client's Google Calendar.
+2. **Decline it:** in the client's Google Calendar, open the event and choose **No** under "Going?". Within a minute or two: the client gets **"Your session is still booked"**, with the session, coach, time in their zone and a **See your booking** button; nothing arrives for the coach. In Render's logs: `[nylas] client declined the invite for booking ...: email queued`, then `[postmark] sent declined-invite to client`.
+3. **Once only:** change the answer to **Yes**, then **No** again, and decline once more. **No second email.**
+4. **Delete instead of decline** (a second booking): in the client's Google Calendar delete the event (choose to notify the organiser if Google asks). Google should record that as a decline, and the same email should arrive. **If it does not, tell me**: that is the one thing I cannot confirm from here.
+5. **Cancelled booking:** book again, cancel it from Revie, then decline the (removed) invite or any leftover copy: nothing is sent.
+6. **Someone else declining:** invite another guest to the coach's event by hand in the coach's Google Calendar, decline as them: nothing is sent. The coach declining their own event: nothing is sent.
+7. **The booking is untouched** throughout: still booked on the order page, nothing refunded, the coach's calendar event still there.
+8. **A failed send** (only if you want to see the alert): unset the Postmark token or use a bad template alias on Dev for a minute, decline, wait for three ticks: Sentry gets `postmark-declined-invite-failed` once.
+
+**Judgement calls (change any):** the email goes out on the next sweeper tick, so up to about a minute after Nylas's notice; "still booked" is not sent to a booking whose transaction is not accepted (for example a late-cancelled one), since it would be untrue; the copy says "Cancelling within 48 hours of the session is charged in full" always, as you wrote it, even when the session is further away.
+
+**Not verified:** nothing ran against Nylas, Google, Postgres or Postmark (tests use fakes). In particular unverified: that Nylas's `event.updated` notice for Google carries `participants` with `status: "no"` after an invitee's decline (if it carries no guest list, the code reads the event from Nylas instead, which should have it); that deleting the invite from the client's own calendar produces that same decline; and how the email looks in a real inbox.
+
+**What's next**
+- Run steps 1 to 4 and tell me whether the delete case (step 4) produces the email.
+- At cutover: the production template (`docs/go-live-plan.md`).
+
+---
+
 ## HANDOFF — 2026-11-24 (a coach's Google connection breaks: detected, bookings stop, coach told once)
 
 **Branch / PR:** `grant-expired-reconnect`, one PR against `main`, not merged.

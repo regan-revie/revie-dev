@@ -16,7 +16,7 @@ const mockNylasEvents = {};
 jest.mock('./eventIdBackfill', () => ({ lookupEventId: jest.fn() }));
 
 // The "database" lives outside the module registry, so it survives a simulated restart.
-const mockStore = { bookings: new Map(), events: new Map(), waits: new Map() };
+const mockStore = { bookings: new Map(), events: new Map(), waits: new Map(), emails: new Map() };
 // The calendar the booking's listing sells against (null: none recorded).
 const mockOwn = { calendar: 'cal-1' };
 jest.mock('./db', () => ({
@@ -35,6 +35,12 @@ jest.mock('./db', () => ({
     });
   }),
   cancelSessionEmails: jest.fn(async () => 2),
+  // Like the real one: a key that is already there queues nothing.
+  queueSessionEmail: jest.fn(async e => {
+    if (mockStore.emails.has(e.dedupeKey)) return false;
+    mockStore.emails.set(e.dedupeKey, e);
+    return true;
+  }),
   // Like the real query: the event row's grant AND the booking's own coach grant must both match.
   findBookingByEvent: jest.fn(async (grant, event) => {
     const e = [...mockStore.events.values()].find(x => x.grant === grant && x.event === event);
@@ -162,6 +168,7 @@ beforeEach(() => {
   mockStore.bookings.clear();
   mockStore.events.clear();
   mockStore.waits.clear();
+  mockStore.emails.clear();
   mockStore.bookings.set(BOOKING, {
     nylas_booking_id: BOOKING,
     sharetribe_transaction_id: TX,
@@ -490,7 +497,8 @@ describe('the coach undoes the deletion', () => {
 
     const result = await calendar.handleCalendarEvent({
       trigger: 'event.updated',
-      data: event({ status: 'confirmed' }),
+      // Nylas's event notices carry the guest list; without one the event would be read to find it.
+      data: event({ status: 'confirmed', participants: [] }),
     });
     expect(result).toEqual({ handled: true, action: 'restored', via: 'calendar-event' });
 
@@ -879,5 +887,197 @@ describe("only the coach's own copy of the event can cancel a booking", () => {
       expect(summary).toMatchObject({ restored: 1, cancelled: 0 });
       expect(refundCalls()).toHaveLength(0);
     });
+  });
+});
+
+describe("the client declines the coach's calendar invitation", () => {
+  const CLIENT = 'Alex@Client.example';
+  const COACH = 'sam@coach.example';
+  const guests = (clientStatus, extra = []) => [
+    { email: COACH, name: 'Sam Coach', status: 'yes' },
+    { email: 'alex@client.example', name: 'Alex Client', status: clientStatus },
+    ...extra,
+  ];
+  const updated = (participants, extra = {}) => ({
+    trigger: 'event.updated',
+    data: event({ status: 'confirmed', participants, ...extra }),
+  });
+  const queued = () => [...mockStore.emails.values()];
+
+  beforeEach(() => {
+    // The booking is a week away, so there is a session to still be booked for.
+    mockStore.bookings.get(BOOKING).booking_start = new Date(Date.now() + 7 * 24 * 3600000);
+  });
+
+  const load = () => {
+    const sync = loadSync();
+    integration.loadTransactionAsOperator.mockImplementation(async () => ({
+      listing: { attributes: { publicData: { nylasCalendarId: mockOwn.calendar } } },
+      customer: { attributes: { email: CLIENT } },
+    }));
+    return sync.calendar;
+  };
+
+  it('a decline queues one email to the client, and cancels nothing and refunds nothing', async () => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(updated(guests('no')));
+
+    expect(result).toEqual({ handled: true, action: 'declined-invite-queued' });
+    expect(queued()).toHaveLength(1);
+    expect(queued()[0]).toMatchObject({
+      dedupeKey: 'declined-invite:booking-1:client',
+      kind: 'declined-invite',
+      nylasBookingId: BOOKING,
+      recipient: 'client',
+    });
+    expect(db.scheduleEventCancellation).not.toHaveBeenCalled();
+    expect(integration.applyTransition).not.toHaveBeenCalled();
+    expect(mockTx.refunds).toBe(0);
+  });
+
+  it('nothing is queued for the coach: one email, to the client', async () => {
+    const calendar = load();
+    await calendar.handleCalendarEvent(updated(guests('no')));
+    expect(queued().every(e => e.recipient === 'client')).toBe(true);
+  });
+
+  it('a second decline (a repeat notice, or declining again later) queues nothing more', async () => {
+    const calendar = load();
+    await calendar.handleCalendarEvent(updated(guests('no')));
+    const again = await calendar.handleCalendarEvent(updated(guests('no')));
+    // Accepted again, then declined again, a day later.
+    await calendar.handleCalendarEvent(updated(guests('yes')));
+    advance(24 * 60);
+    const later = await calendar.handleCalendarEvent(updated(guests('no')));
+
+    expect(again).toEqual({ handled: true, action: 'declined-invite-already-queued' });
+    expect(later).toEqual({ handled: true, action: 'declined-invite-already-queued' });
+    expect(queued()).toHaveLength(1);
+  });
+
+  it("matches the client's email whatever its case or spacing", async () => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(
+      updated([{ email: '  ALEX@client.EXAMPLE ', status: 'no' }])
+    );
+    expect(result.action).toBe('declined-invite-queued');
+  });
+
+  it.each(['yes', 'maybe', 'noreply'])('a client who is %s sends nothing', async status => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(updated(guests(status)));
+    expect(result).toEqual({ handled: false, reason: 'event-not-cancelled' });
+    expect(queued()).toHaveLength(0);
+  });
+
+  it('someone else on the invitation declining is ignored', async () => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(
+      updated(guests('yes', [{ email: 'friend@elsewhere.example', status: 'no' }]))
+    );
+    expect(result).toEqual({ handled: false, reason: 'event-not-cancelled' });
+    expect(queued()).toHaveLength(0);
+  });
+
+  it('the coach declining their own event is ignored', async () => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(
+      updated([{ email: COACH, status: 'no' }, { email: 'alex@client.example', status: 'yes' }])
+    );
+    expect(result.handled).toBe(false);
+    expect(queued()).toHaveLength(0);
+  });
+
+  it("a guest's own copy is ignored: the notice from another grant (the client is also a coach)", async () => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent({
+      trigger: 'event.updated',
+      data: event({
+        grant_id: 'their-own-grant',
+        status: 'confirmed',
+        participants: guests('no'),
+      }),
+    });
+    expect(result).toEqual({ handled: false, reason: 'not-a-revie-booking' });
+    expect(queued()).toHaveLength(0);
+  });
+
+  it("another calendar of the coach's grant is ignored too", async () => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(
+      updated(guests('no'), { calendar_id: 'some-other-calendar' })
+    );
+    expect(result).toEqual({ handled: false, reason: 'not-the-coach-copy' });
+    expect(queued()).toHaveLength(0);
+  });
+
+  it('an event that is not a Revie booking is ignored, even with a decline in it', async () => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(
+      updated(guests('no'), { id: 'someone-elses-meeting' })
+    );
+    expect(result).toEqual({ handled: false, reason: 'not-a-revie-booking' });
+    expect(queued()).toHaveLength(0);
+  });
+
+  it.each(['cancelled', 'completed'])('a booking that is %s is ignored', async status => {
+    mockStore.bookings.get(BOOKING).status = status;
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(updated(guests('no')));
+    expect(result).toEqual({ handled: false, reason: 'booking-not-active' });
+    expect(queued()).toHaveLength(0);
+  });
+
+  it('a session that has already passed is not told anything', async () => {
+    mockStore.bookings.get(BOOKING).booking_start = new Date(Date.now() - 3600000);
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(updated(guests('no')));
+    expect(result).toEqual({ handled: true, action: 'declined-invite-session-passed' });
+    expect(queued()).toHaveLength(0);
+  });
+
+  it('a decline is not a cancellation: the event stays confirmed, so no wait starts', async () => {
+    const calendar = load();
+    await calendar.handleCalendarEvent(updated(guests('no')));
+    expect(mockStore.waits.size).toBe(0);
+  });
+
+  it('when the notice carries no guest list, the event is read to find the decline', async () => {
+    const calendar = load();
+    nylasRequest.mockResolvedValue({ status: 'confirmed', participants: guests('no') });
+    const result = await calendar.handleCalendarEvent({
+      trigger: 'event.updated',
+      data: event({ status: 'confirmed' }),
+    });
+    expect(nylasRequest).toHaveBeenCalledTimes(1);
+    expect(nylasRequest.mock.calls[0][0]).toContain('/events/event-1?calendar_id=cal-1');
+    expect(result.action).toBe('declined-invite-queued');
+  });
+
+  it('a deleted-event notice is a cancellation, never a decline email', async () => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent({
+      trigger: 'event.deleted',
+      data: event({ participants: guests('no') }),
+    });
+    expect(result.action).toBe('cancellation-scheduled');
+    expect(queued()).toHaveLength(0);
+  });
+
+  it('a cancelled event (the coach deleted it) is the cancellation path, whoever has declined', async () => {
+    const calendar = load();
+    const result = await calendar.handleCalendarEvent(
+      updated(guests('no'), { status: 'cancelled' })
+    );
+    expect(result.action).toBe('cancellation-scheduled');
+    expect(queued()).toHaveLength(0);
+  });
+
+  it('only asks Sharetribe for the client when somebody has declined', async () => {
+    const calendar = load();
+    integration.loadTransactionAsOperator.mockClear();
+    await calendar.handleCalendarEvent(updated(guests('yes')));
+    // The one call is the own-calendar check every matched notice already makes.
+    expect(integration.loadTransactionAsOperator).toHaveBeenCalledTimes(1);
   });
 });

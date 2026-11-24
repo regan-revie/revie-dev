@@ -15,6 +15,9 @@
  *    went out less than two hours before it was due.
  *  - Moving the session cancels its pending reminders and queues new ones from the new time, and
  *    sends both people a confirmation of the change (the client's carries the moved calendar file).
+ *  - A client who declines the coach's calendar invite is told once that the session is still booked
+ *    (and how to cancel), because declining or deleting the invite feels like cancelling and is not
+ *    (see queueDeclinedInviteEmail and calendarEventSync.js). Nothing goes to the coach.
  *  - Cancelling it, from any side and by any route (our button, the Scheduler, the coach deleting
  *    the calendar event and the five-minute wait ending), cancels everything still pending.
  *
@@ -105,6 +108,9 @@ const scheduleReminders = async ({ bookingId, sessionStart, now = Date.now() }) 
 
 const confirmationKey = bookingId => `confirmed:${bookingId}:client`;
 
+/** One per booking, ever: the key has no time in it, so a second decline can never queue a second email. */
+const declinedInviteKey = bookingId => `declined-invite:${bookingId}:client`;
+
 /**
  * Queue the client's "You're booked": once per booking (the key has no time in it, so moving the
  * session never sends it again). Due at once; the sender waits for the Meet link.
@@ -122,6 +128,30 @@ const queueConfirmation = async ({ bookingId, sessionStart, now = Date.now() }) 
     sessionStart: Number.isFinite(start.getTime()) ? start : null,
   });
   return { queued: added ? 1 : 0 };
+};
+
+/**
+ * Tell the client their session is still booked, because they declined the coach's calendar invite.
+ *
+ * Once per booking: the dedupe key carries no time, so a second decline (or the same one reported
+ * again) queues nothing. Not queued for a session already under way or over. The send re-checks that
+ * the booking is still active and the session still ahead, so a booking cancelled in between is not
+ * emailed. Goes out on the next sweeper tick.
+ *
+ * @returns {Promise<{queued: boolean, reason?: string}>}
+ */
+const queueDeclinedInviteEmail = async ({ bookingId, sessionStart, now = Date.now() }) => {
+  const start = new Date(sessionStart).getTime();
+  if (!Number.isFinite(start) || start <= now) return { queued: false, reason: 'session-passed' };
+  const queued = await db.queueSessionEmail({
+    dedupeKey: declinedInviteKey(bookingId),
+    kind: 'declined-invite',
+    nylasBookingId: bookingId,
+    recipient: 'client',
+    sendAt: iso(now),
+    sessionStart: iso(start),
+  });
+  return queued ? { queued: true } : { queued: false, reason: 'already-queued' };
 };
 
 /**
@@ -505,6 +535,11 @@ const processDueSessionEmails = async ({
         // Sent any time until the session starts: a late "You're booked" is still the only
         // confirmation the client gets. Only a session already under way is too late.
         if (new Date(mapping.booking_start).getTime() <= now) skip = 'started';
+      } else if (row.kind === 'declined-invite') {
+        // Only for a session still ahead, and (checked below) still booked: a booking cancelled in
+        // the meantime, or a session that has passed, gets nothing. Not stale-skipped: the news (it
+        // is still booked) is as true hours later as it is now, until the session starts.
+        if (new Date(mapping.booking_start).getTime() <= now) skip = 'started';
       } else if (now - new Date(row.send_at).getTime() > CONFIRMATION_STALE_MS) skip = 'stale';
 
       if (skip) {
@@ -528,6 +563,14 @@ const processDueSessionEmails = async ({
         now,
       });
       if (!to) throw new Error('the recipient has no email address on record');
+
+      // Declined the invite: only worth saying while the session really is still on.
+      if (row.kind === 'declined-invite' && !LIVE_TRANSITIONS.includes(lastTransition)) {
+        // eslint-disable-next-line no-await-in-loop
+        await db.finishSessionEmail(row.dedupe_key, 'skipped', 'not-accepted');
+        summary.skipped += 1;
+        continue; // eslint-disable-line no-continue
+      }
 
       // The 60-hour reminder goes only to a session that is still on, and while the free window it
       // describes is still open (sending can have been off, or late, for hours).
@@ -615,6 +658,9 @@ const processDueSessionEmails = async ({
           // Once Sharetribe's booked email is switched off, this is the client's only confirmation.
           log.error(e, 'postmark-confirmation-failed', { bookingId, domain });
         }
+        if (row.kind === 'declined-invite') {
+          log.error(e, 'postmark-declined-invite-failed', { bookingId, domain });
+        }
       } else {
         // eslint-disable-next-line no-await-in-loop
         await db.retrySessionEmail(row.dedupe_key, e.message).catch(() => {});
@@ -631,6 +677,7 @@ module.exports = {
   reportOverdueConfirmations,
   scheduleReminders,
   schedule60hReminder,
+  queueDeclinedInviteEmail,
   rescheduleEmails,
   cancelBookingEmails,
   backfillReminders,
@@ -640,6 +687,7 @@ module.exports = {
   safeScheduleReminders: safely('queue reminders', scheduleReminders),
   safeSchedule60hReminder: safely('queue the 60-hour reminder', schedule60hReminder),
   safeQueueConfirmation: safely('queue the booked email', queueConfirmation),
+  safeQueueDeclinedInviteEmail: safely('queue the declined-invite email', queueDeclinedInviteEmail),
   safeRescheduleEmails: safely('queue reschedule emails', rescheduleEmails),
   safeCancelBookingEmails: safely('cancel session emails', cancelBookingEmails),
   REMINDER_LEAD_MS,

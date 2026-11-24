@@ -29,12 +29,72 @@ const modelFieldsFor = alias =>
     : modelFields;
 
 // The session emails (all but the reconnect email, which is about a connection, not a session).
+// Emails about a session that carry no Meet link: the 60-hour reminder is a date and one button, and
+// the declined-invite note says it is still booked and where to cancel.
+const NO_MEET_LINK = ['session-reminder-60h-client', 'calendar-invite-declined-client'];
+
 const SESSION_TEMPLATES = Object.entries(TEMPLATES).filter(
   ([alias]) => alias !== CALENDAR_RECONNECT_ALIAS
 );
 
 const variablesIn = text =>
   Array.from(text.matchAll(/\{\{[#/^]?\s*([A-Za-z]+)\s*\}\}/g)).map(m => m[1]);
+
+describe('the "your session is still booked" email (the client declined the calendar invite)', () => {
+  const t = TEMPLATES['calendar-invite-declined-client'];
+  const render = (body, model) =>
+    body
+      .replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (all, name, inner) =>
+        model[name] ? inner.replace(/\{\{\.\}\}/g, model[name]) : ''
+      )
+      .replace(/\{\{(\w+)\}\}/g, (all, name) => (name in model ? model[name] : all));
+  const model = buildSessionEmailModel({
+    recipient: 'client',
+    sessionName: 'Find your focus',
+    coachName: 'Sam Coach',
+    clientName: 'Alex Client',
+    start: '2026-12-10T17:00:00Z',
+    end: '2026-12-10T18:00:00Z',
+    coachTimeZone: 'Europe/London',
+    clientTimeZone: 'America/Los_Angeles',
+    manageUrl: 'https://heyrevie.com/order/tx-1',
+  });
+
+  it('is under the alias the code sends, with the agreed subject', () => {
+    expect(TEMPLATE_ALIASES['declined-invite-client']).toBe('calendar-invite-declined-client');
+    expect(t.subject).toBe('Your session is still booked');
+  });
+
+  it('says what they did, that it is still booked, and where to cancel: the session, the coach and the time in their zone', () => {
+    [t.html, t.text].forEach(body => {
+      const out = render(body, model);
+      expect(out).toContain(
+        `You declined the calendar invite for Find your focus with Sam Coach on ${model.sessionDate}, ${model.sessionTime} (Pacific Time).`
+      );
+      expect(out).toContain('Your session is still booked. To cancel, use Revie.');
+      expect(out).toContain('Cancelling within 48 hours of the session is charged in full.');
+    });
+  });
+
+  it('has one button, See your booking, in maroon, to the booking page', () => {
+    expect(t.html.match(/<a href=/g)).toHaveLength(1);
+    expect(t.html).toContain('See your booking');
+    expect(t.html).toContain('href="{{manageUrl}}"');
+    expect(t.html).toContain(`background-color:${MAROON}`);
+    expect(t.text).toContain('See your booking: {{manageUrl}}');
+  });
+
+  it('does not suggest messaging or contacting the coach', () => {
+    [t.html, t.text, t.subject].forEach(body => {
+      expect(body).not.toMatch(/message|write to (your )?coach|contact (your )?coach/i);
+    });
+  });
+
+  it('prints no blank when there is no timezone note', () => {
+    const out = render(t.text, { ...model, timeZoneNote: '' });
+    expect(out).not.toMatch(/\{\{/);
+  });
+});
 
 describe('the reconnect-your-calendar email', () => {
   const t = TEMPLATES[CALENDAR_RECONNECT_ALIAS];
@@ -65,6 +125,7 @@ describe('Postmark templates', () => {
   it('has one template per email the code sends, under the aliases the code uses', () => {
     expect(Object.values(TEMPLATE_ALIASES).sort()).toEqual([
       'booking-confirmed-client',
+      'calendar-invite-declined-client',
       'session-reminder-60h-client',
       'session-reminder-client',
       'session-reminder-coach',
@@ -119,7 +180,7 @@ describe('Postmark templates', () => {
   it('every one links to the booking page, and (but for the 60-hour reminder, which is a date and a button) to the Meet call', () => {
     SESSION_TEMPLATES.forEach(([alias, t]) => {
       expect(t.html).toMatch(/\{\{manageUrl\}\}/);
-      if (alias !== 'session-reminder-60h-client') expect(t.html).toMatch(/\{\{#meetLink\}\}/);
+      if (!NO_MEET_LINK.includes(alias)) expect(t.html).toMatch(/\{\{#meetLink\}\}/);
     });
   });
 
@@ -302,7 +363,7 @@ describe('Postmark templates', () => {
         expect(out).toContain('https://heyrevie.com/order/x'); // the booking link
         expect(out).toContain(withMove.sessionDate);
         // The 60-hour reminder is a date and one button: no Meet link by design.
-        if (alias !== 'session-reminder-60h-client') {
+        if (!NO_MEET_LINK.includes(alias)) {
           expect(out).toContain('https://meet.google.com/abc-defg-hij');
         }
       });

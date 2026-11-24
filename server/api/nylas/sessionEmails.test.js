@@ -30,7 +30,10 @@ jest.mock('./db', () => ({
     return true;
   }),
   cancelSessionEmails: jest.fn(
-    async (bookingId, kinds = ['reminder', 'reminder60', 'rescheduled', 'confirmed']) => {
+    async (
+      bookingId,
+      kinds = ['reminder', 'reminder60', 'rescheduled', 'confirmed', 'declined-invite']
+    ) => {
       let n = 0;
       mockStore.rows.forEach(r => {
         if (r.nylas_booking_id === bookingId && kinds.includes(r.kind) && r.status === 'pending') {
@@ -1438,6 +1441,183 @@ describe('the 60-hour reminder (client only)', () => {
       const tags = log.error.mock.calls.map(c => c[1]);
       expect(tags.filter(t => t === 'postmark-reminder-60h-failed')).toHaveLength(1);
       expect(tags).not.toContain('postmark-confirmation-failed');
+    });
+  });
+});
+
+describe('"Your session is still booked" (the client declined the calendar invite)', () => {
+  const declinedRows = status => rowsOf(status).filter(r => r.kind === 'declined-invite');
+  const ALIAS = 'calendar-invite-declined-client';
+  const queueDeclined = async (startHours = 100, extra) => {
+    const start = makeBooking(startHours, extra);
+    return emails.queueDeclinedInviteEmail({ bookingId: BOOKING, sessionStart: start });
+  };
+
+  describe('queueing', () => {
+    it('queues one email for the client, due now, keyed by the booking alone', async () => {
+      expect(await queueDeclined()).toEqual({ queued: true });
+      const [row] = declinedRows();
+      expect(row).toMatchObject({
+        dedupe_key: 'declined-invite:bk-1:client',
+        recipient: 'client',
+        status: 'pending',
+      });
+      expect(row.send_at.getTime()).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('once per booking: asking again, even days later, queues nothing', async () => {
+      await queueDeclined();
+      expect(await queueDeclined()).toEqual({ queued: false, reason: 'already-queued' });
+      advance(72);
+      expect(await queueDeclined(200)).toEqual({ queued: false, reason: 'already-queued' });
+      expect(declinedRows()).toHaveLength(1);
+    });
+
+    it('does not queue one for a session that has started or passed', async () => {
+      expect(await queueDeclined(-1)).toEqual({ queued: false, reason: 'session-passed' });
+      expect(declinedRows()).toHaveLength(0);
+    });
+
+    it('is cancelled with the booking if it has not gone out yet', async () => {
+      await queueDeclined();
+      await emails.cancelBookingEmails(BOOKING);
+      expect(declinedRows()[0].status).toBe('cancelled');
+    });
+  });
+
+  describe('sending', () => {
+    it('sends to the client only, by its own template, with the session, coach, time in their zone and a booking link', async () => {
+      await queueDeclined();
+      const summary = await emails.processDueSessionEmails({ send });
+
+      expect(summary).toMatchObject({ checked: 1, sent: 1 });
+      expect(sent).toHaveLength(1);
+      expect(sent[0].to).toBe('alex@client.example');
+      expect(sent[0].templateAlias).toBe(ALIAS);
+      expect(sent[0].tag).toBe('declined-invite');
+      expect(sent[0].model).toMatchObject({
+        recipientName: 'Alex',
+        sessionName: 'Find your focus',
+        coachName: 'Sam Coach',
+        timeZoneName: 'Eastern Time',
+        manageUrl: 'https://revie-dev.onrender.com/order/tx-1',
+      });
+      expect(sent[0].attachments).toBeUndefined();
+      expect(declinedRows()[0].status).toBe('sent');
+    });
+
+    it('nothing goes to the coach', async () => {
+      await queueDeclined();
+      await emails.processDueSessionEmails({ send });
+      expect(sent.every(mail => mail.to !== 'sam@coach.example')).toBe(true);
+    });
+
+    it('goes out even if it was held back for hours (it is as true then as now), until the session starts', async () => {
+      await queueDeclined(100);
+      advance(20);
+      const summary = await emails.processDueSessionEmails({ send });
+      expect(summary.sent).toBe(1);
+    });
+
+    it('is sent once: the next tick finds nothing to send', async () => {
+      await queueDeclined();
+      await emails.processDueSessionEmails({ send });
+      advance(1);
+      expect((await emails.processDueSessionEmails({ send })).checked).toBe(0);
+      expect(sent).toHaveLength(1);
+    });
+  });
+
+  describe('when it is no longer wanted', () => {
+    it.each(['cancelled', 'completed'])(
+      'a booking that has become %s gets nothing',
+      async status => {
+        await queueDeclined();
+        mockStore.bookings.get(BOOKING).status = status;
+        await emails.processDueSessionEmails({ send });
+        expect(sent).toHaveLength(0);
+        expect(declinedRows('skipped')[0].last_error).toBe('inactive');
+      }
+    );
+
+    it('a session that has started in the meantime gets nothing', async () => {
+      await queueDeclined(5);
+      advance(6);
+      await emails.processDueSessionEmails({ send });
+      expect(sent).toHaveLength(0);
+      expect(declinedRows('skipped')[0].last_error).toBe('started');
+    });
+
+    it.each(['transition/cancel', 'transition/late-cancel', 'transition/operator-decline'])(
+      'a transaction that is %s (not a session that is on) gets nothing',
+      async last => {
+        await queueDeclined();
+        mockTxState.last = last;
+        await emails.processDueSessionEmails({ send });
+        expect(sent).toHaveLength(0);
+        expect(declinedRows('skipped')[0].last_error).toBe('not-accepted');
+      }
+    );
+
+    it('a reschedule leaves it alone: it is still booked, at the new time', async () => {
+      await queueDeclined();
+      mockTxState.last = 'transition/update-booking';
+      await emails.processDueSessionEmails({ send });
+      expect(sent).toHaveLength(1);
+    });
+  });
+
+  describe('when it fails', () => {
+    it('is retried, and reported to Sentry as postmark-declined-invite-failed once the third try fails', async () => {
+      send.mockRejectedValue(new Error('postmark down'));
+      await queueDeclined();
+      for (let i = 0; i < 3; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await emails.processDueSessionEmails({ send });
+      }
+      expect(declinedRows('failed')).toHaveLength(1);
+      const reports = log.error.mock.calls.filter(c => c[1] === 'postmark-declined-invite-failed');
+      expect(reports).toHaveLength(1);
+      expect(reports[0][2]).toMatchObject({ bookingId: BOOKING, domain: 'client.example' });
+      // And it is not reported as anything about a confirmation or a reminder.
+      const tags = log.error.mock.calls.map(c => c[1]);
+      expect(tags).not.toContain('postmark-confirmation-failed');
+      expect(tags).not.toContain('postmark-reminder-60h-failed');
+    });
+
+    it('does not report until the last try', async () => {
+      send.mockRejectedValueOnce(new Error('postmark down'));
+      await queueDeclined();
+      await emails.processDueSessionEmails({ send });
+      expect(log.error.mock.calls.map(c => c[1])).not.toContain('postmark-declined-invite-failed');
+      expect(declinedRows('pending')).toHaveLength(1);
+    });
+
+    it('carries no address or body in what is reported', async () => {
+      send.mockRejectedValue(new Error('postmark down'));
+      await queueDeclined();
+      for (let i = 0; i < 3; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await emails.processDueSessionEmails({ send });
+      }
+      const reported = JSON.stringify(
+        log.error.mock.calls.filter(c => c[1] === 'postmark-declined-invite-failed').map(c => c[2])
+      );
+      expect(reported).not.toMatch(/alex@|@client\.example\b.*alex/);
+      expect(reported).not.toContain('Alex');
+    });
+  });
+
+  describe('the sending switch', () => {
+    it('while sending is off nothing is claimed, so it goes out when it is switched on', async () => {
+      process.env.POSTMARK_SENDING_ENABLED = 'false';
+      await queueDeclined();
+      expect((await emails.processDueSessionEmails({ send })).disabled).toBe(true);
+      expect(sent).toHaveLength(0);
+
+      process.env.POSTMARK_SENDING_ENABLED = 'true';
+      await emails.processDueSessionEmails({ send });
+      expect(sent).toHaveLength(1);
     });
   });
 });

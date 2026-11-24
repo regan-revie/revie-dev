@@ -25,6 +25,8 @@ const TEMPLATE_ALIASES = {
   'reminder-coach': 'session-reminder-coach',
   'rescheduled-client': 'session-rescheduled-client',
   'rescheduled-coach': 'session-rescheduled-coach',
+  // The client declined the calendar invite for a session that is still booked (calendarEventSync.js).
+  'declined-invite-client': 'calendar-invite-declined-client',
 };
 
 const button = (href, label) =>
@@ -73,6 +75,40 @@ ${body}
 </html>`;
 
 const TEMPLATES = {
+  // Sent once per booking when the client declines the coach's calendar invite (or deletes it, which
+  // Google reports as a decline). They sometimes think that cancels the session, and then are charged
+  // for a no-show. Says it is still booked and where to cancel; deliberately does not suggest
+  // messaging the coach, and nothing goes to the coach (Google already tells them).
+  'calendar-invite-declined-client': {
+    name: 'Your session is still booked (client declined the invite)',
+    subject: 'Your session is still booked',
+    html: layout(
+      [
+        p('Hi {{recipientName}},'),
+        p(
+          'You declined the calendar invite for {{sessionName}} with {{coachName}} on {{sessionDate}}, {{sessionTime}} ({{timeZoneName}}).'
+        ),
+        `{{#timeZoneNote}}${p('{{.}}')}{{/timeZoneNote}}`,
+        p('Your session is still booked. To cancel, use Revie.'),
+        button('{{manageUrl}}', 'See your booking'),
+        p('Cancelling within 48 hours of the session is charged in full.'),
+      ].join('\n')
+    ),
+    text: `Hi {{recipientName}},
+
+You declined the calendar invite for {{sessionName}} with {{coachName}} on {{sessionDate}}, {{sessionTime}} ({{timeZoneName}}).
+{{timeZoneNote}}
+Your session is still booked. To cancel, use Revie.
+
+See your booking: {{manageUrl}}
+
+Cancelling within 48 hours of the session is charged in full.
+
+Questions? Reply to this email or write to hello@heyrevie.com.
+
+Revie`,
+  },
+
   // Not a session email, so not in TEMPLATE_ALIASES: it is sent once when a coach's Google Calendar
   // connection stops working (server/api/nylas/grantStatus.js), with its own small model
   // (reconnectEmailModel.js: recipientName, reconnectUrl).
