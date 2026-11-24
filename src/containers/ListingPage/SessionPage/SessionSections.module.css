@@ -1,0 +1,452 @@
+@import '../../../styles/customMediaQueries.css';
+
+/**
+ * The session page's sections below the hero. Values are the approved design's
+ * (docs/design/session-page/): phone first, desktop from the large breakpoint.
+ */
+
+/* ---------- The session ---------- */
+
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  @media (--viewportLarge) {
+    gap: 20px;
+    max-width: 680px;
+  }
+}
+
+.lead {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-size: 24px;
+  line-height: 1.25;
+
+  & b {
+    font-weight: 700;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 32px;
+  }
+}
+
+.body {
+  margin: 0;
+
+  @media (--viewportLarge) {
+    font-size: 18px;
+  }
+}
+
+.more {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.paragraph {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.prepCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px;
+  border: 1px solid rgba(49, 4, 22, 0.16);
+  border-radius: var(--borderRadiusLarge);
+}
+
+.prepText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.prepTitle {
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.prepBody {
+  margin: 0;
+  font-size: 15px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+
+  @media (--viewportLarge) {
+    font-size: 16px;
+  }
+}
+
+/* ---------- The coach ---------- */
+
+.coach {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+
+  @media (--viewportLarge) {
+    gap: 32px;
+  }
+}
+
+.quoteCard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 0;
+  padding: 28px 24px;
+  border-radius: 28px;
+  background: var(--revieOrange);
+  color: var(--revieMaroon);
+
+  @media (--viewportLarge) {
+    gap: 28px;
+    padding: 40px 44px;
+    border-radius: 32px;
+    box-shadow: 0 16px 40px rgba(49, 4, 22, 0.12);
+  }
+}
+
+.quote {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-size: 19px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+
+  & b {
+    font-weight: 700;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 24px;
+  }
+}
+
+.traits {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+
+  @media (--viewportLarge) {
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 16px 24px;
+  }
+}
+
+.traitLabel {
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+
+  @media (--viewportLarge) {
+    font-size: 13px;
+  }
+}
+
+.traitTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @media (--viewportLarge) {
+    gap: 8px;
+  }
+}
+
+/* On a phone the second label needs air above it; on desktop the grid's row gap does it. */
+.traitTags + .traitLabel {
+  margin-top: 16px;
+
+  @media (--viewportLarge) {
+    margin-top: 0;
+  }
+}
+
+.stylePill,
+.toolPill {
+  margin: 0;
+  padding: 6px 16px;
+  border-radius: var(--borderRadiusPill);
+  font-size: 14px;
+
+  @media (--viewportLarge) {
+    font-size: 15px;
+  }
+}
+
+.stylePill {
+  background: var(--reviePink);
+  color: var(--revieMaroon);
+}
+
+.toolPill {
+  background: var(--reviePeriwinkle);
+  color: var(--revieGreen);
+}
+
+.storyBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(49, 4, 22, 0.14);
+
+  @media (--viewportLarge) {
+    padding-top: 0;
+    border-top: none;
+  }
+}
+
+.story {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  @media (--viewportLarge) {
+    gap: 16px;
+    max-width: 680px;
+  }
+}
+
+.social {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.socialLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieChartreuse);
+  color: var(--revieMaroon);
+  transition: background-color 150ms;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--reviePink);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------- Good to know ---------- */
+
+.good {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin: 0;
+  padding: 48px 0;
+
+  @media (--viewportLarge) {
+    gap: 32px;
+    padding: 88px 0;
+  }
+}
+
+.goodGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  @media (--viewportLarge) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    font-size: 16px;
+  }
+}
+
+.goodCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border-radius: var(--borderRadiusLarge);
+  background: var(--revieCream);
+  color: var(--revieMaroon);
+
+  @media (--viewportLarge) {
+    gap: 12px;
+    padding: 28px;
+  }
+}
+
+.goodIcon {
+  width: 32px;
+  height: 32px;
+
+  @media (--viewportLarge) {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.goodTitle {
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 18px;
+
+  @media (--viewportLarge) {
+    font-size: 20px;
+  }
+}
+
+.goodText {
+  margin: 0;
+  font-size: 15px;
+
+  @media (--viewportLarge) {
+    font-size: 16px;
+  }
+}
+
+/* The phone design ends this band with a link to the coach's other sessions. */
+.allSessions {
+  font-size: 15px;
+  color: var(--revieCream);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--revieCream);
+    text-decoration-thickness: 2px;
+  }
+
+  @media (--viewportLarge) {
+    display: none;
+  }
+}
+
+/* ---------- Reviews ---------- */
+
+.reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.reviewsHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.average {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.averageNumber {
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 1;
+}
+
+.reviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.reviewCard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0;
+  padding: 28px;
+  border: 1px solid rgba(49, 4, 22, 0.16);
+  border-radius: var(--borderRadiusLarge);
+  background: var(--revieCream);
+  color: var(--revieMaroon);
+}
+
+.stars {
+  display: flex;
+  gap: 3px;
+}
+
+.starEmpty {
+  opacity: 0.25;
+}
+
+.reviewQuote {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-size: 19px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.reviewCaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+  font-size: 14px;
+}
+
+.reviewDate {
+  color: rgba(49, 4, 22, 0.74);
+}
+
+.outlineButton {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1.5px solid var(--revieMaroon);
+  border-radius: var(--borderRadiusPill);
+  background: transparent;
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--reviePink);
+    background: var(--reviePink);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.reviewsError {
+  margin: 0;
+  color: var(--colorFail);
+}

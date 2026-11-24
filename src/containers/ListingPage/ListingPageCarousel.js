@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCallback } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
-import classNames from 'classnames';
 
 // Utils
 import { FormattedMessage } from '../../util/reactIntl';
@@ -14,19 +13,9 @@ import { manageDisableScrolling, isScrollingDisabled } from '../../ducks/ui.duck
 import { initializeCardPaymentData } from '../../ducks/stripe.duck.js';
 
 // Shared components
-import {
-  H2,
-  H3,
-  H4,
-  Page,
-  NamedLink,
-  OrderPanel,
-  LayoutSingleColumn,
-  SectionText,
-} from '../../components';
+import { H4, Page, NamedLink, OrderPanel, LayoutSingleColumn } from '../../components';
 
 // Related components and modules
-import TopbarContainer from '../TopbarContainer/TopbarContainer';
 import FooterContainer from '../FooterContainer/FooterContainer';
 import NotFoundPage from '../NotFoundPage/NotFoundPage';
 
@@ -49,15 +38,21 @@ import {
   getDerivedRenderData,
 } from './ListingPage.shared';
 import Notifications from './Notifications/Notifications';
-import SectionReviews from './SectionReviews';
-import SectionAuthorMaybe from './SectionAuthorMaybe';
-import SectionMapMaybe from './SectionMapMaybe';
-import SectionGallery from './SectionGallery';
-import CustomListingFields from './CustomListingFields';
-import SessionOutcomesSection from '../../components/SessionOutcomes/SessionOutcomesSection';
 import ListingPageAccessWrapper from './ListingPageAccessWrapper';
 
+// The redesigned session page (docs/design/session-page/)
+import SessionTopbar from './SessionPage/SessionTopbar';
+import SessionHero from './SessionPage/SessionHero';
+import SessionAbout from './SessionPage/SessionAbout';
+import SessionCoach from './SessionPage/SessionCoach';
+import SessionGoodToKnow from './SessionPage/SessionGoodToKnow';
+import SessionReviews from './SessionPage/SessionReviews';
+import SessionInquiryModal from './SessionPage/SessionInquiryModal';
+import { firstNameOf } from './SessionPage/sessionPageHelpers';
+import SessionOutcomesSection from '../../components/SessionOutcomes/SessionOutcomesSection';
+
 import css from './ListingPage.module.css';
+import sessionCss from './SessionPage/SessionPage.module.css';
 
 const MIN_LENGTH_FOR_LONG_WORDS_IN_TITLE = 16;
 
@@ -83,7 +78,6 @@ export const ListingPageComponent = props => {
     scrollingDisabled,
     showListingError,
     reviews = [],
-    fetchReviewsError,
     sendInquiryInProgress,
     sendInquiryError,
     history,
@@ -110,24 +104,19 @@ export const ListingPageComponent = props => {
     payoutDetailsWarningClassName: css.payoutDetailsWarning,
   });
   const {
-    listingConfig,
     listingId,
-    isVariant,
     currentListing,
     listingSlug,
     params,
     listingPathParamType,
     listingTab,
     description,
-    geolocation,
     price,
     title,
     publicData,
-    metadata,
     richTitle,
     isOwnListing,
     showListingImage,
-    showDescription,
     processType,
     ensuredAuthor,
     noPayoutDetailsSetWithOwnListing,
@@ -143,7 +132,7 @@ export const ListingPageComponent = props => {
     hasInvalidListingData,
   } = derivedData;
 
-  const topbar = <TopbarContainer />;
+  const topbar = <SessionTopbar />;
 
   if (showListingError && showListingError.status === 404) {
     // 404 listing not found
@@ -236,113 +225,102 @@ export const ListingPageComponent = props => {
         },
       }}
     >
-      <LayoutSingleColumn className={css.pageRoot} topbar={topbar} footer={<FooterContainer />}>
-        <div className={css.contentWrapperForProductLayout}>
-          <div className={css.mainColumnForProductLayout}>
-            <Notifications
-              mounted={mounted}
-              listing={currentListing}
-              isOwnListing={isOwnListing}
-              noPayoutDetailsSetWithOwnListing={noPayoutDetailsSetWithOwnListing}
-              currentUser={currentUser}
-              className={css.actionBarForProductLayout}
-              editParams={{
-                id: listingId.uuid,
-                slug: listingSlug,
-                type: listingPathParamType,
-                tab: listingTab,
-              }}
-            />
-            {showListingImage && (
-              <SectionGallery
+      <LayoutSingleColumn
+        className={sessionCss.pageRoot}
+        topbar={topbar}
+        footer={<FooterContainer />}
+      >
+        <div className={sessionCss.page}>
+          <div className={sessionCss.main}>
+            <div className={sessionCss.column}>
+              <Notifications
+                mounted={mounted}
                 listing={currentListing}
-                variantPrefix={config.layout.listingImage.variantPrefix}
+                isOwnListing={isOwnListing}
+                noPayoutDetailsSetWithOwnListing={noPayoutDetailsSetWithOwnListing}
+                currentUser={currentUser}
+                className={sessionCss.actionBar}
+                editParams={{
+                  id: listingId.uuid,
+                  slug: listingSlug,
+                  type: listingPathParamType,
+                  tab: listingTab,
+                }}
               />
-            )}
-            <div
-              className={showListingImage ? css.mobileHeading : css.noListingImageHeadingProduct}
-            >
-              {showListingImage ? (
-                <H2 as="h1" className={css.orderPanelTitle}>
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H2>
-              ) : (
-                <H3 as="h1" className={css.orderPanelTitle}>
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H3>
-              )}
+
+              <SessionHero
+                listing={currentListing}
+                author={ensuredAuthor}
+                reviews={reviews}
+                userFields={config.user?.userFields}
+                onManageDisableScrolling={onManageDisableScrolling}
+              />
+
+              <SessionAbout description={description} preWork={publicData.pre_work} />
+
+              {/* "You'll walk away with": hidden unless outcome 1 has text */}
+              <SessionOutcomesSection publicData={publicData} />
+
+              {/* Hidden while the session has no reviews */}
+              <SessionReviews reviews={reviews} />
+
+              <SessionCoach author={ensuredAuthor} userFields={config.user?.userFields} />
+
+              <SessionGoodToKnow
+                firstName={firstNameOf(authorDisplayName)}
+                authorId={ensuredAuthor?.id?.uuid}
+              />
             </div>
-            {showDescription && <SectionText text={description} showAsIngress />}
 
-            {/* Revie: the session's outcomes as a numbered list; hidden unless outcome 1 has text */}
-            <SessionOutcomesSection publicData={publicData} />
-
-            <CustomListingFields
-              publicData={publicData}
-              metadata={metadata}
-              listingFieldConfigs={listingConfig.listingFields}
-              categoryConfiguration={config.categoryConfiguration}
-              intl={intl}
-            />
-
-            <SectionMapMaybe
-              geolocation={geolocation}
-              publicData={publicData}
-              listingId={currentListing.id}
-              mapsConfig={config.maps}
-            />
-            <SectionReviews reviews={reviews} fetchReviewsError={fetchReviewsError} />
-            <SectionAuthorMaybe
-              title={title}
-              listing={currentListing}
-              authorDisplayName={authorDisplayName}
-              onContactUser={onContactUser}
-              isInquiryModalOpen={isAuthenticated && inquiryModalOpen}
-              onCloseInquiryModal={() => setInquiryModalOpen(false)}
-              sendInquiryError={sendInquiryError}
-              sendInquiryInProgress={sendInquiryInProgress}
-              onSubmitInquiry={onSubmitInquiry}
-              currentUser={currentUser}
-              onManageDisableScrolling={onManageDisableScrolling}
-            />
-          </div>
-          <div className={css.orderColumnForProductLayout}>
-            <OrderPanel
-              className={classNames(css.productOrderPanel, {
-                [css.imagesEnabled]: showListingImage,
-              })}
-              listing={currentListing}
-              isOwnListing={isOwnListing}
-              onSubmit={handleOrderSubmit}
-              authorLink={
-                <NamedLink
-                  className={css.authorNameLink}
-                  name={isVariant ? 'ListingPageVariant' : 'ListingPage'}
-                  params={params}
-                  to={{ hash: '#author' }}
-                >
-                  {authorDisplayName}
-                </NamedLink>
-              }
-              title={<FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />}
-              titleDesktop={
-                <H4 as="h1" className={css.orderPanelTitle}>
+            <div className={sessionCss.bookColumn}>
+              <OrderPanel
+                listing={currentListing}
+                isOwnListing={isOwnListing}
+                onSubmit={handleOrderSubmit}
+                authorLink={
+                  // The coach's own page: the template linked to an author section lower down, which
+                  // the redesigned page no longer has.
+                  <NamedLink
+                    className={css.authorNameLink}
+                    name="ProfilePage"
+                    params={{ id: ensuredAuthor?.id?.uuid }}
+                  >
+                    {authorDisplayName}
+                  </NamedLink>
+                }
+                title={
                   <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H4>
-              }
-              sectionHeadingAs="h2"
-              payoutDetailsWarning={payoutDetailsWarning}
-              author={ensuredAuthor}
-              onManageDisableScrolling={onManageDisableScrolling}
-              onContactUser={onContactUser}
-              {...restOfProps}
-              validListingTypes={config.listing.listingTypes}
-              marketplaceCurrency={config.currency}
-              dayCountAvailableForBooking={config.stripe.dayCountAvailableForBooking}
-              marketplaceName={config.marketplaceName}
-              showListingImage={showListingImage}
-            />
+                }
+                titleDesktop={
+                  // The page's own h1 is in the hero, so the panel's heading is an h2.
+                  <H4 as="h2" className={css.orderPanelTitle}>
+                    <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
+                  </H4>
+                }
+                sectionHeadingAs="h2"
+                payoutDetailsWarning={payoutDetailsWarning}
+                author={ensuredAuthor}
+                onManageDisableScrolling={onManageDisableScrolling}
+                onContactUser={onContactUser}
+                {...restOfProps}
+                validListingTypes={config.listing.listingTypes}
+                marketplaceCurrency={config.currency}
+                dayCountAvailableForBooking={config.stripe.dayCountAvailableForBooking}
+                marketplaceName={config.marketplaceName}
+                showListingImage={showListingImage}
+              />
+            </div>
           </div>
+          <SessionInquiryModal
+            title={title}
+            authorDisplayName={authorDisplayName}
+            isOpen={isAuthenticated && inquiryModalOpen}
+            onClose={() => setInquiryModalOpen(false)}
+            sendInquiryError={sendInquiryError}
+            sendInquiryInProgress={sendInquiryInProgress}
+            onSubmitInquiry={onSubmitInquiry}
+            onManageDisableScrolling={onManageDisableScrolling}
+          />
         </div>
       </LayoutSingleColumn>
     </Page>

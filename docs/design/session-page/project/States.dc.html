@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Booking panel — can't book yet</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/3359179f8c0408d8229d5560ab61e0ea) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/607f780e20ebb4bc54fee2057d319e2c) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/af892071ee3abbe7f3a1a1b4e991b758) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/e55bc6eeb43905184b850306d9daadff) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Schibsted Grotesk';src:url(/_blob/2215ec698ba0b2184ade89350c6cf3e4) format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+</style>
+<style>
+body{margin:0;background:#EFEEED}
+a{color:#310416}a:hover{color:#310416;text-decoration-thickness:2px}
+button{font:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #DBABF5;outline-offset:2px}
+.x-close{transition:background-color 150ms,border-color 150ms}
+.x-close:hover,.x-close:focus-visible{background:#FF90C2 !important;border-color:#FF90C2 !important}
+@media (max-width: 1100px){.fgrid{grid-template-columns:repeat(2, minmax(0, 1fr)) !important}}
+@media (max-width: 640px){.fgrid,.good{grid-template-columns:minmax(0, 1fr) !important}}
+.bookbar{display:none}
+@media (max-width: 1023px){.book{display:none !important}.bookbar{display:flex !important}}
+</style>
+</helmet>
+<div style="width: 880px; height: 640px; box-sizing: border-box; padding: 40px; background: #EFEEED; color: #310416; font-family: 'Bio Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.5; display: flex; gap: 40px; align-items: flex-start">
+
+<div style="flex: 1 1 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: center; gap: 14px; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #310416"><span>What a client sees</span><span aria-hidden="true" style="flex: 1; height: 1px; background: currentColor; opacity: 0.3"></span></div>
+<aside aria-label="Book this session" style="box-sizing: border-box; padding: 28px; border-radius: 20px; background: #EFEEED; border: 1px solid rgba(49,4,22,0.16); box-shadow: 0 12px 32px rgba(49,4,22,0.10); display: flex; flex-direction: column; gap: 20px">
+<h2 style="margin: 0; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 28px; line-height: 1.1">Book with <b>Maya</b></h2>
+<div><div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(49,4,22,0.12)"><span style="font-weight: 700">30-minute session</span><span>$60</span></div><div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(49,4,22,0.12)"><span style="font-weight: 700">60-minute session</span><span>$110</span></div><div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(49,4,22,0.12)"><span style="font-weight: 700">90-minute session</span><span>$150</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<p style="margin: 0; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 20px; line-height: 1.25">Maya isn't taking bookings yet.</p>
+<p style="margin: 0; font-size: 15px">She's setting up her calendar. Message her, or find a coach who's free now.</p>
+</div>
+<a href="#" style="display: inline-flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 999px; background: #310416; color: #EFEEED; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; font-size: 14px; letter-spacing: 1px; text-transform: uppercase">Find another coach</a>
+<a href="#" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 999px; border: 1.5px solid #310416; color: #310416; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; width: 100%; box-sizing: border-box"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 400 400" fill="#310416" style="flex: none"><path d="M295.25,277.54c-29.78,29.59-75.37,38.05-115.89,30.99-10.34-1.8-16.59-6.51-27.52-2.21-7.86,3.09-15.13,8.4-23.6,10.69-15.75,4.25-24.19,1.57-39.23-.32-5.52-.69-13.43,1.65-10.75-7.8,4.13-3.73,8.69-7.16,12.58-11.12,5.01-5.09,9.44-11.27,14.09-16.67,1.53-1.77,4.57-3.49,5.48-6.17.22-1.55-5.84-6.39-7.25-8.19-12.33-15.73-15.55-37-16.4-56.71-2.12-49.09,21.37-96.15,66.9-116.67,60.85-27.43,136.87-10.8,161.16,56,13.47,37.03,9.63,99.16-19.58,128.18ZM91.83,309.58c7.19,1.3,13.53,2.39,20.86,1.45,16.96-2.16,25.24-8.44,39.8-14.65,7.01-2.99,12.98.94,20.34,2.03,22.59,3.33,46.09,4.32,67.99-2.93,33.68-11.15,58.74-28.94,67.68-64.92,17.39-69.95-17.46-138.81-94.9-139.82-62.05-.81-110.89,39.16-117.24,101.62-1.9,18.71,2.62,54.17,14.4,69.29,2,2.56,7.89,7.09,7.82,10.34-.05,2.15-.65,7.51-1.95,9.31-6.7,9.23-17.07,16-23.5,25.31-.63.92-1.5,1.74-1.31,2.97Z"></path></svg>Message Maya</a>
+</aside>
+</div>
+
+<div style="flex: 1 1 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: center; gap: 14px; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #310416"><span>What Maya sees on her own page</span><span aria-hidden="true" style="flex: 1; height: 1px; background: currentColor; opacity: 0.3"></span></div>
+<aside aria-labelledby="setup-title" style="box-sizing: border-box; padding: 28px; border-radius: 20px; background: #EFEEED; border: 1px solid rgba(49,4,22,0.16); box-shadow: 0 12px 32px rgba(49,4,22,0.10); display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 id="setup-title" style="margin: 0; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 26px; line-height: 1.15">Clients can't book <b>this session yet.</b></h2>
+<span style="font-family: 'Schibsted Grotesk', sans-serif; font-size: 13px; letter-spacing: 1px; text-transform: uppercase">One step left</span>
+</div>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column">
+<li style="display: flex; align-items: center; gap: 14px; padding: 16px 0; border-bottom: 1px solid rgba(49,4,22,0.12)"><svg role="img" aria-label="Done" width="28" height="28" viewBox="0 0 28 28" style="flex: none"><circle cx="14" cy="14" r="14" fill="#032723"></circle><path d="M8.5 14.5l3.5 3.5 7.5-8" fill="none" stroke="#EAEA73" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="flex: 1">Connect your Google Calendar</span><span style="font-size: 14px; opacity: 0.8">Connected</span></li>
+<li style="display: flex; align-items: center; gap: 14px; padding: 16px 0"><svg role="img" aria-label="To do" width="28" height="28" viewBox="0 0 28 28" style="flex: none"><circle cx="14" cy="14" r="12.5" fill="none" stroke="#310416" stroke-width="2" stroke-dasharray="4 3"></circle></svg><span style="flex: 1; font-weight: 700">Add your payout details</span><a href="#" style="font-size: 15px; font-weight: 700; text-decoration: none; color: #310416">Add →</a></li>
+</ul>
+</aside>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

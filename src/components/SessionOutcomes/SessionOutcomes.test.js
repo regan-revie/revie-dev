@@ -123,11 +123,22 @@ describe('SessionOutcomesSection (session page)', () => {
     expect(screen.getByRole('heading', { name: "You'll walk away with" })).toBeInTheDocument();
     const list = screen.getByRole('list');
     expect(list.tagName).toBe('OL');
+    // Each item is its number (a decoration, in a circle) and the outcome.
     expect(screen.getAllByRole('listitem').map(li => li.textContent)).toEqual([
-      'First',
-      'Second',
-      'Third',
+      '1First',
+      '2Second',
+      '3Third',
     ]);
+  });
+
+  it('skips a blank outcome without leaving a gap in the numbers', () => {
+    render(
+      <SessionOutcomesSection
+        publicData={{ outcome_1: 'First', outcome_2: '  ', outcome_3: 'Third' }}
+      />,
+      { messages }
+    );
+    expect(screen.getAllByRole('listitem').map(li => li.textContent)).toEqual(['1First', '2Third']);
   });
 
   it('hides the whole section when outcome 1 has no text', () => {

@@ -1,0 +1,102 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 3300,
+      "is_interactive": true,
+      "title": "Desktop — session page (signed in)",
+      "w": 1440,
+      "x": -15,
+      "y": -41
+    },
+    "Phone.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 28,
+      "title": "Phone — session page (scroll inside)",
+      "w": 390,
+      "x": 1520,
+      "y": 0
+    },
+    "PhoneSheet.dc.html": {
+      "h": 844,
+      "radius": 28,
+      "title": "Phone — after tapping See times",
+      "w": 390,
+      "x": 1990,
+      "y": 0
+    },
+    "HeaderLoggedOut.dc.html": {
+      "h": 130,
+      "title": "Header — signed out (same as heyrevie.com)",
+      "w": 1440,
+      "x": 1520,
+      "y": 1724
+    },
+    "States.dc.html": {
+      "h": 640,
+      "title": "Booking panel — can't book yet (client / coach)",
+      "w": 880,
+      "x": 1520,
+      "y": 964
+    },
+    "Reviews.dc.html": {
+      "expand": "fill",
+      "is_interactive": true,
+      "h": 3900,
+      "w": 1440,
+      "x": 0,
+      "y": 3380,
+      "title": "Desktop — session page once it has reviews"
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-11-16T20:15:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "noteOrder": [
+    "title",
+    "sample",
+    "cut"
+  ],
+  "notes": {
+    "cut": {
+      "fill": "pink",
+      "text": "Left out on purpose: coach's timezone in the strip (no reliable source; times show in the client's timezone instead). Reviews are hidden until there's at least one; see the board below Desktop for the version with reviews.",
+      "w": 320,
+      "x": 2460,
+      "y": 340
+    },
+    "sample": {
+      "fill": "orange",
+      "text": "Sample coach, copy and prices are made up to show the layout. Fonts are the real TT Commons Pro, Bio Sans and Schibsted Grotesk from the repo. Icons are the Revie set; header and footer copy heyrevie.com.",
+      "w": 320,
+      "x": 2460,
+      "y": 0
+    },
+    "title": {
+      "kind": "title1",
+      "maxW": 2380,
+      "text": "Session page (/l/…) — proposal for review",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Phone.dc.html",
+    "PhoneSheet.dc.html",
+    "States.dc.html",
+    "HeaderLoggedOut.dc.html",
+    "Reviews.dc.html"
+  ],
+  "pages": [],
+  "title": "Revie session page — desktop & phone"
+}

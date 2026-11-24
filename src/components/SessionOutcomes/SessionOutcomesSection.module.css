@@ -1,0 +1,103 @@
+@import '../../styles/customMediaQueries.css';
+
+/* "You'll walk away with" band. Values are the approved session page design's. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin: 0;
+  padding: 48px 0;
+
+  @media (--viewportLarge) {
+    gap: 48px;
+    padding: 80px 0 88px;
+  }
+}
+
+/* The thin line the numbers sit on: down the circles' centres on a phone, across them on desktop. */
+.track {
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 22px;
+    bottom: 22px;
+    left: 22px;
+    width: 1px;
+    background: var(--revieGreen);
+    opacity: 0.3;
+  }
+
+  @media (--viewportLarge) {
+    &::before {
+      top: 28px;
+      bottom: auto;
+      left: -100vmax;
+      right: -100vmax;
+      width: auto;
+      height: 1px;
+    }
+  }
+}
+
+.list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @media (--viewportLarge) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 40px;
+  }
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 0;
+
+  @media (--viewportLarge) {
+    flex-direction: column;
+    gap: 20px;
+  }
+}
+
+.number {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieGreen);
+  color: var(--revieChartreuse);
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 20px;
+
+  @media (--viewportLarge) {
+    width: 56px;
+    height: 56px;
+    font-size: 24px;
+  }
+}
+
+.text {
+  padding-top: 9px;
+  font-size: 17px;
+  line-height: 1.5;
+
+  @media (--viewportLarge) {
+    padding-top: 0;
+  }
+}

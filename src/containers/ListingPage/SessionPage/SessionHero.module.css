@@ -1,0 +1,488 @@
+@import '../../../styles/customMediaQueries.css';
+
+/**
+ * The session page hero. Values are the approved design's (docs/design/session-page/): phone first,
+ * desktop from the large breakpoint, which is also where the booking panel moves beside the page.
+ */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  /* On a phone the next section starts 40px below the hero, not the column's 56px gap. */
+  margin-bottom: -16px;
+  padding: 28px 0 40px;
+
+  @media (--viewportLarge) {
+    gap: 32px;
+    margin-bottom: 0;
+    padding: 48px 0 80px;
+  }
+}
+
+/* The label shows the range on a phone ("30–90") and the list on desktop ("30, 60 or 90"). */
+.labelWide {
+  display: none;
+
+  @media (--viewportLarge) {
+    display: inline;
+  }
+}
+
+.labelNarrow {
+  @media (--viewportLarge) {
+    display: none;
+  }
+}
+
+.title {
+  margin: 0;
+  max-width: 700px;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1.05;
+  letter-spacing: normal;
+  color: var(--revieCream);
+  overflow-wrap: anywhere;
+
+  & b {
+    font-weight: 700;
+  }
+
+  @media (--viewportLarge) {
+    font-size: clamp(40px, 4.4vw, 60px);
+    line-height: 1.04;
+    letter-spacing: -1px;
+  }
+}
+
+/* Quick facts */
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+
+  @media (--viewportLarge) {
+    flex-flow: row wrap;
+    gap: 12px 28px;
+  }
+}
+
+.fact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.factIcon {
+  width: 24px;
+  height: 24px;
+  color: var(--reviePeriwinkle);
+
+  @media (--viewportLarge) {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+/* The coach row. One grid so the phone and desktop arrangements share markup: on a phone the
+   photo and name sit side by side with the badges and tags full width underneath; on desktop
+   everything but the photo stacks in one column beside it. */
+.coachRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 16px;
+  row-gap: 22px;
+  align-items: center;
+  padding-top: 22px;
+  border-top: 1px solid rgba(239, 238, 237, 0.25);
+
+  @media (--viewportLarge) {
+    column-gap: 28px;
+    row-gap: 10px;
+    align-items: start;
+    padding-top: 32px;
+  }
+}
+
+.sticker {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  width: 76px;
+  height: 104px;
+  margin-right: 6px;
+
+  @media (--viewportLarge) {
+    grid-row: 1 / span 3;
+    width: 112px;
+    height: 152px;
+    margin-right: 8px;
+  }
+}
+
+.stickerBack {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieChartreuse);
+  transform: translate(6px, 4px) rotate(4deg);
+
+  @media (--viewportLarge) {
+    transform: translate(8px, 6px) rotate(4deg);
+  }
+}
+
+.stickerPhoto {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieLavender);
+  transform: rotate(-3deg);
+}
+
+.stickerImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.stickerInitials {
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 28px;
+  color: var(--revieMaroon);
+}
+
+.info {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  @media (--viewportLarge) {
+    gap: 10px;
+  }
+}
+
+.nameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+
+  @media (--viewportLarge) {
+    gap: 12px;
+  }
+}
+
+.name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--revieCream);
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--revieCream);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  @media (--viewportLarge) {
+    gap: 8px;
+    font-size: 26px;
+  }
+}
+
+.pronouns {
+  align-self: center;
+  padding: 2px 9px;
+  border-radius: var(--borderRadiusPill);
+  background: rgba(239, 238, 237, 0.16);
+  font-size: 12px;
+  line-height: 1.4;
+
+  @media (--viewportLarge) {
+    padding: 3px 11px;
+    font-size: 13px;
+  }
+}
+
+.coachTitle {
+  font-family: var(--fontFamilySecondary);
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.45;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+
+  @media (--viewportLarge) {
+    font-size: 16px;
+  }
+}
+
+.badges {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+
+  @media (--viewportLarge) {
+    grid-column: 2;
+    gap: 8px;
+  }
+}
+
+.newBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px 2px 8px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieChartreuse);
+  color: var(--revieMaroon);
+  font-size: 13px;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--revieMaroon);
+    text-decoration: underline;
+  }
+
+  & svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  @media (--viewportLarge) {
+    gap: 6px;
+    padding: 3px 12px 3px 10px;
+    font-size: 14px;
+
+    & svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}
+
+.cert {
+  padding: 2px 10px;
+  border: 1.5px solid rgba(239, 238, 237, 0.6);
+  border-radius: var(--borderRadiusPill);
+  font-size: 13px;
+
+  @media (--viewportLarge) {
+    padding: 3px 12px;
+    font-size: 14px;
+  }
+}
+
+.where {
+  font-size: 13px;
+  opacity: 0.85;
+
+  @media (--viewportLarge) {
+    margin-left: 4px;
+    font-size: 14px;
+  }
+}
+
+/* Lived-experience tags: periwinkle, pink and orange pills, never chartreuse. */
+.tags {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @media (--viewportLarge) {
+    grid-column: 2;
+    gap: 8px;
+    margin-top: 4px;
+  }
+}
+
+.tag {
+  margin: 0;
+  padding: 3px 11px;
+  border-radius: var(--borderRadiusPill);
+  font-size: 13px;
+
+  @media (--viewportLarge) {
+    padding: 4px 12px;
+    font-size: 14px;
+  }
+}
+
+.tag_periwinkle {
+  background: var(--reviePeriwinkle);
+  color: var(--revieGreen);
+}
+
+.tag_pink {
+  background: var(--reviePink);
+  color: var(--revieMaroon);
+}
+
+.tag_orange {
+  background: var(--revieOrange);
+  color: var(--revieMaroon);
+}
+
+.moreButton {
+  padding: 2px 11px;
+  border: 1.5px solid var(--revieCream);
+  border-radius: var(--borderRadiusPill);
+  background: transparent;
+  color: var(--revieCream);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms, border-color 150ms;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--reviePink);
+    background: var(--reviePink);
+    color: var(--revieMaroon);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+
+  @media (--viewportLarge) {
+    padding: 3px 12px;
+    font-size: 14px;
+  }
+}
+
+/* "{Name}'s been there." dialog */
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(49, 4, 22, 0.6);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 440px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 32px;
+  border-radius: 28px;
+  background: var(--revieCream);
+  color: var(--revieMaroon);
+  box-shadow: 0 24px 64px rgba(49, 4, 22, 0.35);
+  text-align: left;
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dialogTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dialogTitle {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: normal;
+
+  & b {
+    font-weight: 700;
+  }
+}
+
+.dialogSubtitle {
+  font-family: var(--fontFamilySecondary);
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.dialogClose {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid rgba(49, 4, 22, 0.25);
+  border-radius: var(--borderRadiusPill);
+  background: transparent;
+  color: var(--revieMaroon);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--reviePink);
+    background: var(--reviePink);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.dialogTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dialogTag {
+  margin: 0;
+  padding: 7px 16px;
+  border-radius: var(--borderRadiusPill);
+  font-size: 15px;
+}
