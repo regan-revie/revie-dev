@@ -7,6 +7,33 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: A coach whose Google connection breaks is not bookable, and is told once
+**Date:** Nov 24, 2026
+**Decision:** When a coach's Google Calendar connection stops working (Nylas `grant.expired` or `grant.deleted`, or found by a daily check), their sessions stop being bookable the same way as "no calendar connected" ("This coach isn't taking bookings yet"); no new booking or price check can start. Existing bookings are untouched. The Calendar page and the setup card ask her to reconnect, and she gets one email per break ("Reconnect your calendar to keep taking bookings"), not daily. Reconnecting clears it within a minute, with no second email. Sentry tag `nylas-grant-expired`, coach id only.
+**Why:** Before this the Calendar page still said "connected", sessions still looked bookable, and a client could pay for a time that could not be put on the calendar.
+**Affects:** `server/api/nylas/grantStatus.js`, `grantHealth.js`, the Nylas webhook destination (two new triggers), the Calendar page, the session setup card, a new Postmark template. Recorded from the chat with Regan, not pasted from the planning project.
+
+### DECISION: ADHD and Autistic are lived-experience options; there is no AuDHD option
+**Date:** Nov 19, 2026
+**Decision:** `adhd` ("ADHD") and `autistic` ("Autistic") are added to the profile field `personality_identifier` and the listing field `identity`, with the same key on both sides. The existing `neurodivergent` / `neurdivergent` keys stay and are relabelled "Neurodivergent". A coach who is both picks both.
+**Affects:** `server/api/coachTraits/traits.js`, Console on Dev (and Test and Live at cutover). Recorded from the chat with Regan.
+
+### DECISION: The gender question is optional, private and on the account page
+**Date:** Nov 19, 2026
+**Decision:** "How do you identify?" (private user field `identity`) is never asked at sign-up and never shown on any page or copied to listings. It was removed everywhere on Nov 18, then brought back on Nov 19 as an optional question on the account page for coaches and clients, with the help text "Optional. Only Revie sees this. It helps us match you with the right coach." Stored answers are kept.
+**Affects:** `src/util/userFieldPolicy.js`, the account page. Recorded from the chat with Regan.
+
+### DECISION: Client sign-up is minimal, client answers stay private, and search never ends empty
+**Date:** Nov 19, 2026
+**Decision:** Client sign-up asks only account type, name, email, password, the age check and terms (location is asked of coaches only, in code; the other client questions leave sign-up in Console and their stored answers are kept). A client's `support`, `work` and `client_wants` are never shown on a public profile. A search with fewer than three matches also shows "Other coaches you might like" (published, calendar-bookable sessions, no repeats).
+**Affects:** `src/util/userFieldPolicy.js`, the search page, Console (Dev now, Test and Live at cutover). Recorded from the chat with Regan.
+
+### DECISION: Coach traits are asked once, on the profile, and copied to every listing
+**Date:** Nov 18, 2026
+**Decision:** A coach's identity tags, languages, location and communication style are asked once on her profile (the first three already existed as user fields; communication style is new) and copied by the server onto each of her listings as `identity`, `language`, `coachlocation` and `communication_style`. Only the public fields are copied (never the private gender field); option keys that differ between profile and listing are translated in code, not renamed in Console; an empty profile answer never clears a listing value. The four are hidden from the session editor and required of coaches in code. `structure` stays per session. Coach sign-up is slimmed (certifications and gender move to the profile).
+**Why:** Sharetribe search can only filter on listing fields, never on the author's profile; asking the same question twice (profile and every session) was the onboarding problem.
+**Affects:** `server/api/coachTraits/` (profile-save endpoint, a 60-second loop, `scripts/coach-traits-backfill.js` forward and reverse), the session editor, the profile form, `docs/onboarding-fields.md`. Recorded from the chat with Regan.
+
 ### DECISION: Revie-funded promo codes come out of Revie's commission only
 **Date:** Nov 23, 2026
 **Decision:** A promo code takes a percentage off what the client pays, as a customer-only negative line item. The coach is always paid on the full, undiscounted price (80%). The ceiling is 15% in code (below the 20% commission, because Stripe's fee also comes out of what Revie keeps). A use is reserved when the booking starts and counts against the caps; it is counted as paid when the booking is accepted, and released when payment expires, the booking is declined or expires, or the client is refunded in full. A late cancellation stays consumed. Each code allows 1 use per client unless set otherwise. One code per booking. Codes are created by script (`scripts/promo-codes.js`); there is no admin screen.
