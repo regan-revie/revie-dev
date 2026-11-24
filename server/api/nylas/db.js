@@ -588,7 +588,7 @@ const queueSessionEmail = async ({
 /** Cancel a booking's emails that have not gone out (only pending ones; a sent one stays sent). */
 const cancelSessionEmails = async (
   nylasBookingId,
-  kinds = ['reminder', 'reminder60', 'rescheduled', 'confirmed']
+  kinds = ['reminder', 'reminder60', 'rescheduled', 'confirmed', 'declined-invite']
 ) => {
   const { rows } = await query(
     `UPDATE session_emails SET status = 'cancelled', updated_at = now()

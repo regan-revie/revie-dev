@@ -32,6 +32,14 @@
  * organiser's. The same rule holds at every step: the stored-id match, the read-back of a grant's
  * bookings, and the five-minute recheck, which reads the event from the booking's own grant and
  * calendar, never from whatever the notice named.
+ *
+ * The same notice also tells us when the CLIENT declines the invitation (their attendee response on
+ * the coach's event becomes "no"), which is not a cancellation and cancels nothing. Clients decline or
+ * delete the invite thinking it cancels the session, and are then charged for a no-show, so they get
+ * one email saying it is still booked and how to cancel (sessionEmails.queueDeclinedInviteEmail). It
+ * is judged from the same own-copy notice as everything above (a guest's copy never counts), only for
+ * the booking's own client (matched by their email, so the coach or any other guest declining is
+ * ignored), and only for a booking that is still active. Nothing goes to the coach.
  */
 
 const log = require('../../log');
@@ -40,6 +48,7 @@ const db = require('./db');
 const { nylasRequest } = require('./client');
 const { processBookingCancelled } = require('./bookingSync');
 const { lookupEventId } = require('./eventIdBackfill');
+const { queueDeclinedInviteEmail } = require('./sessionEmails');
 const {
   isConfigured: integrationConfigured,
   getTransactionBasics,
@@ -156,12 +165,56 @@ const fetchEventStatus = async ({ grantId, calendarId, eventId }) => {
   }
 };
 
+/** The whole event from Nylas, for a notification that did not carry its guest list. */
+const fetchEvent = async ({ grantId, calendarId, eventId }) =>
+  nylasRequest(
+    `/v3/grants/${encodeURIComponent(grantId)}/events/${encodeURIComponent(
+      eventId
+    )}?calendar_id=${encodeURIComponent(calendarId)}&show_cancelled=true`
+  );
+
+/** Emails as compared: case and surrounding spaces do not matter. */
+const sameEmail = (a, b) =>
+  typeof a === 'string' &&
+  typeof b === 'string' &&
+  a.trim() !== '' &&
+  a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** The guests of the event who have declined (Nylas: `status: 'no'`). */
+const declinedParticipants = participants =>
+  (Array.isArray(participants) ? participants : []).filter(
+    p => p && typeof p.status === 'string' && p.status.toLowerCase() === 'no'
+  );
+
+/**
+ * Has the booking's own client declined the coach's invitation? Called only for the coach's own copy
+ * of a booking's event that is still active and not cancelled. Reads the guest list from the notice,
+ * or from Nylas if the notice did not carry one, and only asks Sharetribe for the client's email when
+ * somebody has declined at all (almost every notice has no decline in it).
+ *
+ * @returns {Promise<boolean>}
+ */
+const clientHasDeclined = async ({ mapping, data, grant, calendarId, eventId, getEvent }) => {
+  let participants = data.participants;
+  if (!Array.isArray(participants)) {
+    const event = await getEvent({ grantId: grant, calendarId, eventId });
+    participants = event && event.participants;
+  }
+  const declined = declinedParticipants(participants);
+  if (declined.length === 0) return false;
+
+  const { customer } = await loadTransactionAsOperator(mapping.sharetribe_transaction_id);
+  const clientEmail = customer && customer.attributes && customer.attributes.email;
+  return declined.some(p => sameEmail(p.email, clientEmail));
+};
+
 /**
  * @param {object} params
  * @param {string} params.trigger 'event.updated' | 'event.deleted'
  * @param {object} params.data the notification's event object
  * @param {string} [params.grantId]
  * @param {Function} [params.getEventStatus] injected in tests
+ * @param {Function} [params.getEvent] injected in tests
  * @returns {Promise<{handled: boolean, action?: string, reason?: string}>}
  */
 const handleCalendarEvent = async ({
@@ -169,6 +222,8 @@ const handleCalendarEvent = async ({
   data,
   grantId,
   getEventStatus = fetchEventStatus,
+  getEvent = fetchEvent,
+  queueDeclined = queueDeclinedInviteEmail,
 }) => {
   const eventId = data && data.id;
   const grant = (data && data.grant_id) || grantId;
@@ -268,6 +323,37 @@ const handleCalendarEvent = async ({
   // The event is there and not cancelled. If a wait was running, the coach has undone the deletion:
   // end it now rather than leave it to find out in five minutes.
   const restored = await db.markEventRestored(mapping.nylas_booking_id);
+
+  // And if the booking's client has declined the invitation, tell them (once) it is still booked.
+  // Judged on the coach's own copy only (checked above), so a guest's own calendar never gets here.
+  if (
+    trigger === 'event.updated' &&
+    (await clientHasDeclined({
+      mapping,
+      data,
+      grant,
+      calendarId: own.calendarId,
+      eventId,
+      getEvent,
+    }))
+  ) {
+    const queued = await queueDeclined({
+      bookingId: mapping.nylas_booking_id,
+      sessionStart: mapping.booking_start,
+    });
+    console.log(
+      `[nylas] client declined the invite for booking ${short(mapping.nylas_booking_id)}: ${
+        queued.queued ? 'email queued' : queued.reason
+      }`
+    );
+    if (!restored) {
+      return {
+        handled: true,
+        action: queued.queued ? 'declined-invite-queued' : `declined-invite-${queued.reason}`,
+      };
+    }
+  }
+
   if (restored) return { handled: true, action: 'restored', via: 'calendar-event' };
   return { handled: false, reason: 'event-not-cancelled' };
 };
