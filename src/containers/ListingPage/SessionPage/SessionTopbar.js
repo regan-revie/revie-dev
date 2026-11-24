@@ -8,8 +8,7 @@ import { useConfiguration } from '../../../context/configurationContext';
 import { useRouteConfiguration } from '../../../context/routeConfigurationContext';
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { pathByRouteName } from '../../../util/routes';
-import { getCurrentUserTypeRoles, showCreateListingLinkForUser } from '../../../util/userHelpers';
-import { ACCOUNT_SETTINGS_PAGES } from '../../../routing/routeConfiguration';
+import { getCurrentUserTypeRoles } from '../../../util/userHelpers';
 import { sendVerificationEmail, hasCurrentUserErrors } from '../../../ducks/user.duck';
 import { logout, authenticationInProgress } from '../../../ducks/auth.duck';
 import { manageDisableScrolling } from '../../../ducks/ui.duck';
@@ -25,8 +24,7 @@ import {
   NamedLink,
 } from '../../../components';
 
-import logoAvatar from '../../../assets/revie-logo-mobile.png';
-import menuCss from '../../TopbarContainer/Topbar/TopbarDesktop/TopbarDesktop.module.css';
+import logoAvatar from '../../../assets/revie-logo-avatar.svg';
 import { IconInbox } from './SessionIcons';
 
 import css from './SessionTopbar.module.css';
@@ -76,13 +74,46 @@ const HamburgerIcon = () => (
   </svg>
 );
 
-const AccountMenu = ({ currentUser, currentPage, onLogout, showManageListingsLink }) => {
+// What the account menu lists, by who is signed in. A coach manages sessions and a calendar; a
+// client has bookings. Both end with the same three. `to` is a route name (and optional params).
+export const accountMenuItems = (kind, inboxTab) =>
+  kind === 'coach'
+    ? [
+        { id: 'sessions', messageId: 'SessionTopbar.yourSessions', route: 'ManageListingsPage' },
+        { id: 'calendar', messageId: 'SessionTopbar.calendar', route: 'CalendarSettingsPage' },
+        {
+          id: 'profile',
+          messageId: 'TopbarDesktop.profileSettingsLink',
+          route: 'ProfileSettingsPage',
+        },
+        {
+          id: 'account',
+          messageId: 'TopbarDesktop.accountSettingsLink',
+          route: 'AccountSettingsPage',
+        },
+      ]
+    : [
+        {
+          id: 'bookings',
+          messageId: 'SessionTopbar.yourBookings',
+          route: 'InboxPage',
+          params: { tab: inboxTab },
+        },
+        {
+          id: 'profile',
+          messageId: 'TopbarDesktop.profileSettingsLink',
+          route: 'ProfileSettingsPage',
+        },
+        {
+          id: 'account',
+          messageId: 'TopbarDesktop.accountSettingsLink',
+          route: 'AccountSettingsPage',
+        },
+      ];
+
+const AccountMenu = ({ currentUser, currentPage, onLogout, kind, inboxTab }) => {
   const intl = useIntl();
-  const current = page => {
-    const isAccountSettingsPage =
-      page === 'AccountSettingsPage' && ACCOUNT_SETTINGS_PAGES.includes(currentPage);
-    return currentPage === page || isAccountSettingsPage ? menuCss.currentPage : null;
-  };
+  const items = accountMenuItems(kind, inboxTab);
   return (
     <Menu skipFocusOnNavigation={true}>
       <MenuLabel
@@ -95,39 +126,19 @@ const AccountMenu = ({ currentUser, currentPage, onLogout, showManageListingsLin
         </span>
         <Chevron />
       </MenuLabel>
-      <MenuContent className={menuCss.profileMenuContent}>
-        {showManageListingsLink ? (
-          <MenuItem key="ManageListingsPage">
-            <NamedLink
-              className={classNames(menuCss.menuLink, current('ManageListingsPage'))}
-              name="ManageListingsPage"
-            >
-              <span className={menuCss.menuItemBorder} />
-              <FormattedMessage id="SessionTopbar.yourSessions" />
+      <MenuContent rootClassName={css.menuCard} contentClassName={css.menuList}>
+        {items.map(item => (
+          <MenuItem key={item.id}>
+            <NamedLink name={item.route} params={item.params} className={css.menuLink}>
+              <FormattedMessage id={item.messageId} />
             </NamedLink>
           </MenuItem>
-        ) : null}
-        <MenuItem key="ProfileSettingsPage">
-          <NamedLink
-            className={classNames(menuCss.menuLink, current('ProfileSettingsPage'))}
-            name="ProfileSettingsPage"
-          >
-            <span className={menuCss.menuItemBorder} />
-            <FormattedMessage id="TopbarDesktop.profileSettingsLink" />
-          </NamedLink>
-        </MenuItem>
-        <MenuItem key="AccountSettingsPage">
-          <NamedLink
-            className={classNames(menuCss.menuLink, current('AccountSettingsPage'))}
-            name="AccountSettingsPage"
-          >
-            <span className={menuCss.menuItemBorder} />
-            <FormattedMessage id="TopbarDesktop.accountSettingsLink" />
-          </NamedLink>
-        </MenuItem>
+        ))}
         <MenuItem key="logout">
-          <InlineTextButton rootClassName={menuCss.logoutButton} onClick={onLogout}>
-            <span className={menuCss.menuItemBorder} />
+          <InlineTextButton
+            rootClassName={classNames(css.menuLink, css.menuLogout)}
+            onClick={onLogout}
+          >
             <FormattedMessage id="TopbarDesktop.logout" />
           </InlineTextButton>
         </MenuItem>
@@ -191,11 +202,12 @@ const SessionTopbar = () => {
     });
   };
 
-  const showCreateListingsLink = showCreateListingLinkForUser(config, currentUser);
   const { customer: isCustomer, provider: isProvider } = getCurrentUserTypeRoles(
     config,
     currentUser
   );
+  // A coach if they sell sessions (or sell and book, and have sessions); otherwise a client.
+  const menuKind = isProvider && (!isCustomer || currentUserHasListings) ? 'coach' : 'client';
   const inboxTab = !isCustomer
     ? 'sales'
     : !isProvider
@@ -259,11 +271,7 @@ const SessionTopbar = () => {
           ))}
           {signedIn ? (
             <>
-              <NamedLink
-                name="InboxPage"
-                params={{ tab: inboxTab }}
-                className={classNames(css.navLink, css.navGap)}
-              >
+              <NamedLink name="InboxPage" params={{ tab: inboxTab }} className={css.navLink}>
                 <FormattedMessage id="SessionTopbar.inbox" />
                 {notificationCount > 0 ? (
                   <span className={css.count} aria-label={countLabel}>
@@ -273,9 +281,9 @@ const SessionTopbar = () => {
               </NamedLink>
               <AccountMenu
                 currentUser={currentUser}
-                currentPage="ListingPage"
                 onLogout={handleLogout}
-                showManageListingsLink={showCreateListingsLink}
+                kind={menuKind}
+                inboxTab={inboxTab}
               />
             </>
           ) : null}
@@ -356,17 +364,16 @@ const SessionTopbar = () => {
                     <span className={css.count}>{notificationCount}</span>
                   ) : null}
                 </NamedLink>
-                {showCreateListingsLink ? (
-                  <NamedLink name="ManageListingsPage" className={css.mobileLink}>
-                    <FormattedMessage id="SessionTopbar.yourSessions" />
+                {accountMenuItems(menuKind, inboxTab).map(item => (
+                  <NamedLink
+                    key={item.id}
+                    name={item.route}
+                    params={item.params}
+                    className={css.mobileLink}
+                  >
+                    <FormattedMessage id={item.messageId} />
                   </NamedLink>
-                ) : null}
-                <NamedLink name="ProfileSettingsPage" className={css.mobileLink}>
-                  <FormattedMessage id="TopbarDesktop.profileSettingsLink" />
-                </NamedLink>
-                <NamedLink name="AccountSettingsPage" className={css.mobileLink}>
-                  <FormattedMessage id="TopbarDesktop.accountSettingsLink" />
-                </NamedLink>
+                ))}
                 <InlineTextButton rootClassName={css.mobileLink} onClick={handleLogout}>
                   <FormattedMessage id="TopbarDesktop.logout" />
                 </InlineTextButton>

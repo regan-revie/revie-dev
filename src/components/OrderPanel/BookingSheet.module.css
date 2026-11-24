@@ -1,0 +1,92 @@
+/* The phone booking sheet. Values are the approved design's (PhoneSheet.dc.html). */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(49, 4, 22, 0.6);
+}
+
+.sheet {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px 24px 0 0;
+  background: var(--revieCream);
+  color: var(--revieMaroon);
+  font-family: var(--fontFamily);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 20px 12px;
+}
+
+.handle {
+  align-self: center;
+  width: 40px;
+  height: 4px;
+  border-radius: var(--borderRadiusPill);
+  background: rgba(49, 4, 22, 0.25);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 400;
+  font-size: 26px;
+  letter-spacing: normal;
+
+  & b {
+    font-weight: 700;
+  }
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1.5px solid rgba(49, 4, 22, 0.25);
+  border-radius: var(--borderRadiusPill);
+  background: transparent;
+  color: var(--revieMaroon);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--reviePink);
+    background: var(--reviePink);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}

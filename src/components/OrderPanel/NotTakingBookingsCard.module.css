@@ -1,0 +1,70 @@
+.card {
+  gap: 20px;
+}
+
+.prices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.priceRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(49, 4, 22, 0.12);
+}
+
+.priceName {
+  font-weight: 700;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lead {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.text {
+  margin: 0;
+  font-size: 15px;
+}
+
+.findButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieMaroon);
+  color: var(--revieCream);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background-color 150ms, color 150ms;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--reviePink);
+    color: var(--revieMaroon);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 3px;
+  }
+}

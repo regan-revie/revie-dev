@@ -1,0 +1,51 @@
+/* The coach photo "sticker". Shape and angles are the approved design's (docs/design/session-page/). */
+
+.root {
+  position: relative;
+  box-sizing: border-box;
+  /* 112:152. The caller sets the width; this sets the height. */
+  aspect-ratio: 112 / 152;
+  /* So the initials can be sized from the pill's own width (30%). */
+  container-type: inline-size;
+}
+
+/* The chartreuse pill behind, offset and tilted the other way. */
+.back {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieChartreuse);
+  transform: translate(7%, 4%) rotate(4deg);
+}
+
+/* The photo's pill, tilted -3 degrees. Lavender while there is no photo. */
+.frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieLavender);
+  transform: rotate(-3deg);
+}
+
+/* Cropped here, in the browser: fill the pill, keep the face near the top. */
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 25%;
+}
+
+.initials {
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  /* about 30% of the pill's width; the fixed size is for a browser without container units */
+  font-size: 28px;
+  font-size: 30cqw;
+  line-height: 1;
+  color: var(--revieMaroon);
+}

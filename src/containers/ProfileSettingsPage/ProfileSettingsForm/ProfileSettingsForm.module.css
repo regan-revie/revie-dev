@@ -218,33 +218,6 @@
   left: -1000px;
 }
 
-.tip {
-  composes: marketplaceDefaultFontStyles from global;
-  color: var(--colorGrey600);
-  margin-top: 0;
-  margin-bottom: 12px;
-
-  @media (--viewportMedium) {
-    margin-top: 0;
-    margin-bottom: 0;
-  }
-}
-
-.fileInfo {
-  composes: h5 from global;
-  color: var(--colorGrey600);
-  margin-top: 0;
-  margin-bottom: 0;
-  padding-top: 5px;
-  padding-bottom: 1px;
-
-  @media (--viewportMedium) {
-    margin-top: 0;
-    margin-bottom: 0;
-    padding: 4px 0 4px 0;
-  }
-}
-
 .nameContainer {
   display: flex;
   justify-content: space-between;

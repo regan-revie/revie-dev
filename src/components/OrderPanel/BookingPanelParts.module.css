@@ -1,0 +1,117 @@
+@import '../../styles/customMediaQueries.css';
+
+/* Booking panel pieces. Values are the approved design's (docs/design/session-page/ Main, States). */
+
+.heading {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: normal;
+  color: var(--revieMaroon);
+
+  & b {
+    font-weight: 700;
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  box-sizing: border-box;
+  padding: 28px;
+  border: 1px solid rgba(49, 4, 22, 0.16);
+  border-radius: var(--borderRadiusLarge);
+  background: var(--revieCream);
+  box-shadow: 0 12px 32px rgba(49, 4, 22, 0.1);
+  color: var(--revieMaroon);
+  font-family: var(--fontFamily);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.stepTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.stepNumber {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieMaroon);
+  color: var(--revieCream);
+  font-size: 14px;
+}
+
+.messageButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1.5px solid var(--revieMaroon);
+  border-radius: var(--borderRadiusPill);
+  background: transparent;
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--reviePink);
+    background: var(--reviePink);
+    color: var(--revieMaroon);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.messageLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--revieMaroon);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}

@@ -102,7 +102,7 @@ const CustomFieldShortText = props => {
       id={formId ? `${formId}.${name}` : name}
       name={name}
       type="text"
-      maxLength={70}
+      maxLength={fieldConfig?.maxLength || 70}
       label={label}
       helpText={fieldConfig?.helpText}
       placeholder={placeholder}
@@ -127,6 +127,7 @@ const CustomFieldText = props => {
       id={formId ? `${formId}.${name}` : name}
       name={name}
       type="textarea"
+      {...(fieldConfig?.maxLength ? { maxLength: fieldConfig.maxLength } : {})}
       label={label}
       helpText={fieldConfig?.helpText}
       placeholder={placeholder}

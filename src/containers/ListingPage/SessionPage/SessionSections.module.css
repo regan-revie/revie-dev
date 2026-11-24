@@ -24,10 +24,6 @@
   font-size: 24px;
   line-height: 1.25;
 
-  & b {
-    font-weight: 700;
-  }
-
   @media (--viewportLarge) {
     font-size: 32px;
   }
@@ -121,10 +117,6 @@
   font-size: 19px;
   line-height: 1.35;
   overflow-wrap: anywhere;
-
-  & b {
-    font-weight: 700;
-  }
 
   @media (--viewportLarge) {
     font-size: 24px;

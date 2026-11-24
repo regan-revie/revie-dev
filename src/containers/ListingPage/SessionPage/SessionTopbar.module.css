@@ -78,10 +78,6 @@
   }
 }
 
-.navGap {
-  margin-left: 32px;
-}
-
 .signIn {
   margin-left: 32px;
   padding: 20px 8px;
@@ -169,6 +165,76 @@
   font-family: var(--fontFamilyHeadline);
   font-weight: 700;
   font-size: 18px;
+}
+
+/* The account menu: a rounded cream card like the booking panel, maroon Bio Sans, lavender on hover. */
+.menuCard {
+  position: absolute;
+  z-index: var(--zIndexPopup);
+  box-sizing: border-box;
+  min-width: 240px;
+  padding: 12px;
+  border: 1px solid rgba(49, 4, 22, 0.16);
+  border-radius: var(--borderRadiusLarge);
+  background: var(--revieCream);
+  box-shadow: 0 12px 32px rgba(49, 4, 22, 0.1);
+  transition: var(--transitionStyleButton);
+}
+
+.menuList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menuLink {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 10px 16px;
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: none;
+  color: var(--revieMaroon);
+  font-family: var(--fontFamily);
+  font-size: 16px;
+  line-height: 1.4;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 150ms;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--revieLavender);
+    color: var(--revieMaroon);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+/* Log out sits apart from the pages, under a hairline. */
+.menuLogout {
+  margin-top: 10px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 16px;
+    right: 16px;
+    height: 1px;
+    background: rgba(49, 4, 22, 0.14);
+  }
 }
 
 /* ---------- Phone ---------- */

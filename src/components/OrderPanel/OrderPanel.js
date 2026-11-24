@@ -44,7 +44,7 @@ import {
 import { ModalInMobile, NamedLink, PrimaryButton, AvatarSmall, H1, H2 } from '../../components';
 import PriceVariantPicker from './PriceVariantPicker/PriceVariantPicker';
 import SubmitFinePrint from './SubmitFinePrint/SubmitFinePrint';
-import SessionSetupCard from './SessionSetupCard/SessionSetupCard';
+import RevieBookingPanel, { PANEL_STATES } from './RevieBookingPanel';
 
 import css from './OrderPanel.module.css';
 
@@ -198,16 +198,6 @@ const PriceMissing = () => {
     </p>
   );
 };
-
-// Revie: a session is booked through its coach's calendar, never through Sharetribe's own
-// availability plan. Until the server has set the listing up (it does so by itself once the coach
-// has connected a calendar, see server/api/nylas/reconcile.js) there is nothing to book. This is
-// not an error, so it is plain body text, not the red the template uses for problems.
-const BookingNotice = ({ messageId }) => (
-  <p className={css.notice}>
-    <FormattedMessage id={messageId} />
-  </p>
-);
 
 const InvalidCurrency = () => {
   return (
@@ -471,6 +461,57 @@ const OrderPanel = props => {
   const classes = classNames(rootClassName || css.root, className);
   const titleClasses = classNames(titleClassName || css.orderTitle);
 
+  // Revie: a fixed-length session is booked only through its coach's calendar, and has its own
+  // panel (docs/design/session-page/): the booking steps (a card on desktop, a bar and a sheet on a
+  // phone), the coach's setup checklist, or what a client sees while the coach cannot be booked yet.
+  // The price, currency and price-variant problems above still take the stock path.
+  const revieState =
+    !isOpenSession || showPriceMissing || showInvalidCurrency || showInvalidPriceVariantsMessage
+      ? null
+      : showSessionSetupCard
+      ? PANEL_STATES.SETUP
+      : showNylasBookingForm
+      ? PANEL_STATES.FORM
+      : showNotTakingBookings
+      ? PANEL_STATES.NOT_TAKING
+      : showSettingUpNotice
+      ? PANEL_STATES.SETTING_UP
+      : null;
+
+  if (revieState) {
+    return (
+      <RevieBookingPanel
+        className={classes}
+        state={revieState}
+        listing={listing}
+        author={author}
+        isOwnListing={isOwnListing}
+        price={price}
+        priceVariants={isPriceVariationsInUse ? priceVariants : []}
+        BookingForm={NylasBookingForm}
+        bookingFormProps={{
+          formId: 'OrderPanelNylasBookingForm',
+          timeZone,
+          finePrintComponent: SubmitFinePrint,
+          ...priceVariantsMaybe,
+          ...sharedProps,
+        }}
+        setupCardProps={{
+          calendarConnected,
+          calendarReconnectNeeded,
+          payoutDetailsSet,
+          profileFinished: traitsAsked ? profileFinished : undefined,
+          bookable: calendarConnected && payoutDetailsSet,
+        }}
+        onContactUser={onContactUser}
+        isOrderOpen={isOrderOpen}
+        onOpenOrder={() => openOrderModal(isOwnListing, isClosed, history, location)}
+        onCloseOrder={() => closeOrderModal(history, location)}
+        onManageDisableScrolling={onManageDisableScrolling}
+      />
+    );
+  }
+
   return (
     <div className={classes}>
       <ModalInMobile
@@ -523,27 +564,6 @@ const OrderPanel = props => {
           <InvalidCurrency />
         ) : showInvalidPriceVariantsMessage ? (
           <InvalidPriceVariants />
-        ) : showSessionSetupCard ? (
-          <SessionSetupCard
-            calendarConnected={calendarConnected}
-            calendarReconnectNeeded={calendarReconnectNeeded}
-            payoutDetailsSet={payoutDetailsSet}
-            profileFinished={traitsAsked ? profileFinished : undefined}
-            bookable={calendarConnected && payoutDetailsSet}
-          />
-        ) : showNylasBookingForm ? (
-          <NylasBookingForm
-            className={css.bookingForm}
-            formId="OrderPanelNylasBookingForm"
-            timeZone={timeZone}
-            finePrintComponent={SubmitFinePrint}
-            {...priceVariantsMaybe}
-            {...sharedProps}
-          />
-        ) : showNotTakingBookings ? (
-          <BookingNotice messageId="OrderPanel.notTakingBookings" />
-        ) : showSettingUpNotice ? (
-          <BookingNotice messageId="OrderPanel.ownListingSettingUp" />
         ) : showBookingTimeForm ? (
           <BookingTimeForm
             seatsEnabled={seatsEnabled}

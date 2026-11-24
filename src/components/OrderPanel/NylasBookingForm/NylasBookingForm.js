@@ -2,18 +2,24 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Form as FinalForm, FormSpy } from 'react-final-form';
 import classNames from 'classnames';
 
-import { FormattedMessage } from '../../../util/reactIntl';
+import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { getDefaultTimeZoneOnBrowser, getTimeZoneNames } from '../../../util/dates';
 import { nylasAvailability } from '../../../util/api';
 
-import { Form, PrimaryButton } from '../../../components';
-import { BOOKING_PROCESS_NAME } from '../../../transactions/transaction';
+import { Form } from '../../../components';
 
-import EstimatedCustomerBreakdownMaybe from '../EstimatedCustomerBreakdownMaybe';
 import FetchLineItemsError from '../FetchLineItemsError/FetchLineItemsError.js';
-import NylasSlotPicker from './NylasSlotPicker';
+import { MessageCoach, pronounWords, useBookingLayout, LAYOUT_SHEET } from '../BookingPanelParts';
+import NylasSlotSteps from './NylasSlotSteps';
+import PriceVariantRadios, { formatPanelPrice } from './PriceVariantRadios';
 
-import { groupSlotsByDay, slotMatchesVariant } from './nylasSlots';
+import {
+  formatSlotTime12,
+  formatSummaryDay,
+  groupSlotsByDay,
+  slotMatchesVariant,
+  timeZoneCity,
+} from './nylasSlots';
 import css from './NylasBookingForm.module.css';
 
 /**
@@ -36,6 +42,10 @@ import css from './NylasBookingForm.module.css';
  * public.
  */
 const NylasBookingForm = props => {
+  const intl = useIntl();
+  const layout = useBookingLayout();
+  const isSheet = layout === LAYOUT_SHEET;
+  const [changingZone, setChangingZone] = useState(false);
   const {
     rootClassName,
     className,
@@ -43,15 +53,19 @@ const NylasBookingForm = props => {
     isOwnListing,
     price,
     onFetchTransactionLineItems,
-    lineItems,
     fetchLineItemsInProgress,
     fetchLineItemsError,
     isPriceVariationsInUse,
     priceVariants = [],
-    priceVariantFieldComponent: PriceVariantField,
+    // Kept for the callers that still pass it; the length is now chosen with PriceVariantRadios.
+    // eslint-disable-next-line no-unused-vars
+    priceVariantFieldComponent,
     preselectedPriceVariant,
-    marketplaceName,
+    marketplaceName, // eslint-disable-line no-unused-vars
     payoutDetailsWarning,
+    authorFirstName,
+    authorPronouns,
+    onMessage,
     ...rest
   } = props;
 
@@ -72,6 +86,7 @@ const NylasBookingForm = props => {
   const [variantName, setVariantName] = useState(initialPriceVariant?.name || null);
 
   const timeZoneNames = useMemo(() => getTimeZoneNames(), []);
+  const { object: coachObject } = pronounWords(authorPronouns);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,8 +165,6 @@ const NylasBookingForm = props => {
         const matching = availability.slots.filter(s => slotMatchesVariant(s, chosenVariant));
         const days = groupSlotsByDay(matching, timeZone);
 
-        const showBreakdown = selectedSlot && lineItems && !fetchLineItemsInProgress;
-
         const notReady =
           availability.status === 'loading' ? (
             <p className={css.notice}>
@@ -183,87 +196,186 @@ const NylasBookingForm = props => {
             </p>
           ) : null;
 
+        // The steps are numbered as shown: with a single length there is nothing to choose, so the
+        // first step is the day.
+        const hasLengthStep = isPriceVariationsInUse && priceVariants.length > 1;
+        const dayStepNumber = hasLengthStep ? 2 : 1;
+
+        // What is being bought: the chosen length's price, or the session's own price.
+        const currency = price?.currency;
+        const totalAmount = chosenVariant?.priceInSubunits ?? price?.amount;
+        const totalText = formatPanelPrice(intl, totalAmount, currency);
+        const minutes =
+          chosenVariant?.bookingLengthInMinutes ||
+          (selectedSlot ? Math.round((selectedSlot.end - selectedSlot.start) / 60000) : null);
+
+        const summary = selectedSlot
+          ? intl.formatMessage(
+              { id: 'BookingPanel.summary' },
+              {
+                day: formatSummaryDay(selectedSlot.start, timeZone, intl.locale),
+                time: formatSlotTime12(selectedSlot.start, timeZone, intl.locale),
+                minutes: minutes || '',
+              }
+            )
+          : null;
+
+        const messageMaybe =
+          onMessage && !isOwnListing ? (
+            isSheet ? (
+              <MessageCoach variant="link" name={authorFirstName} onClick={onMessage} />
+            ) : (
+              <div className={css.messageBlock}>
+                <div className={css.messageText}>
+                  <FormattedMessage
+                    id="BookingPanel.askFirst"
+                    values={{ name: authorFirstName, object: coachObject }}
+                  />
+                </div>
+                <MessageCoach name={authorFirstName} onClick={onMessage} />
+              </div>
+            )
+          ) : null;
+
         return (
-          <Form onSubmit={handleSubmit} className={classes} enforcePagePreloadFor="CheckoutPage">
-            {isPriceVariationsInUse && PriceVariantField ? (
-              <PriceVariantField priceVariants={priceVariants} {...formRenderProps} />
-            ) : null}
-
-            {/* Changing the length invalidates the pick, so clear it rather than leave a selection
-                that no longer matches what is being bought, and fetch that length's slots. */}
-            <FormSpy
-              subscription={{ values: true }}
-              onChange={({ values: current }) => {
-                const next = current.priceVariantName || null;
-                if (next !== variantName) {
-                  clearSelection(form);
-                  setVariantName(next);
-                }
-              }}
-            />
-
-            {notReady || (
-              // Remounts on a timezone change (via key), which resets its internally-held day
-              // selection - day boundaries move with the zone, so a previously chosen day may no
-              // longer exist. clearSelection below only needs to clear the *slot*.
-              <NylasSlotPicker
-                key={timeZone}
-                slots={matching}
-                timeZone={timeZone}
-                selectedSlot={selectedSlot}
-                onSelectSlot={slot => handleSlotSelect(slot, values.priceVariantName, form)}
-                onDayChange={() => clearSelection(form)}
-              />
-            )}
-
-            {/* Stated and changeable rather than assumed. A client booking while travelling wants
-                their home zone, not wherever the laptop currently is. */}
-            <label className={css.timeZoneRow}>
-              <span className={css.timeZoneLabel}>
-                <FormattedMessage
-                  id="NylasBookingForm.timeZoneLabel"
-                  defaultMessage="Times shown in"
+          <Form
+            onSubmit={handleSubmit}
+            className={classes}
+            enforcePagePreloadFor="CheckoutPage"
+            data-layout={layout}
+          >
+            <div className={css.steps}>
+              {hasLengthStep ? (
+                <PriceVariantRadios
+                  priceVariants={priceVariants}
+                  currency={currency}
+                  stepNumber={1}
                 />
-              </span>
-              <select
-                className={css.timeZoneSelect}
-                value={timeZone}
-                onChange={e => {
-                  setTimeZone(e.target.value);
-                  // The selected slot may no longer make sense on the new zone's day boundaries.
-                  // NylasSlotPicker's own day selection resets itself, via its key={timeZone}.
-                  clearSelection(form);
+              ) : null}
+
+              {/* Changing the length invalidates the pick, so clear it rather than leave a selection
+                  that no longer matches what is being bought, and fetch that length's slots. */}
+              <FormSpy
+                subscription={{ values: true }}
+                onChange={({ values: current }) => {
+                  const next = current.priceVariantName || null;
+                  if (next !== variantName) {
+                    clearSelection(form);
+                    setVariantName(next);
+                  }
                 }}
-              >
-                {timeZoneNames.map(zone => (
-                  <option key={zone} value={zone}>
-                    {zone.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {showBreakdown ? (
-              <EstimatedCustomerBreakdownMaybe
-                lineItems={lineItems}
-                timeZone={timeZone}
-                currency={price?.currency}
-                marketplaceName={marketplaceName}
-                processName={BOOKING_PROCESS_NAME}
               />
-            ) : null}
 
-            <FetchLineItemsError error={fetchLineItemsError} />
+              {notReady || (
+                // Remounts on a timezone change (via key), which resets its internally-held day
+                // selection - day boundaries move with the zone, so a previously chosen day may no
+                // longer exist. clearSelection below only needs to clear the *slot*.
+                <NylasSlotSteps
+                  key={timeZone}
+                  slots={matching}
+                  timeZone={timeZone}
+                  selectedSlot={selectedSlot}
+                  dayStepNumber={dayStepNumber}
+                  onSelectSlot={slot => handleSlotSelect(slot, values.priceVariantName, form)}
+                  onDayChange={() => clearSelection(form)}
+                />
+              )}
 
-            <div className={css.submitButton}>
-              <PrimaryButton type="submit" disabled={!selectedSlot || fetchLineItemsInProgress}>
+              {/* Stated and changeable rather than assumed. A client booking while travelling wants
+                  their home zone, not wherever the laptop currently is. */}
+              <div className={css.timeZoneBlock}>
+                <div className={css.timeZoneLine}>
+                  <FormattedMessage
+                    id="BookingPanel.timeZoneLine"
+                    values={{ zone: timeZoneCity(timeZone) }}
+                  />
+                  {' · '}
+                  <button
+                    type="button"
+                    className={css.linkButton}
+                    aria-expanded={changingZone}
+                    onClick={() => setChangingZone(!changingZone)}
+                  >
+                    <FormattedMessage id="BookingPanel.changeTimeZone" />
+                  </button>
+                </div>
+                {changingZone ? (
+                  <select
+                    className={css.timeZoneSelect}
+                    aria-label={intl.formatMessage({ id: 'BookingPanel.timeZoneLabel' })}
+                    value={timeZone}
+                    onChange={e => {
+                      setTimeZone(e.target.value);
+                      // The selected slot may no longer make sense on the new zone's day boundaries.
+                      // The slot steps reset their own day selection, via their key={timeZone}.
+                      clearSelection(form);
+                    }}
+                  >
+                    {timeZoneNames.map(zone => (
+                      <option key={zone} value={zone}>
+                        {zone.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+              </div>
+            </div>
+
+            <div className={css.footer}>
+              <div className={css.totalRow}>
+                <div className={css.totalLabels}>
+                  <span className={css.totalFor}>
+                    {isSheet ? (
+                      summary || <FormattedMessage id="BookingPanel.pickATime" />
+                    ) : minutes ? (
+                      <FormattedMessage id="BookingPanel.totalFor" values={{ minutes }} />
+                    ) : (
+                      <FormattedMessage id="BookingPanel.total" />
+                    )}
+                  </span>
+                  <span className={css.noFees}>
+                    <FormattedMessage id="BookingPanel.noFees" />
+                  </span>
+                </div>
+                {totalText ? <span className={css.totalPrice}>{totalText}</span> : null}
+              </div>
+
+              {isSheet ? null : (
+                <div className={summary ? css.summary : css.summaryHint}>
+                  {summary || <FormattedMessage id="BookingPanel.pickATime" />}
+                </div>
+              )}
+
+              <FetchLineItemsError error={fetchLineItemsError} />
+
+              <button
+                type="submit"
+                className={css.bookButton}
+                disabled={!selectedSlot || fetchLineItemsInProgress}
+              >
                 <FormattedMessage
                   id="NylasBookingForm.bookButton"
                   defaultMessage="Book a session"
                 />
-              </PrimaryButton>
+              </button>
+
+              {isSheet ? (
+                <div className={css.sheetLinks}>
+                  <span className={css.cancelText}>
+                    <FormattedMessage id="BookingPanel.freeCancel" />
+                  </span>
+                  {messageMaybe}
+                </div>
+              ) : (
+                <>
+                  <p className={css.cancelText}>
+                    <FormattedMessage id="BookingPanel.freeCancel" />
+                  </p>
+                  {messageMaybe}
+                </>
+              )}
+              {payoutDetailsWarning}
             </div>
-            {payoutDetailsWarning}
           </Form>
         );
       }}

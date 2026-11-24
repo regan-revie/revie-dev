@@ -356,11 +356,19 @@ Never copied: the user's private `identity` ("How do you identify?", gender). It
   - `challenging`: Challenging
   - `intuitive`: Intuitive
 
-### `coach_title` and `clients_love`: planned, not in Console yet
-Two things the session page design shows that no field holds today. The page already reads them from the coach's public profile data (keys in `src/containers/ListingPage/SessionPage/coachFields.js`) and leaves the spot out while they are empty, so nothing breaks before they exist.
-- **`coach_title`** (short text, user `publicData`): the coach's one-line title under their name in the hero, set in capitals ("Career coach for women stepping into their first leadership role").
-- **`clients_love`** (long text, user `publicData`): the text for the orange quote card, "Clients love working with me because...". The page shows the stored text as the whole quote, with the part after its last comma in Bold, so the coach's answer should be the full sentence.
-- **To do:** create both in Console (Dev, then Test and Live at cutover), add them to the profile form (coaches), and decide whether they are required. Not asked at sign-up.
+### `coach_title`: One-line title (under the coach's name on the session page)
+- **Type / stored:** short text, user `publicData`. **In Dev Console since Nov 24** (Test and Live at cutover, see `go-live-plan.md`).
+- **Who:** coach. **Required of coaches in code** (profile form), like the four traits; counts toward "Finish your profile" (the third row of the coach's setup card). Not at sign-up.
+- **Limit:** about **40 characters**, enforced in code (`PROFILE_FIELD_MAX_LENGTHS` in `src/util/coachTraits.js`): Console's short text allows 70.
+- **Where it is shown or used:** the session page hero, in capitals under the coach's name ("Career coach for women stepping into their first leadership role"). Left out while empty. Not a search filter and **not copied to listings** (it is not one of the four traits in `server/api/coachTraits/`).
+
+### `clients_love`: "Clients love working with me because..."
+- **Type / stored:** long text, user `publicData`. **In Dev Console since Nov 24.**
+- **Who:** coach. **Optional.** Not at sign-up.
+- **Limit:** about **200 characters**, enforced in code (same place); Console's long text has none.
+- **Where it is shown or used:** the orange quote card in "Get to know {Name}" on the session page, shown as the whole quote in one weight. No card while empty. The coach's answer should be the full sentence.
+
+The keys the page reads are in `src/containers/ListingPage/SessionPage/coachFields.js`.
 
 ## Listing fields
 

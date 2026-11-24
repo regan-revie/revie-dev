@@ -3,7 +3,7 @@ import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { userDisplayNameAsString } from '../../../util/data';
-import { NamedLink, ResponsiveImage } from '../../../components';
+import { CoachPhoto, NamedLink } from '../../../components';
 
 import { IconVideoCall, IconCalendarStar, IconPrep } from './SessionIcons';
 import TagsDialog from './TagsDialog';
@@ -32,8 +32,6 @@ import {
 
 import css from './SessionHero.module.css';
 
-const AVATAR_VARIANTS = ['square-small', 'square-small2x'];
-
 const Star = ({ size }) => (
   <svg
     aria-hidden="true"
@@ -47,36 +45,6 @@ const Star = ({ size }) => (
     <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.5 1.3 6.6L12 17.2l-5.9 3.3 1.3-6.6-4.9-4.5 6.6-.8z" />
   </svg>
 );
-
-/** The capsule "sticker" photo: the coach's profile image, tilted, over a chartreuse shape. */
-const CoachSticker = ({ image, name }) => {
-  const hasImage = image && image.id;
-  const initials = name
-    .split(/\s+/)
-    .map(part => part.charAt(0))
-    .join('')
-    .slice(0, 2);
-  return (
-    <div className={css.sticker}>
-      <div aria-hidden="true" className={css.stickerBack} />
-      <div className={css.stickerPhoto}>
-        {hasImage ? (
-          <ResponsiveImage
-            rootClassName={css.stickerImage}
-            alt={name}
-            image={image}
-            variants={AVATAR_VARIANTS}
-            sizes="(min-width: 1024px) 112px, 76px"
-          />
-        ) : (
-          <span aria-hidden="true" className={css.stickerInitials}>
-            {initials}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
 
 /**
  * The maroon hero at the top of the session page: what the session is called, a few quick facts,
@@ -201,7 +169,12 @@ const SessionHero = props => {
       </ul>
 
       <div className={css.coachRow}>
-        <CoachSticker image={author?.profileImage} name={displayName} />
+        <CoachPhoto
+          className={css.sticker}
+          image={author?.profileImage}
+          name={displayName}
+          sizes="(min-width: 1024px) 112px, 76px"
+        />
 
         <div className={css.info}>
           <div className={css.nameRow}>

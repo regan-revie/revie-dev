@@ -1,0 +1,74 @@
+@import '../../styles/customMediaQueries.css';
+
+/* The phone's bottom bar. Values are the approved design's (Phone.dc.html). Phone only: from the
+   large breakpoint the booking panel sits beside the page instead. */
+.bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-sizing: border-box;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 16px));
+  border-top: 1px solid rgba(49, 4, 22, 0.16);
+  background: var(--revieCream);
+  box-shadow: 0 -8px 24px rgba(49, 4, 22, 0.08);
+  color: var(--revieMaroon);
+
+  @media (--viewportLarge) {
+    display: none;
+  }
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.price {
+  font-family: var(--fontFamilyHeadline);
+  font-size: 22px;
+}
+
+.minutes {
+  font-size: 14px;
+}
+
+.next {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 28px;
+  border: none;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieMaroon);
+  color: var(--revieCream);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--reviePink);
+    color: var(--revieMaroon);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 3px;
+  }
+}

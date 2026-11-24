@@ -245,8 +245,18 @@ describe('the session section', () => {
       messages,
     });
     expect(screen.getByText('First sentence.')).toBeInTheDocument();
+    expect(screen.getByText('First sentence.').querySelector('b')).toBeNull();
     expect(screen.getByText('The rest of it follows.')).toBeInTheDocument();
     expect(screen.queryByTestId('prep-card')).not.toBeInTheDocument();
+  });
+
+  it('does not bold a first sentence with a comma (only titles are bold after the last comma)', () => {
+    render(<SessionAbout description="You're good at it, but not sure. The rest." preWork="" />, {
+      messages,
+    });
+    const lead = screen.getByText("You're good at it, but not sure.");
+    expect(lead.tagName).toBe('P');
+    expect(lead.querySelector('b')).toBeNull();
   });
 
   it('opens further paragraphs with "Read more"', async () => {
@@ -299,7 +309,7 @@ describe('the coach section', () => {
     expect(screen.getByRole('heading', { name: 'Get to know Maya.' })).toBeInTheDocument();
   });
 
-  it('shows the quote with the part after the last comma in Bold', () => {
+  it('shows the quote in one weight (only titles are bold after their last comma)', () => {
     render(
       <SessionCoach
         author={coach({
@@ -311,7 +321,7 @@ describe('the coach section', () => {
     );
     const quote = screen.getByTestId('coach-quote');
     expect(quote).toHaveTextContent("Clients love working with me because I'm blunt, then I help.");
-    expect(quote.querySelector('b')).toHaveTextContent('then I help.');
+    expect(quote.querySelector('b')).toBeNull();
   });
 
   it('shows coaching style and tools, and opens the story and social link', async () => {

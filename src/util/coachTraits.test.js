@@ -1,4 +1,7 @@
 import {
+  COACH_REQUIRED_PROFILE_KEYS,
+  PROFILE_FIELD_MAX_LENGTHS,
+  withProfileFieldLimits,
   COACH_TRAIT_LISTING_KEYS,
   COACH_TRAIT_USER_KEYS,
   missingCoachTraits,
@@ -98,6 +101,55 @@ describe('coachTraits', () => {
       expect(withCoachTraitsRequired(traitConfig, 'client')).toBe(traitConfig);
       const other = { key: 'pronouns', saveConfig: {} };
       expect(withCoachTraitsRequired(other, 'coach')).toBe(other);
+    });
+  });
+
+  describe("coach_title (the one-line title under a coach's name)", () => {
+    it('is required of coaches with the four traits, but is not a trait copied to listings', () => {
+      expect(COACH_REQUIRED_PROFILE_KEYS).toEqual([...COACH_TRAIT_USER_KEYS, 'coach_title']);
+      expect(COACH_TRAIT_USER_KEYS).not.toContain('coach_title');
+      expect(COACH_TRAIT_LISTING_KEYS).toHaveLength(4);
+    });
+
+    it('is made required for a coach, and left as it is for a client', () => {
+      const title = field('coach_title');
+      expect(withCoachTraitsRequired(title, 'coach').saveConfig.isRequired).toBe(true);
+      expect(withCoachTraitsRequired(title, 'client')).toBe(title);
+    });
+
+    it('counts toward "Finish your profile" once the field exists for coaches', () => {
+      const userFields = [...COACH_TRAIT_USER_KEYS, 'coach_title'].map(key =>
+        field(key, coachOnly)
+      );
+      const allFour = {
+        personality_identifier: ['x'],
+        languages: ['x'],
+        location: 'x',
+        communication_style: ['x'],
+      };
+      expect(requiredCoachTraitKeys(userFields)).toContain('coach_title');
+      expect(missingCoachTraits(userWith(allFour), userFields)).toEqual(['coach_title']);
+      expect(
+        missingCoachTraits(userWith({ ...allFour, coach_title: 'Career coach' }), userFields)
+      ).toEqual([]);
+    });
+
+    it('does not count while the field has not been created in Console', () => {
+      const userFields = COACH_TRAIT_USER_KEYS.map(key => field(key, coachOnly));
+      expect(requiredCoachTraitKeys(userFields)).not.toContain('coach_title');
+    });
+  });
+
+  describe('length limits', () => {
+    it('are 40 characters for the title and 200 for "Clients love working with me because..."', () => {
+      expect(PROFILE_FIELD_MAX_LENGTHS).toEqual({ coach_title: 40, clients_love: 200 });
+      expect(withProfileFieldLimits(field('coach_title')).maxLength).toBe(40);
+      expect(withProfileFieldLimits(field('clients_love')).maxLength).toBe(200);
+    });
+
+    it('leave other fields alone', () => {
+      const other = field('location');
+      expect(withProfileFieldLimits(other)).toBe(other);
     });
   });
 });

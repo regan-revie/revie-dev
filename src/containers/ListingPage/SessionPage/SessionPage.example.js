@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import { types as sdkTypes } from '../../../util/sdkLoader';
 import { useConfiguration } from '../../../context/configurationContext';
 import { createUser, createListing, createReview } from '../../../util/testData';
 
+import { withPhoto } from '../../../components/CoachPhoto/CoachPhoto.fixture';
 import SessionTopbar from './SessionTopbar';
 import SessionHero from './SessionHero';
 import SessionAbout from './SessionAbout';
@@ -96,8 +97,10 @@ const reviews = [
 const Page = ({ withReviews, tags }) => {
   const config = useConfiguration();
   const userFields = config?.user?.userFields;
+  // With reviews: the coach has a photo (a drawn portrait, in the shape of a real profile image).
+  // Without: no photo, so the capsule shows her initials.
   const coach = tags
-    ? author
+    ? { ...author, profileImage: withPhoto() }
     : {
         ...author,
         attributes: {
@@ -157,3 +160,52 @@ const WithReviews = () => <Page withReviews={true} tags={true} />;
 
 export const FullPage = { component: NoReviews, props: {}, group: 'session page' };
 export const FullPageWithReviews = { component: WithReviews, props: {}, group: 'session page' };
+
+// The hero twice, once with a photo and once without (the capsule with her initials), for checking
+// the coach photo. With ?bare=1 in the page URL the styleguide's own frame is hidden, so the page
+// can be screenshotted on its own.
+const useBareStyleguide = () =>
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).get('bare')) {
+      return;
+    }
+    const nav = document.querySelector('[class*="StyleguidePage_navBar"]');
+    const main = document.querySelector('[class*="StyleguidePage_main"]');
+    const root = document.querySelector('#styleguide');
+    const heading = document.querySelector('[class*="contentHeading"]');
+    if (nav) nav.style.display = 'none';
+    if (heading) heading.style.display = 'none';
+    if (main) main.style.cssText = 'width:100%;max-width:none;margin:0;padding:0;flex:1 1 100%';
+    if (root) {
+      root.style.display = 'block';
+      root.style.padding = '0';
+    }
+  }, []);
+
+const HeroPair = () => {
+  const config = useConfiguration();
+  const userFields = config?.user?.userFields;
+  useBareStyleguide();
+  const withPhotoCoach = { ...author, profileImage: withPhoto() };
+  return (
+    <div className={sessionCss.page}>
+      {[withPhotoCoach, author].map((coach, i) => (
+        <div key={i} className={sessionCss.main} style={{ display: 'block' }}>
+          <SessionHero
+            listing={listing}
+            author={coach}
+            reviews={[]}
+            userFields={userFields}
+            onManageDisableScrolling={() => {}}
+          />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export const HeroWithPhotoAndWithInitials = {
+  component: HeroPair,
+  props: {},
+  group: 'session page',
+};
