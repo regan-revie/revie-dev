@@ -41,4 +41,43 @@ const assertProcessAliasMatchesListing = (listing, bodyParams) => {
   }
 };
 
-module.exports = { getProcessAliasProblem, assertProcessAliasMatchesListing };
+/**
+ * Refuse to start a booking on a calendar session that has been switched off.
+ *
+ * A session the server has set up on a coach's calendar (it carries Nylas configurations) but that is
+ * now not bookable (the coach's Google connection broke, or they lost their payout details) must not
+ * take a new booking, even from a booking page a client opened earlier. The booking page already
+ * hides the form, and availability returns no times; this is the check no page can skip. A listing
+ * that was never set up on a calendar is not covered here, and bookings already made are untouched.
+ *
+ * @param {object} listing a Sharetribe listing resource
+ * @returns {boolean} true when this listing must not take a new booking
+ */
+const isCalendarListingSwitchedOff = listing => {
+  const publicData = listing?.attributes?.publicData || {};
+  const hasCalendarSetup = Boolean(
+    publicData.nylasConfigurationId || publicData.nylasConfigurationIds
+  );
+  return hasCalendarSetup && !publicData.calendarBookingEnabled;
+};
+
+/** Throws a 400 the checkout can name: "This coach isn't taking bookings right now." */
+const assertCalendarListingBookable = listing => {
+  if (isCalendarListingSwitchedOff(listing)) {
+    const error = new Error('calendar-not-bookable');
+    // Not a 409: the checkout reads a 409 as "that time was just taken".
+    error.status = 400;
+    error.statusText = 'calendar-not-bookable';
+    error.data = {
+      errors: [{ status: 400, code: 'calendar-not-bookable', title: 'calendar-not-bookable' }],
+    };
+    throw error;
+  }
+};
+
+module.exports = {
+  getProcessAliasProblem,
+  assertProcessAliasMatchesListing,
+  isCalendarListingSwitchedOff,
+  assertCalendarListingBookable,
+};

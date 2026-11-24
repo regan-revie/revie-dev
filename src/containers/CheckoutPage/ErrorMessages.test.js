@@ -160,3 +160,31 @@ describe('getErrorMessages()', () => {
     );
   });
 });
+
+describe('a session switched off while the checkout was open (the coach has to reconnect their calendar)', () => {
+  const notBookable = {
+    type: 'error',
+    status: 400,
+    apiErrors: [{ status: 400, code: 'calendar-not-bookable' }],
+  };
+
+  it('says the coach is not taking bookings right now, for the real booking', () => {
+    const messages = getErrorMessages(false, notBookable, false, null, null, null);
+    expect(messageIdOf(messages.initiateOrderErrorMessage)).toBe(
+      'CheckoutPage.calendarNotBookable'
+    );
+  });
+
+  it('says it for the price preview too', () => {
+    const messages = getErrorMessages(false, null, false, null, notBookable, null);
+    expect(messageIdOf(messages.speculateErrorMessage)).toBe('CheckoutPage.calendarNotBookable');
+  });
+
+  it('is not mistaken for "that time was just taken"', () => {
+    expect(isSlotTakenError(notBookable)).toBe(false);
+  });
+
+  it('has wording in the translations', () => {
+    expect(en['CheckoutPage.calendarNotBookable']).toMatch(/isn't taking bookings/);
+  });
+});

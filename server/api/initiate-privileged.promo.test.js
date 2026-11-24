@@ -54,7 +54,10 @@ const load = ({ resolveResult, resolveThrows, initiateThrows } = {}) => {
     serialize: data => JSON.stringify(data),
     handleError,
   }));
-  jest.doMock('./nylas/processAliasCheck', () => ({ assertProcessAliasMatchesListing: () => {} }));
+  jest.doMock('./nylas/processAliasCheck', () => ({
+    assertProcessAliasMatchesListing: () => {},
+    assertCalendarListingBookable: () => {},
+  }));
   jest.doMock('./promo/resolve', () => ({ resolvePromo }));
   jest.doMock('./promo/store', () => store);
   const handler = require('./initiate-privileged');

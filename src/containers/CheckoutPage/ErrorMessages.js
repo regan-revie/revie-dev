@@ -13,6 +13,7 @@ import {
   isTooManyRequestsError,
   transactionInitiateOrderStripeErrors,
   isProviderCommissionBiggerThanMinPrice,
+  isCalendarNotBookableError,
 } from '../../util/errors';
 
 import css from './CheckoutPage.module.css';
@@ -51,6 +52,8 @@ export const getErrorMessages = (
   // We want to show one error at a time for the real transition
   if (listingNotFound) {
     listingNotFoundErrorMessage = <FormattedMessage id="CheckoutPage.listingNotFoundError" />;
+  } else if (isCalendarNotBookableError(initiateOrderError)) {
+    initiateOrderErrorMessage = <FormattedMessage id="CheckoutPage.calendarNotBookable" />;
   } else if (isAmountTooLowError) {
     initiateOrderErrorMessage = <FormattedMessage id="CheckoutPage.initiateOrderAmountTooLow" />;
   } else if (isSlotTakenError(initiateOrderError)) {
@@ -113,6 +116,8 @@ export const getErrorMessages = (
     speculateErrorMessage = (
       <FormattedMessage id="CheckoutPage.providerStripeAccountMissingError" />
     );
+  } else if (isCalendarNotBookableError(speculateTransactionError)) {
+    speculateErrorMessage = <FormattedMessage id="CheckoutPage.calendarNotBookable" />;
   } else if (isSlotTakenError(speculateTransactionError)) {
     speculateErrorMessage = (
       <FormattedMessage

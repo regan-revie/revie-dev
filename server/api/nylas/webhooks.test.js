@@ -243,6 +243,92 @@ describe('receive()', () => {
     });
   });
 
+  describe("grant notifications (a coach's Google connection stopped working)", () => {
+    const grantPayload = (type, object = { grant_id: 'g-1', provider: 'google' }) => ({
+      type,
+      data: { object },
+    });
+    const loadWithGrantHandler = handler => {
+      let mod;
+      jest.isolateModules(() => {
+        process.env.NYLAS_WEBHOOK_SECRET = SECRET;
+        jest.doMock('./grantStatus', () => ({ handleGrantWebhook: handler }));
+        mod = require('./webhooks');
+      });
+      delete process.env.NYLAS_WEBHOOK_SECRET;
+      return mod;
+    };
+
+    it.each(['grant.expired', 'grant.deleted'])('routes %s to the grant handler', async type => {
+      const handler = jest.fn(async () => ({ handled: true, action: 'reconnect-needed' }));
+      const { receive } = loadWithGrantHandler(handler);
+      const res = mockRes();
+      await receive(signedRequest(grantPayload(type), SECRET), res);
+
+      expect(handler).toHaveBeenCalledWith({ trigger: type, grantId: 'g-1' });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toMatchObject({ received: true, handled: true, action: 'reconnect-needed' });
+    });
+
+    it('reads the grant from data.grant_id too, and from the object id as a last resort', async () => {
+      const handler = jest.fn(async () => ({ handled: false, reason: 'grant-not-held' }));
+      const { receive } = loadWithGrantHandler(handler);
+
+      await receive(
+        signedRequest({ type: 'grant.expired', data: { grant_id: 'g-top', object: {} } }, SECRET),
+        mockRes()
+      );
+      expect(handler).toHaveBeenLastCalledWith({ trigger: 'grant.expired', grantId: 'g-top' });
+
+      await receive(
+        signedRequest(grantPayload('grant.expired', { id: 'g-id' }), SECRET),
+        mockRes()
+      );
+      expect(handler).toHaveBeenLastCalledWith({ trigger: 'grant.expired', grantId: 'g-id' });
+    });
+
+    it('does not send grant notices to the booking or calendar handlers', async () => {
+      const { receive } = loadWithGrantHandler(jest.fn(async () => ({ handled: true })));
+      const res = mockRes();
+      await receive(signedRequest(grantPayload('grant.expired'), SECRET), res);
+      expect(res.body).not.toMatchObject({ reason: 'no-database' });
+    });
+
+    it('answers 500 when it cannot record the break, so Nylas delivers it again', async () => {
+      const handler = jest.fn(async () => {
+        throw new Error('Integration API credentials are not configured');
+      });
+      const { receive } = loadWithGrantHandler(handler);
+      const res = mockRes();
+      await receive(signedRequest(grantPayload('grant.expired'), SECRET), res);
+      expect(res.statusCode).toBe(500);
+    });
+
+    it('refuses a grant notice with a wrong signature, and does nothing', async () => {
+      const handler = jest.fn();
+      const { receive } = loadWithGrantHandler(handler);
+      const res = mockRes();
+      await receive(signedRequest(grantPayload('grant.expired'), 'someone-elses-secret'), res);
+      expect(res.statusCode).toBe(401);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('does not log anything from the payload beyond the trigger', async () => {
+      const { receive } = loadWithGrantHandler(
+        jest.fn(async () => ({ handled: true, action: 'x' }))
+      );
+      await receive(
+        signedRequest(
+          grantPayload('grant.expired', { grant_id: 'g-secret-1', email: 'a@b.c' }),
+          SECRET
+        ),
+        mockRes()
+      );
+      const logged = [...console.log.mock.calls, ...console.error.mock.calls].flat().join(' ');
+      expect(logged).not.toMatch(/g-secret-1|a@b\.c/);
+    });
+  });
+
   it('acknowledges but does not handle an unrecognised trigger', async () => {
     const { receive } = loadWebhooks(SECRET);
     const res = mockRes();

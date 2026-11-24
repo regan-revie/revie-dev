@@ -8,6 +8,7 @@
 
 const { runBookingSweep } = require('./bookingSweeper');
 const { runReconcile } = require('../api/nylas/reconcile');
+const { runGrantHealthCheck } = require('../api/nylas/grantHealth');
 const { runTraitSync } = require('../api/coachTraits/reconcileTraits');
 const { runPromoReconcile } = require('../api/promo/reconcile');
 const { resolveMissingEventIds } = require('../api/nylas/eventIdBackfill');
@@ -91,7 +92,7 @@ const start = () => {
     try {
       const result = await runReconcile();
       const changed = Object.entries(result.statuses || {}).filter(
-        ([status]) => !['unchanged', 'ineligible'].includes(status)
+        ([status]) => !['unchanged', 'ineligible', 'reconnect-needed'].includes(status)
       );
       if (changed.length > 0) {
         console.log('[jobs] reconcile', JSON.stringify(result)); // eslint-disable-line no-console
@@ -140,6 +141,28 @@ const start = () => {
     }
   };
 
+  // The daily check of every coach's Google connection (server/api/nylas/grantHealth.js), in case a
+  // Nylas grant.expired / grant.deleted notice never arrived. Own flag; runs a few minutes after
+  // boot, then once a day (so also after each deploy, which costs one Nylas call per coach).
+  const GRANT_CHECK_EVERY_MS = 24 * 60 * 60 * 1000;
+  let lastGrantCheck = 0;
+  let checkingGrants = false;
+  const grantTick = async () => {
+    if (checkingGrants || Date.now() - lastGrantCheck < GRANT_CHECK_EVERY_MS) return;
+    checkingGrants = true;
+    try {
+      const result = await runGrantHealthCheck();
+      if (!result.skipped) lastGrantCheck = Date.now();
+      if (result.marked > 0 || result.failed > 0 || result.suspicious) {
+        console.log('[jobs] grant check', JSON.stringify(result)); // eslint-disable-line no-console
+      }
+    } catch (e) {
+      log.error(e, 'nylas-grant-check-loop-failed', {});
+    } finally {
+      checkingGrants = false;
+    }
+  };
+
   // unref(): these timers must never be the reason the process stays alive.
   setTimeout(tick, FIRST_SWEEP_AFTER_MS).unref();
   setInterval(tick, SWEEP_EVERY_MS).unref();
@@ -147,6 +170,8 @@ const start = () => {
   setInterval(reconcileTick, SWEEP_EVERY_MS).unref();
   setTimeout(traitsTick, FIRST_SWEEP_AFTER_MS + 30 * 1000).unref();
   setInterval(traitsTick, SWEEP_EVERY_MS).unref();
+  setTimeout(grantTick, 3 * 60 * 1000).unref();
+  setInterval(grantTick, 60 * 60 * 1000).unref();
   setTimeout(promoTick, FIRST_SWEEP_AFTER_MS + 45 * 1000).unref();
   setInterval(promoTick, SWEEP_EVERY_MS).unref();
 };

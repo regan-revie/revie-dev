@@ -1,6 +1,10 @@
 jest.mock('../../log', () => ({ error: jest.fn() }));
 jest.mock('./db', () => ({ isAvailable: jest.fn() }));
 jest.mock('./integration', () => ({ getIntegrationSdk: jest.fn() }));
+jest.mock('./grantStatus', () => ({
+  ...jest.requireActual('./grantStatus'),
+  reviewBrokenCoach: jest.fn(),
+}));
 jest.mock('./ensureCoach', () => ({
   ensureCoachListings: jest.fn(),
   updaterFor: jest.fn(update => update),
@@ -10,6 +14,7 @@ const log = require('../../log');
 const db = require('./db');
 const { getIntegrationSdk } = require('./integration');
 const { ensureCoachListings } = require('./ensureCoach');
+const grantStatus = require('./grantStatus');
 
 const loadReconcile = () => {
   let mod;
@@ -171,5 +176,63 @@ describe('runReconcile()', () => {
       await run({ now: t0 + 11 * 60 * 1000 });
       expect(ensureCoachListings).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+describe('a coach whose Google connection broke', () => {
+  const brokenData = { nylasGrantId: 'g1', calendarStatus: 'reconnect_needed' };
+
+  beforeEach(() => {
+    grantStatus.reviewBrokenCoach.mockResolvedValue({ cleared: false });
+  });
+
+  it('is looked at again every tick, and their listings are still handed on (ensureBookable switches them off)', async () => {
+    getIntegrationSdk.mockReturnValue(
+      makeSdk([page([listing('l1', 'u1')], [author('u1', brokenData)])])
+    );
+    await loadReconcile()();
+
+    expect(grantStatus.reviewBrokenCoach).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'u1', privateData: brokenData })
+    );
+    const call = ensureCoachListings.mock.calls[0][0];
+    expect(call.profile.privateData.calendarStatus).toBe('reconnect_needed');
+  });
+
+  it('reconnecting clears it within the tick: the sync that follows sees a working coach, so sessions come back', async () => {
+    grantStatus.reviewBrokenCoach.mockResolvedValue({ cleared: true });
+    getIntegrationSdk.mockReturnValue(
+      makeSdk([page([listing('l1', 'u1')], [author('u1', brokenData)])])
+    );
+    const summary = await loadReconcile()();
+
+    const call = ensureCoachListings.mock.calls[0][0];
+    expect(call.profile.privateData.calendarStatus).toBe('connected');
+    expect(summary.reconnected).toBe(1);
+  });
+
+  it('a coach that is fine costs no Nylas call from this', async () => {
+    getIntegrationSdk.mockReturnValue(
+      makeSdk([page([listing('l1', 'u1')], [author('u1', { nylasGrantId: 'g1' })])])
+    );
+    await loadReconcile()();
+    expect(grantStatus.reviewBrokenCoach).not.toHaveBeenCalled();
+  });
+
+  it('a failure looking at one broken coach is reported and does not stop the others', async () => {
+    grantStatus.reviewBrokenCoach.mockRejectedValueOnce(new Error('nylas down'));
+    getIntegrationSdk.mockReturnValue(
+      makeSdk([
+        page(
+          [listing('l1', 'u1'), listing('l2', 'u2')],
+          [author('u1', brokenData), author('u2', { nylasGrantId: 'g2' })]
+        ),
+      ])
+    );
+    await loadReconcile()();
+    expect(log.error).toHaveBeenCalledWith(expect.any(Error), 'nylas-grant-review-failed', {
+      coachId: 'u1',
+    });
+    expect(ensureCoachListings).toHaveBeenCalledTimes(2);
   });
 });

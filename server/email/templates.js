@@ -73,6 +73,38 @@ ${body}
 </html>`;
 
 const TEMPLATES = {
+  // Not a session email, so not in TEMPLATE_ALIASES: it is sent once when a coach's Google Calendar
+  // connection stops working (server/api/nylas/grantStatus.js), with its own small model
+  // (reconnectEmailModel.js: recipientName, reconnectUrl).
+  'calendar-reconnect-coach': {
+    name: 'Reconnect your calendar (coach)',
+    subject: 'Reconnect your calendar to keep taking bookings',
+    html: layout(
+      [
+        p('Hi {{recipientName}},'),
+        p('Your Google Calendar connection stopped working.'),
+        p(
+          "Until you reconnect, clients can't book you. Your sessions show \"This coach isn't taking bookings yet\". Sessions that are already booked aren't affected."
+        ),
+        button('{{reconnectUrl}}', 'Reconnect calendar'),
+        small('It takes about a minute, and your sessions open for booking again right away.'),
+      ].join('\n')
+    ),
+    text: `Hi {{recipientName}},
+
+Your Google Calendar connection stopped working.
+
+Until you reconnect, clients can't book you. Your sessions show "This coach isn't taking bookings yet". Sessions that are already booked aren't affected.
+
+Reconnect calendar: {{reconnectUrl}}
+
+It takes about a minute, and your sessions open for booking again right away.
+
+Questions? Reply to this email or write to hello@heyrevie.com.
+
+Revie`,
+  },
+
   'booking-confirmed-client': {
     name: "You're booked (client)",
     subject: "You're booked: {{sessionName}} with {{coachName}}",
