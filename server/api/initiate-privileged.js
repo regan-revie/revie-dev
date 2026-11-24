@@ -1,6 +1,9 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
 const { transactionLineItems } = require('../api-util/lineItems');
-const { assertProcessAliasMatchesListing } = require('./nylas/processAliasCheck');
+const {
+  assertProcessAliasMatchesListing,
+  assertCalendarListingBookable,
+} = require('./nylas/processAliasCheck');
 const { resolvePromo } = require('./promo/resolve');
 const promoStore = require('./promo/store');
 const { isIntentionToMakeOffer } = require('../api-util/negotiation');
@@ -72,6 +75,9 @@ module.exports = (req, res) => {
       // Revie: a calendar listing may only be booked under its own process alias. See
       // nylas/processAliasCheck.js.
       assertProcessAliasMatchesListing(listing, bodyParams);
+      // Revie: a calendar session that has been switched off (its coach's Google connection broke)
+      // takes no new booking, however old the page the client is on.
+      assertCalendarListingBookable(listing);
       const commissionAsset = fetchAssetsResponse.data.data[0];
 
       const currency = listing.attributes.price?.currency || orderData.currency;
@@ -160,8 +166,10 @@ module.exports = (req, res) => {
       if (promo && promo.redemptionId && !initiated) {
         await promoStore.release(promo.redemptionId).catch(() => null);
       }
-      // A refused code is an expected answer, not a fault worth alerting on.
-      const isPromoRefusal = Boolean(e.statusText && String(e.statusText).startsWith('promo-'));
-      handleError(res, e, { skipErrorLogging: isPromoRefusal });
+      // A refused code, or a session switched off while a client had its page open, is an expected
+      // answer, not a fault worth alerting on.
+      const status = String(e.statusText || '');
+      const isExpectedRefusal = status.startsWith('promo-') || status === 'calendar-not-bookable';
+      handleError(res, e, { skipErrorLogging: isExpectedRefusal });
     });
 };

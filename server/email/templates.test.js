@@ -1,5 +1,9 @@
 const { TEMPLATES, TEMPLATE_ALIASES, MAROON } = require('./templates');
 const { buildSessionEmailModel } = require('../api/nylas/sessionEmailModel');
+const {
+  buildReconnectEmailModel,
+  CALENDAR_RECONNECT_ALIAS,
+} = require('../api/nylas/reconnectEmailModel');
 
 // Every field the code can put in a model (a rescheduled one has the most).
 const modelFields = Object.keys(
@@ -18,8 +22,44 @@ const modelFields = Object.keys(
   })
 );
 
+// The reconnect email has its own small model, not a session's.
+const modelFieldsFor = alias =>
+  alias === CALENDAR_RECONNECT_ALIAS
+    ? Object.keys(buildReconnectEmailModel({ coachName: 'Sam', siteUrl: 'https://heyrevie.com' }))
+    : modelFields;
+
+// The session emails (all but the reconnect email, which is about a connection, not a session).
+const SESSION_TEMPLATES = Object.entries(TEMPLATES).filter(
+  ([alias]) => alias !== CALENDAR_RECONNECT_ALIAS
+);
+
 const variablesIn = text =>
   Array.from(text.matchAll(/\{\{[#/^]?\s*([A-Za-z]+)\s*\}\}/g)).map(m => m[1]);
+
+describe('the reconnect-your-calendar email', () => {
+  const t = TEMPLATES[CALENDAR_RECONNECT_ALIAS];
+
+  it('exists under the alias the code sends', () => {
+    expect(CALENDAR_RECONNECT_ALIAS).toBe('calendar-reconnect-coach');
+    expect(t).toBeDefined();
+  });
+
+  it('has the agreed subject and one "Reconnect calendar" button to the link', () => {
+    expect(t.subject).toBe('Reconnect your calendar to keep taking bookings');
+    expect(t.html).toContain('>Reconnect calendar</a>');
+    expect(t.html.match(/<a /g)).toHaveLength(1);
+    expect(t.html).toContain('href="{{reconnectUrl}}"');
+    expect(t.text).toContain('Reconnect calendar: {{reconnectUrl}}');
+  });
+
+  it('says the connection stopped working, that clients cannot book until she reconnects, and that booked sessions are safe', () => {
+    [t.html, t.text].forEach(body => {
+      expect(body).toContain('Your Google Calendar connection stopped working.');
+      expect(body).toMatch(/clients can't book you/);
+      expect(body).toMatch(/already booked aren't affected/);
+    });
+  });
+});
 
 describe('Postmark templates', () => {
   it('has one template per email the code sends, under the aliases the code uses', () => {
@@ -41,7 +81,7 @@ describe('Postmark templates', () => {
       ...variablesIn(t.html),
       ...variablesIn(t.text),
     ]);
-    const unknown = [...used].filter(v => !modelFields.includes(v));
+    const unknown = [...used].filter(v => !modelFieldsFor(alias).includes(v));
     expect(unknown).toEqual([]);
   });
 
@@ -54,7 +94,7 @@ describe('Postmark templates', () => {
       expect(t.html).toMatch(/color:#ffffff/);
       expect(t.html).not.toMatch(/#ff9352/i);
       expect(t.text.length).toBeGreaterThan(50);
-      expect(t.html.match(/\{\{#/g).length).toBe(t.html.match(/\{\{\//g).length);
+      expect((t.html.match(/\{\{#/g) || []).length).toBe((t.html.match(/\{\{\//g) || []).length);
     }
   );
 
@@ -77,7 +117,7 @@ describe('Postmark templates', () => {
   });
 
   it('every one links to the booking page, and (but for the 60-hour reminder, which is a date and a button) to the Meet call', () => {
-    Object.entries(TEMPLATES).forEach(([alias, t]) => {
+    SESSION_TEMPLATES.forEach(([alias, t]) => {
       expect(t.html).toMatch(/\{\{manageUrl\}\}/);
       if (alias !== 'session-reminder-60h-client') expect(t.html).toMatch(/\{\{#meetLink\}\}/);
     });
@@ -257,7 +297,7 @@ describe('Postmark templates', () => {
         meetLink: 'https://meet.google.com/abc-defg-hij',
         manageUrl: 'https://heyrevie.com/order/x',
       });
-      Object.entries(TEMPLATES).forEach(([alias, t]) => {
+      SESSION_TEMPLATES.forEach(([alias, t]) => {
         const out = render(t.html, withMove) + render(t.text, withMove);
         expect(out).toContain('https://heyrevie.com/order/x'); // the booking link
         expect(out).toContain(withMove.sessionDate);
@@ -314,7 +354,7 @@ describe('Postmark templates', () => {
     });
 
     it("no section prints a variable by name: inside one, only {{.}} (the section's own value) is safe", () => {
-      Object.entries(TEMPLATES).forEach(([alias, t]) => {
+      SESSION_TEMPLATES.forEach(([alias, t]) => {
         [t.html, t.text].forEach(body => {
           const sections = body.match(/\{\{#(\w+)\}\}[\s\S]*?\{\{\/\1\}\}/g) || [];
           sections.forEach(section => {

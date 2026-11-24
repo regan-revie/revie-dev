@@ -19,6 +19,68 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-24 (a coach's Google connection breaks: detected, bookings stop, coach told once)
+
+**Branch / PR:** `grant-expired-reconnect`, one PR against `main`, not merged.
+
+**What changed**
+1. **Detection, three ways.** Nylas webhooks `grant.expired` and `grant.deleted` for the coach's stored grant; a **daily check** of every coach's grant (also a few minutes after each deploy) in case a webhook is missed; and the reconcile loop looking at each already-marked coach every minute. The state is `calendarStatus` (`connected` or `reconnect_needed`, plus when, why and whether the email went out) in the coach's own **private** user data, where the reconcile loop reads it.
+2. **Bookings stop** the same way as "no calendar connected": the coach's sessions are switched off (clients see "This coach isn't taking bookings yet", no times are offered), and the server refuses to start a booking or a price check on one of them even from an old page (the checkout says "This coach isn't taking bookings right now"). **Existing bookings are not touched.**
+3. **The coach is told:** the Calendar page shows **"Reconnect needed"** with a maroon **"Reconnect Google Calendar"** button instead of "connected"; the setup card on her sessions shows the calendar row as not done ("Reconnect your calendar", straight to the Google connect route); and **one Postmark email**, subject "Reconnect your calendar to keep taking bookings", one button "Reconnect calendar" (to the Calendar page, so it works if she is logged out). **Once per break**, not daily: it is stamped when sent, a failed send is retried but never doubled, and nothing is sent while `POSTMARK_SENDING_ENABLED` is off.
+4. **Reconnecting clears it:** the connect callback clears the mark and sets her sessions up in the same request, so they are bookable at once; if the grant starts working some other way, the loop clears it within the minute. No second email. A later break gets its own one email.
+5. **Sentry:** tag `nylas-grant-expired` with the coach id and the reason, nothing else (no grant id, token or email; a test checks).
+6. **A safeguard you did not ask for:** if the daily check finds *every* grant broken (three or more), it flags nobody and reports `nylas-grant-check-suspicious`. That pattern means our Nylas setup is wrong (a wrong region or key answers 404 for every grant, as the EU/US move could), not that every coach broke. A Nylas outage or rate limit is never treated as a broken grant.
+7. **Tests:** server 1082+ and client (see the PR), format check clean: webhook marks reconnect_needed; the daily check catches a missed one; not bookable while broken (listing switched off, no booking can start); one email per break (duplicate webhook, the loop, failed sends, sending off); reconnect clears it and re-arms.
+
+**Render Shell commands (Dev service), after merge and deploy**
+1. **The email template.** Check first, then create. The create script only adds what is missing here (`--only` limits it to this one template; it will not touch your other templates' wording):
+```
+node scripts/postmark-create-templates.js --dry-run --only calendar-reconnect-coach
+```
+```
+node scripts/postmark-create-templates.js --only calendar-reconnect-coach
+```
+   The dry run should say `valid   calendar-reconnect-coach` and "Dry run: nothing created."; the second should say `created  calendar-reconnect-coach`.
+2. **The Nylas webhook triggers** (see the next section for doing it by hand instead). `--dry-run` shows what it would add:
+```
+node scripts/nylas-add-grant-triggers.js --dry-run
+```
+```
+node scripts/nylas-add-grant-triggers.js
+```
+3. **Check every coach's grant right now** (the same as the daily check; counts only, no names):
+```
+node scripts/nylas-check-grants.js
+```
+
+**The Nylas dashboard step (the one thing only you can do if the script cannot).** Webhook destination `https://revie-dev.onrender.com/api/nylas/webhooks` needs two more triggers: **`grant.expired`** and **`grant.deleted`**. Script above does it by API (like the booking triggers, because the dashboard is behind on some). By hand: Nylas Dashboard, your Dev application, **Notifications** (Webhooks), open the destination, **Edit**, tick `grant.expired` and `grant.deleted` under Grants, Save. Nothing else changes; the signing secret stays the same.
+
+**Dev test steps.** You need a Dev coach with a connected Google Calendar, a payout account and a bookable session, and a client account in another browser.
+1. **Revoke Revie's access in your Google account (this is what breaks it).** In the Google account that is connected as the coach: go to **myaccount.google.com/permissions** (Google Account, then **Security**, then **Your connections to third-party apps and services**, or "Third-party apps with account access"). Find the app named **Revie** (it will say **Nylas** while Dev is still on the Nylas sandbox app, because the Google consent screen shows Nylas's own app there), open it and choose **Delete all connections** / **Remove access**. That makes Google refuse the connection. (Do not delete the Revie *Google Cloud* project; this is only the coach's grant.)
+2. **Make it show up now** rather than waiting for Nylas to notice (a `grant.expired` notice can take minutes to hours; the daily check within a day):
+```
+node scripts/nylas-check-grants.js
+```
+   Expect `"marked":1`.
+3. **Within a minute**, as that coach: **Account, Calendar** says **"Reconnect needed"** with a maroon **"Reconnect Google Calendar"** button, not "connected". Open one of her sessions: the setup card shows the calendar row not done as **"Reconnect your calendar"**.
+4. **As the client** (refresh): the same session says **"This coach isn't taking bookings yet"**, no booking form. If you left the checkout open from before, paying is refused with "This coach isn't taking bookings right now".
+5. **The email:** the coach gets one "Reconnect your calendar to keep taking bookings" with a **Reconnect calendar** button (if `POSTMARK_SENDING_ENABLED` is on for Dev). Run the check from step 2 again, and wait a few minutes: **no second email**.
+6. **An existing booking** made before the break is still there, unchanged, on both sides.
+7. **Sentry:** an event with tag `nylas-grant-expired` and the coach's id (no email or token).
+8. **Reconnect:** press the button, sign in to the same Google account, allow. You land on the Calendar page saying connected; the session is bookable again **at once**, and within a minute the client's page too. **No second email.**
+9. **Then break it once more** (step 1 again): a **new** email, once.
+10. **Webhook route (once the triggers are added):** after step 1, check Render's logs for `[nylas] grant.expired -> reconnect-needed` (the notice itself), within minutes to hours.
+
+**Judgement calls (change any):** the daily check runs about 3 minutes after each boot and every 24 hours after, not at a fixed clock time. A coach with no published session is covered by the daily check and by the webhook, but not by the per-minute look (that loop only visits coaches with a published session). The email goes to the account email, in the first name of the coach.
+
+**Not verified:** nothing ran against Nylas, Sharetribe, Postgres or Postmark (tests use fakes). Specifically unverified: the exact `grant.expired` payload (I read the grant from `data.object.grant_id`, then `data.grant_id`, then `data.object.id`); that Nylas's `GET /v3/grants/:id` returns `grant_status: "invalid"` for a revoked Google grant (it is documented, but if it returns something else the daily check would see it as "unknown", and the webhook is then the only detector: tell me what it printed); that the Integration API returns `privateData` in `users.query` (the reconcile loop relies on the same); the Calendar page and card as the coach actually sees them.
+
+**What's next**
+- Check the Dev result of steps 1 to 4, especially what `GET /v3/grants/:id` really returns.
+- At cutover: the production webhook triggers and template (`docs/go-live-plan.md`).
+
+---
+
 ## HANDOFF — 2026-11-23 (promo codes: Revie-funded, out of Revie's commission only)
 
 **Branch / PR:** `promo-codes`, one PR against `main`, not merged. Decision recorded in `docs/decisions.md`; the detail in `docs/tech-constraints.md` ("Promo codes").

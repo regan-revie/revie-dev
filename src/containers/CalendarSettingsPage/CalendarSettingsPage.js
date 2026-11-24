@@ -10,7 +10,7 @@ import {
   showCreateListingLinkForUser,
   showPaymentDetailsForUser,
 } from '../../util/userHelpers';
-import { getCalendarConnection } from '../../util/calendarConnection';
+import { getCalendarConnection, CONNECT_URL, goToUrl } from '../../util/calendarConnection';
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 import { updateProfile } from '../ManageAccountPage/ManageAccountPage.duck';
 
@@ -31,12 +31,9 @@ import BookingHoursSection from './BookingHoursSection';
 
 import css from './CalendarSettingsPage.module.css';
 
-// Where the coach is sent to connect, and where the Nylas callback (server/api/nylas/callback.js)
-// sends them back to. `returnPath` is honoured by connect.js only when it is a relative path.
-const CALENDAR_PATH = '/account/calendar';
-export const CONNECT_URL = `/api/nylas/connect?provider=google&returnPath=${encodeURIComponent(
-  CALENDAR_PATH
-)}`;
+// Where the coach is sent to connect or reconnect lives in util/calendarConnection.js, so the session
+// setup card can use the same link.
+export { CONNECT_URL };
 
 // The callback appends ?calendarConnect=<status> to the return path.
 const RESULT_MESSAGES = {
@@ -45,10 +42,8 @@ const RESULT_MESSAGES = {
   failed: { id: 'CalendarSettingsPage.resultFailed', isError: true },
 };
 
-const defaultGoTo = url => {
-  // A full page load, not a router navigation: this leaves the app for Google and comes back.
-  if (typeof window !== 'undefined') window.location.assign(url);
-};
+// A full page load, not a router navigation: this leaves the app for Google and comes back.
+const defaultGoTo = goToUrl;
 
 /**
  * Account settings > Calendar, for coaches. Connects the coach's Google Calendar through Nylas so
@@ -73,7 +68,7 @@ export const CalendarSettingsPageComponent = props => {
     return <NamedRedirect name="ContactDetailsPage" />;
   }
 
-  const { connected, email } = getCalendarConnection(currentUser);
+  const { connected, reconnectNeeded, email } = getCalendarConnection(currentUser);
   const result =
     RESULT_MESSAGES[new URLSearchParams(location?.search || '').get('calendarConnect')];
 
@@ -120,7 +115,24 @@ export const CalendarSettingsPageComponent = props => {
             </p>
           ) : null}
 
-          {connected ? (
+          {reconnectNeeded ? (
+            <div className={css.panel} data-testid="reconnectNeeded">
+              <H4 as="h2" className={css.panelHeading}>
+                <FormattedMessage id="CalendarSettingsPage.reconnectNeededTitle" />
+              </H4>
+              <p className={css.explanation}>
+                <FormattedMessage id="CalendarSettingsPage.reconnectNeededText" />
+              </p>
+              {email ? (
+                <p className={css.connectedAs}>
+                  <FormattedMessage id="CalendarSettingsPage.lastConnectedAs" values={{ email }} />
+                </p>
+              ) : null}
+              <PrimaryButton type="button" onClick={() => goTo(CONNECT_URL)}>
+                <FormattedMessage id="CalendarSettingsPage.reconnectButton" />
+              </PrimaryButton>
+            </div>
+          ) : connected ? (
             <div className={css.panel}>
               <H4 as="h2" className={css.panelHeading}>
                 <FormattedMessage id="CalendarSettingsPage.connectedTitle" />

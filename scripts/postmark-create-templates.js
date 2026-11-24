@@ -1,6 +1,6 @@
 /**
  * Create Revie's Postmark email templates (the client's "You're booked", the 60-hour and 24-hour
- * session reminders and reschedule confirmations). A template that already exists is left alone unless --overwrite is given,
+ * session reminders and reschedule confirmations, and the coach's "Reconnect your calendar"). A template that already exists is left alone unless --overwrite is given,
  * so adding "You're booked" (alias booking-confirmed-client) does not touch the others.
  * Run once, by hand:
  *
@@ -20,6 +20,10 @@
 
 const { TEMPLATES } = require('../server/email/templates');
 const { buildSessionEmailModel } = require('../server/api/nylas/sessionEmailModel');
+const {
+  buildReconnectEmailModel,
+  CALENDAR_RECONNECT_ALIAS,
+} = require('../server/api/nylas/reconnectEmailModel');
 
 const API = 'https://api.postmarkapp.com';
 const token = process.env.POSTMARK_SERVER_TOKEN;
@@ -83,7 +87,10 @@ const wanted = Object.entries(TEMPLATES).filter(([alias]) => !only || alias === 
       Subject: t.subject,
       HtmlBody: t.html,
       TextBody: t.text,
-      TestRenderModel: sampleModel(recipient),
+      TestRenderModel:
+        alias === CALENDAR_RECONNECT_ALIAS
+          ? buildReconnectEmailModel({ coachName: 'Sam Coach', siteUrl: 'https://heyrevie.com' })
+          : sampleModel(recipient),
       InlineCssForHtmlTestRender: true,
     });
     const ok = status === 200 && payload.AllContentIsValid;

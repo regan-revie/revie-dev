@@ -30,7 +30,8 @@ const makeReq = () => ({
   cookies: { 'nylas-connect-state': 'state-1' },
 });
 
-const setup = ({ storedGrantId, newGrantId }) => {
+const setup = ({ storedGrantId, newGrantId, extraPrivate = {} }) => {
+  const updateProfile = jest.fn(async () => ({}));
   getSdk.mockReturnValue({
     currentUser: {
       show: jest.fn(async () => ({
@@ -40,7 +41,9 @@ const setup = ({ storedGrantId, newGrantId }) => {
             attributes: {
               profile: {
                 displayName: 'Coach',
-                privateData: storedGrantId ? { nylasGrantId: storedGrantId } : {},
+                privateData: storedGrantId
+                  ? { nylasGrantId: storedGrantId, ...extraPrivate }
+                  : { ...extraPrivate },
               },
             },
           },
@@ -48,12 +51,13 @@ const setup = ({ storedGrantId, newGrantId }) => {
       })),
     },
   });
-  getTrustedSdk.mockResolvedValue({ currentUser: { updateProfile: jest.fn(async () => ({})) } });
+  getTrustedSdk.mockResolvedValue({ currentUser: { updateProfile } });
   exchangeCodeForGrant.mockResolvedValue({
     grantId: newGrantId,
     provider: 'google',
     email: 'coach@example.com',
   });
+  return { updateProfile };
 };
 
 const run = async () => {
@@ -153,5 +157,46 @@ describe('Nylas callback and a changed grant', () => {
       );
       spy.mockRestore();
     });
+  });
+});
+
+describe('Nylas callback when a coach reconnects after their Google connection broke', () => {
+  const broken = {
+    calendarStatus: 'reconnect_needed',
+    calendarBrokenAt: '2026-12-01T10:00:00.000Z',
+    calendarReconnectEmailedAt: '2026-12-01T10:00:05.000Z',
+  };
+
+  it('clears the mark and re-arms the one email for any future break', async () => {
+    const { updateProfile } = setup({
+      storedGrantId: 'grant-same',
+      newGrantId: 'grant-same',
+      extraPrivate: broken,
+    });
+    await run();
+
+    expect(updateProfile).toHaveBeenCalledTimes(1);
+    expect(updateProfile.mock.calls[0][0].privateData).toMatchObject({
+      nylasGrantId: 'grant-same',
+      calendarStatus: 'connected',
+      calendarBrokenAt: null,
+      calendarBrokenReason: null,
+      calendarReconnectEmailedAt: null,
+    });
+  });
+
+  it('sets the sessions up straight away as a working coach, so they are bookable again at once', async () => {
+    setup({ storedGrantId: 'grant-same', newGrantId: 'grant-same', extraPrivate: broken });
+    await run();
+
+    expect(ensureOwnListings).toHaveBeenCalledTimes(1);
+    // The profile read before the connect still said reconnect_needed; what is passed on must not.
+    expect(ensureOwnListings.mock.calls[0][0].profile.privateData.calendarStatus).toBe('connected');
+  });
+
+  it('marks a first-time connection connected too', async () => {
+    const { updateProfile } = setup({ storedGrantId: null, newGrantId: 'grant-new' });
+    await run();
+    expect(updateProfile.mock.calls[0][0].privateData.calendarStatus).toBe('connected');
   });
 });

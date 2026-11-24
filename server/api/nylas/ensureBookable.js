@@ -72,8 +72,9 @@ const signatureOf = inputs =>
  * @param {object} [params.overrides] `eventTypeKey`, `calendarId`, `minBookingNoticeMinutes`,
  *   `useEnvAlias`: what an explicit enable may choose that the loop never does
  * @param {boolean} [params.force] skip the signature check and always sync
- * @returns {Promise<{status: string}>} one of: ineligible, no-grant, no-payouts, payouts-unknown,
- *   disabled-no-payouts, no-process-alias, no-calendar, unchanged, adopted, synced
+ * @returns {Promise<{status: string}>} one of: ineligible, no-grant, reconnect-needed,
+ *   disabled-reconnect-needed, no-payouts, payouts-unknown, disabled-no-payouts, no-process-alias,
+ *   no-calendar, unchanged, adopted, synced
  */
 const ensureListingBookable = async ({
   listing,
@@ -96,6 +97,16 @@ const ensureListingBookable = async ({
   if (!grantId) return { status: 'no-grant' };
 
   const enabled = !!publicData.calendarBookingEnabled;
+
+  // The coach's Google connection has stopped working (grantStatus.js): they are not bookable, the same
+  // as with no calendar connected, so clients see "This coach isn't taking bookings yet". Bookings
+  // already made are untouched. It was reported to Sentry when it was noticed, so this stays quiet.
+  // Reconnecting clears the mark, and the ordinary sync below switches the listing back on.
+  if (privateData.calendarStatus === 'reconnect_needed') {
+    if (!enabled) return { status: 'reconnect-needed' };
+    await updateListing({ id: listing.id, publicData: { calendarBookingEnabled: false } });
+    return { status: 'disabled-reconnect-needed' };
+  }
 
   // Payout details come before anything else is looked at or written. Not known (the caller could not
   // read it) leaves the listing alone, so a missing attribute can never switch off a working listing.

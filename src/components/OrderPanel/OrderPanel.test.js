@@ -17,6 +17,7 @@ import {
 } from '../../util/testHelpers';
 import { TIME_SLOT_TIME } from '../../util/types';
 
+import * as calendarConnection from '../../util/calendarConnection';
 import OrderPanel from './OrderPanel';
 
 const { screen, waitFor } = testingLibrary;
@@ -564,6 +565,80 @@ describe('OrderPanel', () => {
     });
     expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
     expect(screen.queryByText('OrderPanel.ownListingSettingUp')).not.toBeInTheDocument();
+  });
+
+  // A coach whose Google connection broke: the server has switched their sessions off
+  // (calendarBookingEnabled false) and marked their user reconnect_needed.
+  const brokenCoach = {
+    user: {
+      currentUser: createCurrentUser('coach1', {
+        stripeConnected: true,
+        profile: {
+          publicData: { calendarConnected: true },
+          privateData: { nylasGrantId: 'g', calendarStatus: 'reconnect_needed' },
+        },
+      }),
+    },
+  };
+
+  it('Booking: fixed, own listing, Google connection broke: the calendar row is not done and offers Reconnect', async () => {
+    renderFixed({ listing: fixedListing(), isOwnListing: true }, { initialState: brokenCoach });
+
+    await waitFor(() => {
+      expect(screen.getByText('OrderPanel.setupCardHeadingReconnect')).toBeInTheDocument();
+    });
+    expect(screen.getByText('OrderPanel.setupCardIntroReconnect')).toBeInTheDocument();
+    expect(stepButton('OrderPanel.setupReconnectCalendar')).toBeInTheDocument();
+    // Not the first-time wording, and not ticked.
+    expect(stepButton(CALENDAR)).not.toBeInTheDocument();
+    expect(screen.queryByText('OrderPanel.setupStepDone')).toBeInTheDocument(); // payouts are done
+    expect(screen.getAllByText('OrderPanel.setupStepDone')).toHaveLength(1);
+  });
+
+  it('Booking: fixed, own listing, the Reconnect row goes straight to the Google connect route', async () => {
+    const goToUrl = jest.spyOn(calendarConnection, 'goToUrl').mockImplementation(() => {});
+    try {
+      renderFixed({ listing: fixedListing(), isOwnListing: true }, { initialState: brokenCoach });
+      const button = await screen.findByRole('button', {
+        name: 'OrderPanel.setupReconnectCalendar',
+      });
+      button.click();
+      expect(goToUrl).toHaveBeenCalledWith(
+        '/api/nylas/connect?provider=google&returnPath=%2Faccount%2Fcalendar'
+      );
+    } finally {
+      goToUrl.mockRestore();
+    }
+  });
+
+  it('Booking: fixed, Google connection broke: a client sees "isn\'t taking bookings yet" and no booking form', async () => {
+    // The listing is switched off by the server, which is what the client's page reads.
+    renderFixed({ listing: fixedListing(), isOwnListing: false });
+    expect(await screen.findByText('OrderPanel.notTakingBookings')).toBeInTheDocument();
+    expect(screen.queryByText('BookingFixedDurationForm.requestToBook')).not.toBeInTheDocument();
+    expect(screen.queryByText('OrderPanel.setupCardHeadingReconnect')).not.toBeInTheDocument();
+  });
+
+  it('Booking: fixed, own listing, reconnected: no reconnect card, the session is set up again', async () => {
+    const reconnected = {
+      user: {
+        currentUser: createCurrentUser('coach1', {
+          stripeConnected: true,
+          profile: {
+            publicData: { calendarConnected: true },
+            privateData: { nylasGrantId: 'g', calendarStatus: 'connected' },
+          },
+        }),
+      },
+    };
+    renderFixed(
+      { listing: fixedListing({ calendarBookingEnabled: true }), isOwnListing: true },
+      { initialState: reconnected }
+    );
+    await waitFor(() => {
+      expect(screen.getAllByText('title!').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText('OrderPanel.setupCardHeadingReconnect')).not.toBeInTheDocument();
   });
 
   it('Booking: fixed, a client or visitor: the plain "isn\'t taking bookings yet" line, never the card', async () => {

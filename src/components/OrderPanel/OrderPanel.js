@@ -360,7 +360,10 @@ const OrderPanel = props => {
   // server has not reached has no availability plan yet.
   const config = useConfiguration();
   const currentUser = useSelector(state => state.user?.currentUser);
-  const calendarConnected = getCalendarConnection(currentUser).connected;
+  const {
+    connected: calendarConnected,
+    reconnectNeeded: calendarReconnectNeeded,
+  } = getCalendarConnection(currentUser);
   const payoutDetailsSet = !!currentUser?.attributes?.stripeConnected;
   // The profile answers a coach's sessions are searched by. Unfinished counts as not finished, but
   // it does not stop the session being booked, so it never shows the "setting up" notice below.
@@ -523,6 +526,7 @@ const OrderPanel = props => {
         ) : showSessionSetupCard ? (
           <SessionSetupCard
             calendarConnected={calendarConnected}
+            calendarReconnectNeeded={calendarReconnectNeeded}
             payoutDetailsSet={payoutDetailsSet}
             profileFinished={traitsAsked ? profileFinished : undefined}
             bookable={calendarConnected && payoutDetailsSet}

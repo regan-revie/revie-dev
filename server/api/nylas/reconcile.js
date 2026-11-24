@@ -20,6 +20,7 @@ const db = require('./db');
 const integration = require('./integration');
 const { ensureCoachListings, updaterFor } = require('./ensureCoach');
 const { resolveBookingProcessAlias } = require('./listingSync');
+const grantStatus = require('./grantStatus');
 
 const PER_PAGE = 100;
 const MAX_PAGES = 10;
@@ -78,6 +79,32 @@ const runReconcile = async ({ now = Date.now() } = {}) => {
   }
 
   for (const [userId, { author, listings }] of byCoach) {
+    // A coach whose Google connection broke (grantStatus.js): ask Nylas again every tick. If the grant
+    // works again the mark is cleared right here and their sessions are switched back on below, within
+    // the minute and with no second email; if not, make sure the one email has gone out. The listings
+    // themselves are switched off by ensureBookable.
+    let profile = author.attributes.profile;
+    if (grantStatus.statusOf(profile && profile.privateData) === grantStatus.RECONNECT_NEEDED) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const { cleared } = await grantStatus.reviewBrokenCoach({
+          sdk,
+          userId,
+          privateData: profile.privateData,
+          now,
+        });
+        if (cleared) {
+          profile = {
+            ...profile,
+            privateData: { ...profile.privateData, calendarStatus: grantStatus.CONNECTED },
+          };
+          summary.reconnected = (summary.reconnected || 0) + 1;
+        }
+      } catch (e) {
+        log.error(e, 'nylas-grant-review-failed', { coachId: userId });
+      }
+    }
+
     // Skip listings that failed recently; they are tried again once the pause is over.
     const due = listings.filter(
       l => !(now - (failedAt.get(l.id.uuid) || 0) < RETRY_FAILED_AFTER_MS)
@@ -88,7 +115,7 @@ const runReconcile = async ({ now = Date.now() } = {}) => {
     // eslint-disable-next-line no-await-in-loop
     const { locked, results } = await ensureCoachListings({
       userId,
-      profile: author.attributes.profile,
+      profile,
       // Not the profile: payout status is an attribute of the user itself.
       stripeConnected: author.attributes.stripeConnected,
       listings: due,

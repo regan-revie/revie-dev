@@ -1,4 +1,9 @@
-const { getProcessAliasProblem, assertProcessAliasMatchesListing } = require('./processAliasCheck');
+const {
+  getProcessAliasProblem,
+  assertProcessAliasMatchesListing,
+  isCalendarListingSwitchedOff,
+  assertCalendarListingBookable,
+} = require('./processAliasCheck');
 
 const calendarListing = alias => ({
   attributes: { publicData: { calendarBookingEnabled: true, transactionProcessAlias: alias } },
@@ -58,5 +63,46 @@ describe('assertProcessAliasMatchesListing()', () => {
         processAlias: 'default-booking/release-2',
       })
     ).not.toThrow();
+  });
+});
+
+describe('a calendar session that has been switched off', () => {
+  const listingWith = publicData => ({ attributes: { publicData } });
+  const setUp = { nylasConfigurationIds: { 60: 'cfg-60' } };
+
+  it("takes no new booking: it was set up on a calendar and is now off (the coach's Google connection broke)", () => {
+    const off = listingWith({ ...setUp, calendarBookingEnabled: false });
+    expect(isCalendarListingSwitchedOff(off)).toBe(true);
+    expect(() => assertCalendarListingBookable(off)).toThrow('calendar-not-bookable');
+  });
+
+  it('the refusal is a 400 the checkout can name (a 409 would read as "that time was just taken")', () => {
+    try {
+      assertCalendarListingBookable(listingWith({ ...setUp, calendarBookingEnabled: false }));
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect(e.status).toBe(400);
+      expect(e.data.errors[0].code).toBe('calendar-not-bookable');
+    }
+  });
+
+  it('an older single-configuration listing counts as set up too', () => {
+    expect(
+      isCalendarListingSwitchedOff(
+        listingWith({ nylasConfigurationId: 'cfg', calendarBookingEnabled: false })
+      )
+    ).toBe(true);
+  });
+
+  it('a bookable one is fine', () => {
+    expect(() =>
+      assertCalendarListingBookable(listingWith({ ...setUp, calendarBookingEnabled: true }))
+    ).not.toThrow();
+  });
+
+  it('a listing that was never set up on a calendar is not touched by this check', () => {
+    expect(isCalendarListingSwitchedOff(listingWith({ unitType: 'fixed' }))).toBe(false);
+    expect(isCalendarListingSwitchedOff(listingWith({}))).toBe(false);
+    expect(isCalendarListingSwitchedOff(undefined)).toBe(false);
   });
 });

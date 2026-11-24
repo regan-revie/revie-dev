@@ -105,6 +105,12 @@ module.exports = (req, res) => {
               nylasGrantId: grant.grantId,
               nylasGrantProvider: grant.provider,
               nylasGrantEmail: grant.email,
+              // Connecting (or reconnecting) clears a "reconnect needed" mark and re-arms the one
+              // email for any future break. See grantStatus.js.
+              calendarStatus: 'connected',
+              calendarBrokenAt: null,
+              calendarBrokenReason: null,
+              calendarReconnectEmailedAt: null,
             },
             // A public flag so listing and profile UI can show connection state without exposing
             // the grant id itself.
@@ -148,6 +154,7 @@ module.exports = (req, res) => {
                 nylasGrantId: grant.grantId,
                 nylasGrantProvider: grant.provider,
                 nylasGrantEmail: grant.email,
+                calendarStatus: 'connected',
               },
             },
             siteUrl: ROOT_URL,

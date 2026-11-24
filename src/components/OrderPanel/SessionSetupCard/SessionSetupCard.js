@@ -4,6 +4,7 @@ import { useHistory } from 'react-router-dom';
 import { useRouteConfiguration } from '../../../context/routeConfigurationContext';
 import { FormattedMessage } from '../../../util/reactIntl';
 import { createResourceLocatorString } from '../../../util/routes';
+import { CONNECT_URL, goToUrl } from '../../../util/calendarConnection';
 
 import { H4, SecondaryButton } from '../../../components';
 
@@ -22,7 +23,7 @@ const Todo = () => (
   </svg>
 );
 
-const Step = ({ done, labelId, routeName }) => {
+const Step = ({ done, labelId, routeName, href }) => {
   const history = useHistory();
   const routeConfiguration = useRouteConfiguration();
 
@@ -41,7 +42,12 @@ const Step = ({ done, labelId, routeName }) => {
         <SecondaryButton
           type="button"
           className={css.stepButton}
-          onClick={() => history.push(createResourceLocatorString(routeName, routeConfiguration))}
+          onClick={() =>
+            href
+              ? // Leaves the app (for Google) and comes back, so a full page load, not a route change.
+                goToUrl(href)
+              : history.push(createResourceLocatorString(routeName, routeConfiguration))
+          }
         >
           <FormattedMessage id={labelId} />
         </SecondaryButton>
@@ -61,6 +67,8 @@ const Step = ({ done, labelId, routeName }) => {
  *
  * @param {Object} props
  * @param {boolean} props.calendarConnected
+ * @param {boolean} [props.calendarReconnectNeeded] the coach's Google connection stopped working: the
+ *   calendar row is not done and its button reconnects (server/api/nylas/grantStatus.js)
  * @param {boolean} props.payoutDetailsSet
  * @param {boolean} [props.profileFinished] the coach has answered the profile questions that their
  *   sessions are searched by (language, location, ...). Leave undefined where there are none to
@@ -69,6 +77,7 @@ const Step = ({ done, labelId, routeName }) => {
  */
 const SessionSetupCard = ({
   calendarConnected,
+  calendarReconnectNeeded = false,
   payoutDetailsSet,
   profileFinished,
   bookable = false,
@@ -76,19 +85,36 @@ const SessionSetupCard = ({
   <section className={css.card} aria-labelledby="sessionSetupHeading">
     <H4 as="h2" id="sessionSetupHeading" className={css.heading}>
       <FormattedMessage
-        id={bookable ? 'OrderPanel.setupCardHeadingFindable' : 'OrderPanel.setupCardHeading'}
+        id={
+          calendarReconnectNeeded
+            ? 'OrderPanel.setupCardHeadingReconnect'
+            : bookable
+            ? 'OrderPanel.setupCardHeadingFindable'
+            : 'OrderPanel.setupCardHeading'
+        }
       />
     </H4>
     <p className={css.intro}>
       <FormattedMessage
-        id={bookable ? 'OrderPanel.setupCardIntroFindable' : 'OrderPanel.setupCardIntro'}
+        id={
+          calendarReconnectNeeded
+            ? 'OrderPanel.setupCardIntroReconnect'
+            : bookable
+            ? 'OrderPanel.setupCardIntroFindable'
+            : 'OrderPanel.setupCardIntro'
+        }
       />
     </p>
     <ul className={css.steps}>
       <Step
         done={calendarConnected}
-        labelId="OrderPanel.setupConnectCalendar"
+        labelId={
+          calendarReconnectNeeded
+            ? 'OrderPanel.setupReconnectCalendar'
+            : 'OrderPanel.setupConnectCalendar'
+        }
         routeName="CalendarSettingsPage"
+        href={calendarReconnectNeeded ? CONNECT_URL : undefined}
       />
       <Step
         done={payoutDetailsSet}

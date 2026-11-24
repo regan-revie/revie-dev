@@ -390,3 +390,9 @@ export const promoRefusalReason = error => {
   const found = apiErrors.find(e => typeof e?.code === 'string' && e.code.startsWith('promo-'));
   return found ? found.code.replace(/^promo-/, '') : null;
 };
+
+/**
+ * Revie: the coach's session has been switched off (their Google connection broke or their payout
+ * details are missing), so it takes no new booking. See server/api/nylas/processAliasCheck.js.
+ */
+export const isCalendarNotBookableError = error => hasErrorWithCode(error, 'calendar-not-bookable');

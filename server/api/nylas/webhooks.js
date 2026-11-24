@@ -17,6 +17,7 @@
 const { verifySignature, SIGNATURE_HEADER } = require('./signature');
 const { handleBookingWebhook } = require('./bookingSync');
 const { handleCalendarEvent } = require('./calendarEventSync');
+const { handleGrantWebhook } = require('./grantStatus');
 const { WEBHOOK_SECRET, canVerifyWebhooks } = require('./config');
 
 // Scheduler booking triggers we expect to act on. Anything else is acknowledged and ignored, so an
@@ -30,9 +31,13 @@ const HANDLED_TRIGGERS = [
   // arrive for every event on every connected calendar, almost none of them ours.
   'event.updated',
   'event.deleted',
+  // A coach's Google connection stopped working or was removed (grantStatus.js).
+  'grant.expired',
+  'grant.deleted',
 ];
 
 const isCalendarEvent = trigger => typeof trigger === 'string' && trigger.startsWith('event.');
+const isGrantEvent = trigger => typeof trigger === 'string' && trigger.startsWith('grant.');
 
 /**
  * Answer Nylas's ownership challenge by echoing the challenge value verbatim.
@@ -135,23 +140,29 @@ const receive = (req, res) => {
   );
 
   const calendarEvent = isCalendarEvent(trigger);
+  const grantEvent = isGrantEvent(trigger);
   // Calendar notifications are mostly not ours, so only the ones that turn out to be are logged
   // (below); the access line above already records that one arrived.
-  if (!calendarEvent) {
+  if (!calendarEvent && !grantEvent) {
     console.log(
       `[nylas] ${trigger} booking=${bookingId || 'unknown'} customFields=${hasCustomFields}`
     );
   }
 
-  const grantIdFromBody = body.data?.grant_id ?? data.grant_id;
+  // A grant notification names the grant as `grant_id` (or, on some payloads, as the object's `id`).
+  const grantIdFromBody =
+    body.data?.grant_id ?? data.grant_id ?? (grantEvent ? data.id : undefined);
 
   // Returned so tests can await completion; Express ignores a handler's return value.
-  return (calendarEvent
+  const handled = grantEvent
+    ? handleGrantWebhook({ trigger, grantId: grantIdFromBody })
+    : calendarEvent
     ? handleCalendarEvent({ trigger, data, grantId: grantIdFromBody })
-    : handleBookingWebhook({ trigger, data, grantId: grantIdFromBody })
-  )
+    : handleBookingWebhook({ trigger, data, grantId: grantIdFromBody });
+
+  return handled
     .then(result => {
-      if (!calendarEvent || result.handled) {
+      if (grantEvent || !calendarEvent || result.handled) {
         console.log(`[nylas] ${trigger} -> ${result.action || result.reason}`);
       }
       res.status(200).json({ received: true, ...result });

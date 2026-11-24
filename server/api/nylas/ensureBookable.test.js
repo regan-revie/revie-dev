@@ -421,3 +421,77 @@ describe('payout details', () => {
     expect(syncListingConfigurations).not.toHaveBeenCalled();
   });
 });
+
+describe('a coach whose Google connection broke (calendarStatus reconnect_needed)', () => {
+  const broken = {
+    nylasGrantId: 'g1',
+    nylasGrantEmail: 'coach@example.com',
+    calendarStatus: 'reconnect_needed',
+  };
+  const enabledListing = () =>
+    newListing({
+      calendarBookingEnabled: true,
+      nylasConfigurationIds: { 60: 'cfg-60' },
+      nylasCalendarId: 'cal-1',
+    });
+
+  it('is not bookable: a listing that was bookable is switched off, and nothing else is touched', async () => {
+    const { result, updateListing } = await run(enabledListing(), { profile: profile(broken) });
+    expect(result.status).toBe('disabled-reconnect-needed');
+    expect(updateListing).toHaveBeenCalledTimes(1);
+    expect(updateListing).toHaveBeenCalledWith({
+      id: { uuid: 'l1' },
+      publicData: { calendarBookingEnabled: false },
+    });
+    // Nothing is asked of Nylas with a grant that does not work.
+    expect(listCalendars).not.toHaveBeenCalled();
+    expect(syncListingConfigurations).not.toHaveBeenCalled();
+  });
+
+  it('a listing that is already off stays off, with no writes and no calls (every minute, for free)', async () => {
+    const { result, updateListing } = await run(
+      newListing({ calendarBookingEnabled: false, nylasConfigurationIds: { 60: 'cfg-60' } }),
+      { profile: profile(broken) }
+    );
+    expect(result.status).toBe('reconnect-needed');
+    expect(updateListing).not.toHaveBeenCalled();
+    expect(listCalendars).not.toHaveBeenCalled();
+  });
+
+  it('is not reported to Sentry again here (it was reported when the break was noticed)', async () => {
+    await run(enabledListing(), { profile: profile(broken) });
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it('is judged before payout details: a broken calendar is not hidden behind "no payouts"', async () => {
+    const { result } = await run(enabledListing(), {
+      profile: profile(broken),
+      stripeConnected: false,
+    });
+    expect(result.status).toBe('disabled-reconnect-needed');
+  });
+
+  it('once reconnected, the very next sync switches it back on', async () => {
+    // What the sync finds after the callback has cleared the mark: switched off, grant working.
+    const switchedOff = newListing({
+      calendarBookingEnabled: false,
+      nylasConfigurationIds: { 60: 'cfg-60' },
+      nylasCalendarId: 'cal-1',
+      nylasSyncSignature: 'old',
+    });
+    const { result, updateListing } = await run(switchedOff, {
+      profile: profile({
+        nylasGrantId: 'g1',
+        nylasGrantEmail: 'coach@example.com',
+        calendarStatus: 'connected',
+      }),
+    });
+    expect(result.status).toBe('synced');
+    expect(updateListing.mock.calls[0][0].publicData.calendarBookingEnabled).toBe(true);
+  });
+
+  it('a coach with no status at all is unaffected', async () => {
+    const { result } = await run(newListing());
+    expect(result.status).toBe('synced');
+  });
+});

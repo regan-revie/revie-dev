@@ -30,6 +30,16 @@ const connected = userWith({
   },
 });
 
+const broken = userWith({
+  publicData: { calendarConnected: true, calendarProvider: 'google' },
+  privateData: {
+    nylasGrantId: 'grant-1',
+    nylasGrantProvider: 'google',
+    nylasGrantEmail: 'coach@example.com',
+    calendarStatus: 'reconnect_needed',
+  },
+});
+
 const renderPage = (currentUser, search = '', goTo = undefined, onSaveHours = jest.fn()) =>
   render(
     <CalendarSettingsPageComponent
@@ -45,20 +55,68 @@ describe('getCalendarConnection()', () => {
   it('is connected, with the account email, once the callback has stored the grant', () => {
     expect(getCalendarConnection(connected)).toEqual({
       connected: true,
+      reconnectNeeded: false,
       email: 'coach@example.com',
     });
   });
 
   it('is not connected for a coach with no calendar, or no user at all', () => {
-    expect(getCalendarConnection(notConnected)).toEqual({ connected: false, email: null });
-    expect(getCalendarConnection(null)).toEqual({ connected: false, email: null });
+    const none = { connected: false, reconnectNeeded: false, email: null };
+    expect(getCalendarConnection(notConnected)).toEqual(none);
+    expect(getCalendarConnection(null)).toEqual(none);
   });
 
   it('is still connected, without an email, if only the public flag is present', () => {
     expect(getCalendarConnection(userWith({ publicData: { calendarConnected: true } }))).toEqual({
       connected: true,
+      reconnectNeeded: false,
       email: null,
     });
+  });
+
+  it('a coach whose Google connection broke is NOT connected, and needs to reconnect', () => {
+    expect(getCalendarConnection(broken)).toEqual({
+      connected: false,
+      reconnectNeeded: true,
+      email: 'coach@example.com',
+    });
+  });
+
+  it('"reconnect needed" with no calendar ever connected means nothing', () => {
+    const odd = userWith({ publicData: {}, privateData: { calendarStatus: 'reconnect_needed' } });
+    expect(getCalendarConnection(odd).reconnectNeeded).toBe(false);
+  });
+
+  it('is connected again once the mark is cleared', () => {
+    const cleared = userWith({
+      publicData: { calendarConnected: true },
+      privateData: { nylasGrantId: 'grant-1', calendarStatus: 'connected' },
+    });
+    expect(getCalendarConnection(cleared).connected).toBe(true);
+  });
+});
+
+describe('CalendarSettingsPage when the Google connection broke', () => {
+  it('says "Reconnect needed" instead of "connected", with a Reconnect Google Calendar button', () => {
+    renderPage(broken);
+
+    expect(screen.getByTestId('reconnectNeeded')).toBeInTheDocument();
+    expect(screen.getByText('CalendarSettingsPage.reconnectNeededTitle')).toBeInTheDocument();
+    expect(screen.getByText('CalendarSettingsPage.reconnectNeededText')).toBeInTheDocument();
+    expect(screen.queryByText('CalendarSettingsPage.connectedTitle')).not.toBeInTheDocument();
+    expect(screen.queryByText('CalendarSettingsPage.connectButton')).not.toBeInTheDocument();
+  });
+
+  it('the button goes to the same connect route, which brings the coach back here', () => {
+    const goTo = jest.fn();
+    renderPage(broken, '', goTo);
+    screen.getByRole('button', { name: 'CalendarSettingsPage.reconnectButton' }).click();
+    expect(goTo).toHaveBeenCalledWith(CONNECT_URL);
+  });
+
+  it('shows the working hours section as ever', () => {
+    renderPage(broken);
+    expect(screen.getByText('CalendarSettingsPage.hoursHeading')).toBeInTheDocument();
   });
 });
 
