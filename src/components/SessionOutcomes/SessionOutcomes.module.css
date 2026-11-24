@@ -57,32 +57,3 @@
   padding-left: 20px;
   color: var(--colorGrey700);
 }
-
-/* Session page: the numbered list */
-
-.section {
-  padding: 0 24px;
-  margin-bottom: 24px;
-
-  @media (--viewportMedium) {
-    padding: 0;
-  }
-}
-
-.sectionHeading {
-  composes: p from global;
-  padding: 0;
-  margin: 0 0 8px;
-  font-weight: var(--fontWeightBold);
-}
-
-.list {
-  composes: p from global;
-  margin: 0;
-  padding-left: 24px;
-}
-
-.listItem {
-  margin-bottom: 4px;
-  padding-left: 4px;
-}

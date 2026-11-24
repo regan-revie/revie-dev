@@ -17,6 +17,7 @@ import {
   getHostedConfiguration,
 } from '../../util/testHelpers';
 
+import enMessages from '../../translations/en.json';
 import { storableError } from '../../util/errors';
 
 import {
@@ -215,114 +216,50 @@ describe('ListingPage variants', () => {
     onFetchTimeSlots: noop,
   };
 
-  it('has hero section in coverPhoto mode', async () => {
-    // Select correct SearchPage variant according to route configuration
-    const config = getConfig('coverPhoto');
+  // The redesigned session page (docs/design/session-page/) has no photo area, so both layout
+  // choices in Console render it.
+  it.each(['coverPhoto', 'carousel'])('renders the session page in %s mode', async variantType => {
+    const config = getConfig(variantType);
     const routeConfiguration = getRouteConfiguration(config.layout);
     const props = { ...commonProps };
     const listingRouteConfig = routeConfiguration.find(conf => conf.name === 'ListingPage');
     const ListingPage = listingRouteConfig.component;
 
-    const { getByPlaceholderText, getByRole, queryAllByRole, getByText } = render(
-      <ListingPage {...props} />,
-      {
-        initialState,
-        config,
-        routeConfiguration,
-      }
-    );
-
-    await waitFor(() => {
-      // Has main search in Topbar and it's a location search.
-      expect(getByPlaceholderText('TopbarSearchForm.placeholder')).toBeInTheDocument();
-      expect(screen.getByTestId('location-search')).toBeInTheDocument();
-
-      // Has hero (coverPhoto) section
-      expect(screen.getByTestId('hero')).toBeInTheDocument();
-      expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
-
-      // Has order title (rendered for )
-      const orderTitle = queryAllByRole('heading', { name: 'ListingPage.orderTitle' });
-      expect(orderTitle).toHaveLength(3);
-
-      // Has details section title and selected category info
-      expect(getByRole('heading', { name: 'ListingPage.detailsTitle' })).toBeInTheDocument();
-      expect(getByText('Cat')).toBeInTheDocument();
-      expect(getByText('Cat 1')).toBeInTheDocument();
-
-      // Has details location title
-      expect(getByRole('heading', { name: 'ListingPage.locationTitle' })).toBeInTheDocument();
-
-      // Has details reviews title
-      const reviewsTitle = getByRole('heading', { name: 'ListingPage.reviewsTitle' });
-      expect(reviewsTitle).toBeInTheDocument();
-      const sectionReviews = within(reviewsTitle.parentNode.parentNode);
-      expect(sectionReviews.getByText('It was awesome!')).toBeInTheDocument();
-      expect(sectionReviews.getByText('reviewerA display name')).toBeInTheDocument();
-      expect(sectionReviews.getByText('June 2023')).toBeInTheDocument();
-      expect(sectionReviews.getAllByTitle('4/5')).toHaveLength(2);
-
-      // Has details provider/author title
-      expect(getByRole('heading', { name: 'ListingPage.aboutProviderTitle' })).toBeInTheDocument();
-      // Has link to provider's profile
-      expect(getByRole('link', { name: 'UserCard.viewProfileLink' })).toBeInTheDocument();
-      // Has button to contact provider
-      expect(getByRole('button', { name: 'UserCard.contactUser' })).toBeInTheDocument();
+    const { getByRole, queryByRole, getByText } = render(<ListingPage {...props} />, {
+      initialState,
+      config,
+      routeConfiguration,
+      messages: enMessages,
     });
-  });
 
-  it('has carousel on carousel mode', async () => {
-    // Select correct SearchPage variant according to route configuration
-    const config = getConfig('carousel');
-    const routeConfiguration = getRouteConfiguration(config.layout);
-    const props = { ...commonProps };
-    const listingRouteConfig = routeConfiguration.find(conf => conf.name === 'ListingPage');
-    const ListingPage = listingRouteConfig.component;
-
-    const { getByPlaceholderText, getByRole, queryAllByRole, getByText } = render(
-      <ListingPage {...props} />,
-      {
-        initialState,
-        config,
-        routeConfiguration,
-      }
-    );
     await waitFor(() => {
-      // Has main search in Topbar and it's a location search.
-      expect(getByPlaceholderText('TopbarSearchForm.placeholder')).toBeInTheDocument();
-      expect(screen.getByTestId('location-search')).toBeInTheDocument();
+      // The session page's own top bar: marketing-site links, no search field.
+      expect(getByRole('link', { name: 'Find a coach' })).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('TopbarSearchForm.placeholder')).not.toBeInTheDocument();
 
-      // Does not have hero (coverPhoto) section on carousel mode
-      expect(screen.getByTestId('carousel')).toBeInTheDocument();
+      // No gallery and no cover photo.
+      expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
       expect(screen.queryByTestId('hero')).not.toBeInTheDocument();
 
-      // Has order title (rendered for )
-      const orderTitle = queryAllByRole('heading', { name: 'ListingPage.orderTitle' });
-      expect(orderTitle).toHaveLength(3);
+      // The title in the hero is the page's h1. (The booking panel keeps a second h1 for its phone
+      // sheet, hidden by CSS on desktop; job B's concern.)
+      expect(screen.getByTestId('session-title').tagName).toBe('H1');
+      expect(screen.getByTestId('session-hero')).toBeInTheDocument();
 
-      // Has details section title and selected category info
-      expect(getByRole('heading', { name: 'ListingPage.detailsTitle' })).toBeInTheDocument();
-      expect(getByText('Cat')).toBeInTheDocument();
-      expect(getByText('Cat 1')).toBeInTheDocument();
+      // The old details list, map and "about the provider" section are gone.
+      expect(queryByRole('heading', { name: 'ListingPage.detailsTitle' })).not.toBeInTheDocument();
+      expect(queryByRole('heading', { name: 'ListingPage.locationTitle' })).not.toBeInTheDocument();
+      expect(
+        queryByRole('heading', { name: 'ListingPage.aboutProviderTitle' })
+      ).not.toBeInTheDocument();
+      expect(queryByRole('heading', { name: /Reviews \(\d+\)/ })).not.toBeInTheDocument();
 
-      // Has details location title
-      expect(getByRole('heading', { name: 'ListingPage.locationTitle' })).toBeInTheDocument();
-
-      // Has details reviews title
-      const reviewsTitle = getByRole('heading', { name: 'ListingPage.reviewsTitle' });
-      expect(reviewsTitle).toBeInTheDocument();
-      const sectionReviews = within(reviewsTitle.parentNode.parentNode);
-      expect(sectionReviews.getByText('It was awesome!')).toBeInTheDocument();
-      expect(sectionReviews.getByText('reviewerA display name')).toBeInTheDocument();
-      expect(sectionReviews.getByText('June 2023')).toBeInTheDocument();
-      expect(sectionReviews.getAllByTitle('4/5')).toHaveLength(2);
-
-      // Has details provider/author title
-      expect(getByRole('heading', { name: 'ListingPage.aboutProviderTitle' })).toBeInTheDocument();
-      // Has link to provider's profile
-      expect(getByRole('link', { name: 'UserCard.viewProfileLink' })).toBeInTheDocument();
-      // Has button to contact provider
-      expect(getByRole('button', { name: 'UserCard.contactUser' })).toBeInTheDocument();
+      // The coach and "Good to know" sections, and this session's reviews.
+      expect(screen.getByTestId('session-coach')).toBeInTheDocument();
+      expect(screen.getByTestId('session-good')).toBeInTheDocument();
+      const reviews = within(screen.getByTestId('session-reviews'));
+      expect(reviews.getByText('“It was awesome!”')).toBeInTheDocument();
+      expect(getByText('from 1 review')).toBeInTheDocument();
     });
   });
 });

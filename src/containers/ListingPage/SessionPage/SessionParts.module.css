@@ -1,0 +1,78 @@
+@import '../../../styles/customMediaQueries.css';
+
+/* The all-caps label with a hairline. Schibsted Grotesk 500, 13px, 1.4px tracking (session page design). */
+.label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  line-height: 1.55;
+  color: inherit;
+}
+
+.rule {
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.3;
+}
+
+/* Two-weight headline: Regular with the emphasised part in Bold. */
+.headline {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: normal;
+  color: inherit;
+
+  & b {
+    font-weight: 700;
+  }
+
+  @media (--viewportMedium) {
+    font-size: 40px;
+  }
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 17px;
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+/* Full-width colour behind a column that is narrower than the screen. */
+.band {
+  box-shadow: 0 0 0 100vmax var(--bandColor);
+  clip-path: inset(0 -100vmax);
+  background: var(--bandColor);
+}
+
+.bandMaroon {
+  --bandColor: var(--revieMaroon);
+  color: var(--revieCream);
+}
+
+.bandPeriwinkle {
+  --bandColor: var(--reviePeriwinkle);
+  color: var(--revieGreen);
+}

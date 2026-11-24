@@ -83,6 +83,7 @@ import * as InboxBooking from './containers/InboxPage/InboxPage.booking.example'
 import * as OrderPanel from './components/OrderPanel/OrderPanel.example';
 import * as SessionSetupCard from './components/OrderPanel/SessionSetupCard/SessionSetupCard.example';
 import * as NylasBookingForm from './components/OrderPanel/NylasBookingForm/NylasBookingForm.example';
+import * as SessionPage from './containers/ListingPage/SessionPage/SessionPage.example';
 import * as ManageCalendarBooking from './containers/TransactionPage/ManageCalendarBooking/ManageCalendarBooking.example';
 import * as OutsideClickHandler from './components/OutsideClickHandler/OutsideClickHandler.example';
 import * as PaginationLinks from './components/PaginationLinks/PaginationLinks.example';
@@ -241,6 +242,7 @@ export {
   TopbarDesktop,
   SearchCTA,
   NylasBookingForm,
+  SessionPage,
   ManageCalendarBooking,
   OutsideClickHandler,
   PageBuilder,

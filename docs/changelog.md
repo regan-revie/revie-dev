@@ -19,6 +19,67 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-25 (session page redesign, job A: topbar, hero and page sections)
+
+**Branch / PR:** `session-page-job-a`, one PR against `main`, not merged. **Job B (booking panel, phone sheet, can't-book states) is not started**; the panel's logic and layout are untouched and it still sits right of the content on desktop.
+
+**What changed**
+1. **Decisions recorded** at the top of `docs/decisions.md`: design approved Nov 16; title bold after the last comma; coach traits entered on the profile and copied to sessions; "Lived experience" is the label for identity tags; no "sale / order / request / listing" wording anywhere visible.
+2. **The approved canvas is copied into `docs/design/session-page/`** (all six boards plus `canvas.json`, and a README saying which job builds which). I read it with the Artifact tool, so no files were needed from you. Icons: the five I needed from `~/Desktop/Revie/Icons` are in `src/assets/icons/` (paths also inlined in `SessionIcons.js` so they take the text colour).
+3. **Topbar** (`SessionTopbar.js`, used on the session page only): lavender R at 66px (the repo's existing `revie-logo-mobile.png`), Schibsted all-caps links. Signed out: Find a coach, About, Blog, For coaches, underlined "Sign in", lavender "Get started" pill. Signed in: Find a coach, About, Blog, Inbox with the pink count, initials avatar with the account menu. Phone: logo and menu (plus inbox and initials when signed in, as the phone canvas shows). It keeps the "logged in as" banner and the confirm-your-email reminder the old bar carried.
+4. **Maroon hero**: "SIGNATURE SESSION · 30, 60 OR 90 MIN" (from the price variants; "30–90" on a phone) with a hairline; title Regular with the part after the last comma Bold (all Bold with no comma); quick facts; the coach row with the tilted capsule photo over chartreuse, name linking to her profile, pronouns pill, certification pill, "UK · English, Spanish", "★ New to Revie" (or "★ 4.7 · 3 reviews" once there are reviews), and at most four lived-experience tags (periwinkle, pink, orange, never chartreuse) with "+N more" opening a centred "{First name}'s **been there.**" dialog (Escape, ×, or clicking outside closes it; focus returns to the button).
+5. **The session** (first sentence large, the rest in body text, "Read more" for further paragraphs, a "Before your session" card from `pre_work`), **"You'll walk away with"** (periwinkle band, chartreuse numbers in forest circles on a thin line, hidden without outcome 1), **the coach** ("Get to know **{First name}.**", the orange quote card when she has written one, coaching style in pink, tools in periwinkle, "Read {First name}'s story" opening the bio and her social link), **"Good to know."** (maroon band, four cards), **reviews** (hidden at 0; with some, the average, the two latest, "See all N reviews"). The old details list, map, "About the provider" and the second "Reviews (0)" are gone.
+6. **Layout:** content left, booking panel right and sticky from 1024px up. Both Console layout choices ("carousel" and "cover photo") now render this page (`routeConfiguration.js`, 3 lines; the cover-photo component is untouched but no longer routed).
+7. **Tests:** client suite 1441 passing (100 suites), format check clean; no server code changed. New: title bolding, outcomes hidden without outcome 1, tags capped at 4 with "+N more" and the dialog, reviews hidden at 0, prep fact hidden when empty, plus the helpers (description split, lengths, tag colours, safe social links) and the quote, story and Good to know sections. The two old ListingPage layout tests were replaced by one that checks both layouts render the new page.
+8. **Looked at in the browser** (desktop 1024 and phone 375) through a new styleguide example, `/styleguide/c/SessionPage/FullPage` and `.../FullPageWithReviews` (fixture coach and reviews; the booking panel is a placeholder box). That check found and fixed a real bug: the outcomes line made the whole page scroll sideways.
+
+**Fields: which exist, which do not** (tell me what to do about the two that do not):
+- **"Clients love working with me because..." does not exist** as a field. The orange quote card therefore does not show yet. The page reads it from the coach's public profile data under the key `clients_love` and omits the card while it is empty.
+- **The coach's one-line title does not exist either.** Same treatment, key `coach_title`; the line is omitted.
+- Both are described in `docs/onboarding-fields.md` ("planned, not in Console yet"). To switch them on: create the two user fields in Console (Dev now, Test and Live at cutover), add them to the coach profile form, decide whether they are required. The key names are in one file, `SessionPage/coachFields.js`, if you want different ones.
+- Everything else comes from existing fields on the coach's profile (pronouns, certifications, location, languages, "More about me...", communication style, Tools & Modalities, social link, bio), with labels from Console.
+
+**Where it differs from the canvas, and why** (change any):
+- **The lead sentence** is only the first sentence of the description, as you wrote it; the canvas set two sentences large. I applied "bold after the last comma" to the lead sentence and to the quote card as well, to match the canvas's two weights. Your call whether either should be plain.
+- **The quick fact reads "Short prep questionnaire"** (your brief), not the canvas's "Prep before the session".
+- **The dialog title is "{First name}'s been there."** (your brief; the canvas said "lived experience"); its small line is "Lived experience {name} brings to coaching" (the canvas's "she brings" would guess a pronoun).
+- **The certification pill shows Console's label** ("ICF Certified Coach (ACC)"), longer than the canvas's "ICF ACC". Shortening is a Console label change.
+- **One social link, not two.** She has a single `sociallink` field, so one round icon (LinkedIn, Instagram or a plain link, by site); only http(s) links are used.
+- **Review cards show the month only** ("Oct 2026"), not "60 min session": the length is not on the review the API returns. Reviews under 5 stars show the empty stars dimmed.
+- **No coach photo** shows initials in the capsule.
+- **The phone menu** (what the hamburger opens) is not in the canvas; it is the same links one per line in a simple sheet.
+- **Hover and focus states are mine** (the canvas has none for most): underline on links, pink on pills and buttons (the brand's hover colour), lavender focus ring.
+- **px radii** I kept the canvas's 28, 32 and 40px (quote card, dialog, "Get started"); the CSS audit counts them as hardcoded radii.
+- **Topbar scope:** only the session page has the new bar. Changing it everywhere would have changed search and checkout, which you said not to touch.
+
+**Things to know before merging**
+- **There is no "Message {name}" on the session page until job B.** It lived in the old "About the provider" card, which the design drops; job B adds it to the booking panel. The dialog and its wiring are kept (`SessionInquiryModal.js`, opened by `onContactUser`). If clients must be able to message coaches in the meantime, do not ship job A alone.
+- The booking panel's own words ("order", "listing") were not swept for the "no sale/order/request/listing" decision; that belongs with job B.
+- `OrderPanel` still contains a second, hidden h1 for its phone sheet (job B).
+
+**Console / Render steps:** none. No process, field or environment variable changed. (Creating `coach_title` and `clients_love` is optional and described above.)
+
+**Dev test steps.** Dev is private, so sign in first; use a session whose coach has a photo, pronouns, a certification and several "More about me" tags, then one with none.
+1. Open a session page (`/l/...`). Desktop: maroon hero full width under the maroon bar, booking panel at the right, sticky as you scroll, overlapping the hero's right side as in the canvas. No sideways scroll bar (checked at 1024px and on a phone).
+2. Title: Regular up to the last comma, Bold after it. Try a title with no comma (all Bold).
+3. Hero facts: Video call; **Next available {day}** appears a moment after load, in your own timezone (check it against the booking panel's first day); "Short prep questionnaire" only if the session has "What happens before the session?" text.
+4. Tags: with more than four, "+N more" opens the dialog; Escape, × and a click outside all close it. With four or fewer there is no button. No chartreuse tag.
+5. "New to Revie" with no reviews; leave a review on a test booking and it becomes "★ 4.x · N reviews", linking down to the reviews section, which is absent at 0.
+6. Outcomes band: three numbers; clear outcome 2 and 3 in the session editor and it shows one; clear outcome 1 and the band disappears.
+7. "Read more" and "Read {name}'s story" open and close; a profile with a LinkedIn or Instagram link shows the matching round icon, opening in a new tab.
+8. Signed out (a private window sees the sign-in page first; on Live-like public settings the page itself): the header ends in "Sign in" and "Get started". Signed in: Inbox with the pink count, and the initials menu opens (Your sessions, Profile settings, Account settings, Log out).
+9. Phone width (or your phone): same order in one column, "30–90 MIN" in the label, the hamburger opens the menu, the booking bar at the bottom still works.
+10. Your own session (as the coach): the "pending approval" or "payout details missing" notice still shows above the hero.
+
+**Not verified:** I could not sign in to the private Dev marketplace, so the real `/l/...` page with the real booking panel beside it was never opened in a browser; what I checked was the same components in the styleguide with fixtures, the unit tests and the layout numbers. Specifically unchecked: the real booking panel in the new right column (sticky, and its phone bottom bar with the new page), the topbar signed in (account menu, Inbox count, the email reminder), server-side rendering and hydration of the new topbar, "Next available" against real availability, and a production build (`yarn dev` compiled without warnings).
+
+**What's next**
+- Run the Dev test steps and tell me what looks off; then job B.
+- Decide about the two missing fields (`coach_title`, `clients_love`).
+- Job B: booking panel, phone sheet, can't-book states, "Message {name}", the "no listing/order" words in the panel.
+
+---
+
 ## HANDOFF — 2026-11-25 (client declines the calendar invite: told once that the session is still booked)
 
 **Branch / PR:** `declined-invite-email`, one PR against `main`, not merged.

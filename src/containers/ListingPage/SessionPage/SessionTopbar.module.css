@@ -1,0 +1,321 @@
+@import '../../../styles/customMediaQueries.css';
+
+/**
+ * The session page top bar, after heyrevie.com. Values are the approved design's
+ * (docs/design/session-page/ Main, Phone, HeaderLoggedOut).
+ */
+
+.root {
+  position: relative;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 20px;
+  background: var(--revieMaroon);
+
+  @media (--viewportLarge) {
+    padding: 32px 36px;
+  }
+}
+
+.logo {
+  display: block;
+  line-height: 0;
+}
+
+.logoImage {
+  display: block;
+  width: 48px;
+  height: 48px;
+
+  @media (--viewportLarge) {
+    width: 66px;
+    height: 66px;
+  }
+}
+
+/* ---------- Desktop ---------- */
+
+.nav {
+  display: none;
+
+  @media (--viewportLarge) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 40px;
+  }
+}
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--revieCream);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--revieCream);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 4px;
+  }
+}
+
+.navGap {
+  margin-left: 32px;
+}
+
+.signIn {
+  margin-left: 32px;
+  padding: 20px 8px;
+  border-bottom: 1px solid var(--revieCream);
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: none;
+    border-bottom-width: 3px;
+    padding-bottom: 18px;
+  }
+}
+
+.getStarted {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 58px;
+  padding: 0 40px;
+  border-radius: 40px;
+  background: var(--revieLavender);
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background-color 150ms;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--reviePink);
+    color: var(--revieMaroon);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 3px;
+  }
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--reviePink);
+  color: var(--revieMaroon);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.accountButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--revieCream);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 4px;
+    border-radius: var(--borderRadiusPill);
+  }
+}
+
+.initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieCream);
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+/* ---------- Phone ---------- */
+
+.phoneActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  @media (--viewportLarge) {
+    display: none;
+  }
+}
+
+.phoneInbox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--revieCream);
+}
+
+.dot {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--reviePink);
+}
+
+.phoneInitials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieCream);
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.menuButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--revieCream);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+/* The menu a phone opens: the same links, one per line. */
+.mobileMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 56px;
+}
+
+.mobileLink {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0;
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  text-align: left;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--revieMaroon);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+  }
+}
+
+.mobileGetStarted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  margin-top: 12px;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieMaroon);
+  color: var(--revieCream);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--reviePink);
+    color: var(--revieMaroon);
+    text-decoration: none;
+  }
+}
+
+/* ---------- What the shared top bar also does ---------- */
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: calc(var(--zIndexTopbar) + 1);
+
+  &:focus {
+    left: 0;
+    padding: 12px 16px;
+    background: var(--revieMaroon);
+    color: var(--revieCream);
+    outline: 3px solid var(--revieLavender);
+  }
+}
+
+.missingInformationModal {
+  composes: marketplaceModalBaseStyles from global;
+  padding-top: 70px;
+}
+
+.genericError {
+  padding: 12px 20px;
+  background: var(--colorFail);
+  color: var(--colorWhite);
+  text-align: center;
+}

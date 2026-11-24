@@ -1,0 +1,76 @@
+@import '../../../styles/customMediaQueries.css';
+
+/**
+ * Layout of the session page (the page the redesign replaced was a photo gallery and a details
+ * list). Content column on the left, the booking panel on the right and sticky from the large
+ * breakpoint; below it the panel is the template's own bottom bar and sheet, so its column is
+ * empty. Values are the approved design's (docs/design/session-page/).
+ */
+
+.page {
+  /* The full-width bands and the outcomes line are drawn past the content column; clip them at the
+     page edge so they cannot make the page scroll sideways. (clip, not hidden: no scroll container,
+     so the sticky booking panel still sticks.) */
+  overflow-x: clip;
+  color: var(--revieMaroon);
+  font-size: 16px;
+  line-height: 1.55;
+
+  @media (--viewportLarge) {
+    font-size: 17px;
+  }
+}
+
+.main {
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+
+  /* Content left, booking panel right. A grid rather than a wrapping row: at the narrowest
+     desktop widths a wrapping row dropped the panel below the whole page, out of sight. */
+  @media (--viewportLarge) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    column-gap: 64px;
+    align-items: start;
+    padding: 0 32px;
+  }
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  min-width: 0;
+
+  @media (--viewportLarge) {
+    gap: 96px;
+  }
+}
+
+/* The booking panel. Its own layout is untouched in this job; only where it sits is set here. */
+.bookColumn {
+  max-width: 400px;
+
+  @media (--viewportLarge) {
+    position: sticky;
+    top: 24px;
+    z-index: 2;
+    margin-top: 56px;
+  }
+}
+
+.actionBar {
+  width: 100%;
+  margin: 24px 0 -32px;
+}
+
+/* Keeps the footer clear of the template's fixed "book" bar on a phone. */
+.pageRoot {
+  padding-bottom: 90px;
+
+  @media (--viewportLarge) {
+    padding-bottom: 0;
+  }
+}

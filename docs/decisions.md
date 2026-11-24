@@ -7,6 +7,17 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: The session page design is approved, and the words on it are fixed
+**Date:** Nov 16, 2026 (approved); recorded Nov 24, 2026
+**Decision:**
+- **Session page design approved (Nov 16).** The canvas "Revie session page, desktop & phone" (a copy is in `docs/design/session-page/`) is the design for the session page (`/l/...`). Built in two jobs: A (topbar, hero and page sections), then B (booking panel, phone sheet, can't-book states).
+- **Title bold after the last comma.** A session title is Regular weight with everything after its last comma in Bold; a title with no comma is all Bold.
+- **Coach traits are entered on the profile and copied to sessions** (the Nov 18 decision stands; the session page reads them from the coach's profile).
+- **"Lived experience" is the label for identity tags.**
+- **No "sale", "order", "request" or "listing" wording anywhere a person can see it.** Code, route names and ids keep the template's names; only what is shown changes.
+**Why:** One approved reference stops the page being re-argued component by component, and one vocabulary keeps a coaching product from reading like a shop.
+**Affects:** `src/containers/ListingPage/`, `docs/design/session-page/`, visible strings. Recorded from the chat with Regan, not pasted from the planning project.
+
 ### DECISION: A coach whose Google connection breaks is not bookable, and is told once
 **Date:** Nov 24, 2026
 **Decision:** When a coach's Google Calendar connection stops working (Nylas `grant.expired` or `grant.deleted`, or found by a daily check), their sessions stop being bookable the same way as "no calendar connected" ("This coach isn't taking bookings yet"); no new booking or price check can start. Existing bookings are untouched. The Calendar page and the setup card ask her to reconnect, and she gets one email per break ("Reconnect your calendar to keep taking bookings"), not daily. Reconnecting clears it within a minute, with no second email. Sentry tag `nylas-grant-expired`, coach id only.
