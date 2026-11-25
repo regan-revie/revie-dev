@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 
+import classNames from 'classnames';
+
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { userDisplayNameAsString } from '../../../util/data';
+import { NamedLink, WavePhoto } from '../../../components';
 
-import { Headline, SectionLabel, ToggleButton } from './SessionParts';
+import { Headline, ToggleButton } from './SessionParts';
 import {
   COACH_QUOTE_KEY,
   COMMUNICATION_STYLE_KEY,
+  PRONOUNS_KEY,
   SOCIAL_LINK_KEY,
   TOOLS_KEY,
 } from './coachFields';
@@ -75,19 +79,44 @@ const LinkIcon = () => (
   </svg>
 );
 
+const ChevronRight = () => (
+  <svg
+    aria-hidden="true"
+    focusable="false"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9 6l6 6-6 6" />
+  </svg>
+);
+
 const SOCIAL_ICONS = { linkedin: LinkedInIcon, instagram: InstagramIcon, link: LinkIcon };
 
 /**
- * "The coach": the quote card (when the coach has written one), how they coach, the tools they use,
- * and their story behind a "Read {name}'s story" toggle.
+ * "Get to know {name}": the quote card (when the coach has written one), how they coach, the tools
+ * they use, and their story behind a "Read {name}'s story" toggle.
+ *
+ * The quote card carries the coach's photo in the wavy shape, her name in capitals and pronouns
+ * (when she has set them), and a button to her profile.
+ *
+ * `afterReviews` is set when the session has reviews: the section then opens with a hairline and
+ * more space, so the reviews and the coach read as two sections rather than one long one.
  */
-const SessionCoach = ({ author, userFields }) => {
+const SessionCoach = ({ author, userFields, afterReviews = false }) => {
   const intl = useIntl();
   const [open, setOpen] = useState(false);
 
   const profile = author?.attributes?.profile || {};
   const publicData = profile.publicData || {};
-  const name = firstNameOf(userDisplayNameAsString(author, ''));
+  const displayName = userDisplayNameAsString(author, '');
+  const name = firstNameOf(displayName);
+  const pronouns = optionLabels(userFields, PRONOUNS_KEY, publicData[PRONOUNS_KEY])[0];
 
   const quote = hasText(publicData[COACH_QUOTE_KEY]) ? publicData[COACH_QUOTE_KEY].trim() : null;
   const styles = optionLabels(
@@ -102,10 +131,11 @@ const SessionCoach = ({ author, userFields }) => {
   const SocialIcon = socialHref ? SOCIAL_ICONS[socialKind(socialHref)] : null;
 
   return (
-    <section aria-labelledby="session-coach" className={css.coach} data-testid="session-coach">
-      <SectionLabel>
-        <FormattedMessage id="SessionPage.labelCoach" />
-      </SectionLabel>
+    <section
+      aria-labelledby="session-coach"
+      className={classNames(css.coach, { [css.coachAfterReviews]: afterReviews })}
+      data-testid="session-coach"
+    >
       <Headline
         id="session-coach"
         lead={intl.formatMessage({ id: 'SessionPage.coachHeadingLead' })}
@@ -114,7 +144,29 @@ const SessionCoach = ({ author, userFields }) => {
 
       {quote ? (
         <figure className={css.quoteCard} data-testid="coach-quote">
-          <blockquote className={css.quote}>“{quote}”</blockquote>
+          <WavePhoto
+            className={css.quotePhoto}
+            image={author?.profileImage}
+            name={displayName}
+            sizes="(min-width: 1024px) 260px, 90vw"
+          />
+          <div className={css.quoteBody}>
+            <blockquote className={css.quote}>“{quote}”</blockquote>
+            <figcaption className={css.quoteCaption}>
+              <span className={css.quoteName}>{displayName}</span>
+              {pronouns ? <span className={css.quotePronouns}>{pronouns}</span> : null}
+            </figcaption>
+            {author?.id ? (
+              <NamedLink
+                name="ProfilePage"
+                params={{ id: author.id.uuid }}
+                className={css.profileButton}
+              >
+                <FormattedMessage id="SessionPage.seeProfileButton" values={{ name }} />
+                <ChevronRight />
+              </NamedLink>
+            ) : null}
+          </div>
         </figure>
       ) : null}
 

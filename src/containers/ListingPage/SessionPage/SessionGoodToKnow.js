@@ -4,7 +4,7 @@ import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { NamedLink } from '../../../components';
 
 import { IconVideoCall, IconPaying, IconCancelling, IconCalendarStar } from './SessionIcons';
-import { Band, Headline, SectionLabel } from './SessionParts';
+import { Band, Headline } from './SessionParts';
 
 import css from './SessionSections.module.css';
 
@@ -30,9 +30,6 @@ const SessionGoodToKnow = ({ firstName, authorId }) => {
       className={css.good}
       data-testid="session-good"
     >
-      <SectionLabel>
-        <FormattedMessage id="SessionPage.labelDetails" />
-      </SectionLabel>
       <Headline
         id="session-good"
         lead={intl.formatMessage({ id: 'SessionPage.goodLead' })}

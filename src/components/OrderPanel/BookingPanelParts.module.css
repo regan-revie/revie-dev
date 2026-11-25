@@ -30,6 +30,14 @@
   font-family: var(--fontFamily);
   font-size: 16px;
   line-height: 1.5;
+
+  /* On desktop the card is sticky. Taller than the window (the calendar opened by "More dates"),
+     it scrolls inside itself, so the Book button stays reachable. */
+  @media (--viewportLarge) {
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }
 
 .stepTitle {

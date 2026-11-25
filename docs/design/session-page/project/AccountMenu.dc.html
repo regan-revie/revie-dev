@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Account menu (open)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/3359179f8c0408d8229d5560ab61e0ea) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/607f780e20ebb4bc54fee2057d319e2c) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/af892071ee3abbe7f3a1a1b4e991b758) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/e55bc6eeb43905184b850306d9daadff) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Schibsted Grotesk';src:url(/_blob/2215ec698ba0b2184ade89350c6cf3e4) format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+</style>
+<style>
+body{margin:0;background:#EFEEED}
+a{color:#310416}a:hover{color:#310416;text-decoration-thickness:2px}
+button{font:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #DBABF5;outline-offset:2px}
+.x-close{transition:background-color 150ms,border-color 150ms}
+.x-close:hover,.x-close:focus-visible{background:#FF90C2 !important;border-color:#FF90C2 !important}
+@media (max-width: 1100px){.fgrid{grid-template-columns:repeat(2, minmax(0, 1fr)) !important}}
+@media (max-width: 640px){.fgrid,.good{grid-template-columns:minmax(0, 1fr) !important}}
+.bookbar{display:none}
+@media (max-width: 1023px){.book{display:none !important}.bookbar{display:flex !important}}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 100%; padding: 36px 48px; background: #310416; display: flex; gap: 72px; align-items: flex-start">
+<div style="display: flex; flex-direction: column; gap: 14px; align-items: flex-end">
+<div style="font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #EFEEED; align-self: flex-start">Client</div>
+<div style="display: inline-flex; align-items: center; gap: 8px"><span style="display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 999px; background: #EFEEED; color: #310416; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 18px">JL</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EFEEED" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg></div>
+<div style="box-sizing: border-box; width: 260px; padding: 12px; border: 1px solid rgba(49,4,22,0.16); border-radius: 20px; background: #EFEEED; box-shadow: 0 12px 32px rgba(49,4,22,0.10); font-family: 'Bio Sans', sans-serif">
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px"><li><a href="#" style="display: block; padding: 10px 16px; border-radius: 12px; background: #DBABF5; color: #310416; text-decoration: none; font-size: 16px; line-height: 1.4">Your bookings</a></li><li><a href="#" style="display: block; padding: 10px 16px; border-radius: 12px; color: #310416; text-decoration: none; font-size: 16px; line-height: 1.4">Edit your profile</a></li><li><a href="#" style="display: block; padding: 10px 16px; border-radius: 12px; color: #310416; text-decoration: none; font-size: 16px; line-height: 1.4">Account and payments</a></li></ul>
+<div style="margin: 10px 16px 6px; height: 1px; background: rgba(49,4,22,0.14)"></div>
+<a href="#" style="display: block; padding: 10px 16px; border-radius: 12px; color: #310416; text-decoration: none; font-size: 16px">Log out</a>
+</div></div>
+<div style="display: flex; flex-direction: column; gap: 14px; align-items: flex-end">
+<div style="font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #EFEEED; align-self: flex-start">Coach</div>
+<div style="display: inline-flex; align-items: center; gap: 8px"><span style="display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 999px; background: #EFEEED; color: #310416; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 18px">JL</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EFEEED" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg></div>
+<div style="box-sizing: border-box; width: 260px; padding: 12px; border: 1px solid rgba(49,4,22,0.16); border-radius: 20px; background: #EFEEED; box-shadow: 0 12px 32px rgba(49,4,22,0.10); font-family: 'Bio Sans', sans-serif">
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px"><li><a href="#" style="display: block; padding: 10px 16px; border-radius: 12px; background: #DBABF5; color: #310416; text-decoration: none; font-size: 16px; line-height: 1.4">Your sessions</a></li><li><a href="#" style="display: block; padding: 10px 16px; border-radius: 12px; color: #310416; text-decoration: none; font-size: 16px; line-height: 1.4">Calendar and hours</a></li><li><a href="#" style="display: block; padding: 10px 16px; border-radius: 12px; color: #310416; text-decoration: none; font-size: 16px; line-height: 1.4">Edit your profile</a></li><li><a href="#" style="display: block; padding: 10px 16px; border-radius: 12px; color: #310416; text-decoration: none; font-size: 16px; line-height: 1.4">Account and payments</a></li></ul>
+<div style="margin: 10px 16px 6px; height: 1px; background: rgba(49,4,22,0.14)"></div>
+<a href="#" style="display: block; padding: 10px 16px; border-radius: 12px; color: #310416; text-decoration: none; font-size: 16px">Log out</a>
+</div></div>
+<p style="margin: 0; max-width: 260px; color: #EFEEED; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-size: 15px; line-height: 1.4; opacity: 0.85">As built in job A. The first row shows the hover state (lavender). "Log out" sits apart under a hairline. "Your bookings" opens the inbox on the bookings tab.</p>
+</div>
+</x-dc>
+</body>
+</html>

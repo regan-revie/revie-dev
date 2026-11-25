@@ -19,6 +19,17 @@ const availableVariants = image => {
   return SQUARE_FALLBACK_VARIANTS.filter(name => variants[name]);
 };
 
+/**
+ * The `srcSet` for a profile image, from the best variants it has, or '' when it has none (so the
+ * caller shows initials). Shared with WavePhoto so both pick the same files.
+ */
+export const profilePhotoSrcSet = image => {
+  const imageVariants = image?.attributes?.variants || {};
+  return availableVariants(image)
+    .map(v => `${imageVariants[v].url} ${imageVariants[v].width}w`)
+    .join(', ');
+};
+
 /** "Maya R." gives "MR"; one name gives its first letter. At most two letters. */
 export const initialsOf = name =>
   (name || '')
@@ -53,12 +64,8 @@ export const initialsOf = name =>
  */
 const CoachPhoto = props => {
   const { className, image, name, sizes } = props;
-  const variantNames = availableVariants(image);
-  const imageVariants = image?.attributes?.variants || {};
-  const srcSet = variantNames
-    .map(v => `${imageVariants[v].url} ${imageVariants[v].width}w`)
-    .join(', ');
-  const hasPhoto = variantNames.length > 0;
+  const srcSet = profilePhotoSrcSet(image);
+  const hasPhoto = srcSet !== '';
 
   return (
     <div className={classNames(css.root, className)} data-testid="coach-photo">

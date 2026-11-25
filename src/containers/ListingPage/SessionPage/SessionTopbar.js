@@ -83,12 +83,12 @@ export const accountMenuItems = (kind, inboxTab) =>
         { id: 'calendar', messageId: 'SessionTopbar.calendar', route: 'CalendarSettingsPage' },
         {
           id: 'profile',
-          messageId: 'TopbarDesktop.profileSettingsLink',
+          messageId: 'SessionTopbar.editProfile',
           route: 'ProfileSettingsPage',
         },
         {
           id: 'account',
-          messageId: 'TopbarDesktop.accountSettingsLink',
+          messageId: 'SessionTopbar.accountAndPayments',
           route: 'AccountSettingsPage',
         },
       ]
@@ -101,12 +101,12 @@ export const accountMenuItems = (kind, inboxTab) =>
         },
         {
           id: 'profile',
-          messageId: 'TopbarDesktop.profileSettingsLink',
+          messageId: 'SessionTopbar.editProfile',
           route: 'ProfileSettingsPage',
         },
         {
           id: 'account',
-          messageId: 'TopbarDesktop.accountSettingsLink',
+          messageId: 'SessionTopbar.accountAndPayments',
           route: 'AccountSettingsPage',
         },
       ];

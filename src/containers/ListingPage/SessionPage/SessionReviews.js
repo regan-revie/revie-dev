@@ -4,8 +4,8 @@ import classNames from 'classnames';
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { UserDisplayName } from '../../../components';
 
-import { Headline, SectionLabel } from './SessionParts';
-import { averageRating } from './sessionPageHelpers';
+import { Headline } from './SessionParts';
+import { reviewScore } from './sessionPageHelpers';
 
 import css from './SessionSections.module.css';
 
@@ -54,7 +54,8 @@ const ReviewCard = ({ review }) => {
 
 /**
  * "Reviews of this session". Nothing at all while the session has none: a blank "Reviews (0)" says
- * the wrong thing to a visitor. With some, the average and the two latest, and a button for the rest.
+ * the wrong thing to a visitor. With some, the two latest and a button for the rest. The average is
+ * shown only from three reviews (see `reviewScore`); with one or two the cards stand alone.
  *
  * Each review shows the month it was written; the length of the session reviewed is not on the
  * review the API returns, so it is left out rather than guessed.
@@ -72,7 +73,7 @@ const SessionReviews = ({ reviews = [] }) => {
   );
   const shown = showAll ? newestFirst : newestFirst.slice(0, REVIEWS_SHOWN);
   const canExpand = newestFirst.length > REVIEWS_SHOWN;
-  const average = averageRating(reviews);
+  const { average } = reviewScore(reviews);
 
   return (
     <section
@@ -81,21 +82,20 @@ const SessionReviews = ({ reviews = [] }) => {
       className={css.reviews}
       data-testid="session-reviews"
     >
-      <SectionLabel>
-        <FormattedMessage id="SessionPage.labelReviews" />
-      </SectionLabel>
       <div className={css.reviewsHeader}>
         <Headline
           id="session-reviews"
           lead={intl.formatMessage({ id: 'SessionPage.reviewsLead' })}
           bold={intl.formatMessage({ id: 'SessionPage.reviewsBold' })}
         />
-        <div className={css.average}>
-          <span className={css.averageNumber}>{average}</span>
-          <span>
-            <FormattedMessage id="SessionPage.fromReviews" values={{ count: reviews.length }} />
-          </span>
-        </div>
+        {average ? (
+          <div className={css.average} data-testid="reviews-average">
+            <span className={css.averageNumber}>{average}</span>
+            <span>
+              <FormattedMessage id="SessionPage.fromReviews" values={{ count: reviews.length }} />
+            </span>
+          </div>
+        ) : null}
       </div>
       <div className={css.reviewGrid}>
         {shown.map(review => (

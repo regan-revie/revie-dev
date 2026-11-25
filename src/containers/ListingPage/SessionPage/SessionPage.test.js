@@ -181,14 +181,25 @@ describe('hero coach row', () => {
     expect(screen.getByText('Career coach for first-time leaders')).toBeInTheDocument();
   });
 
-  it('shows "New to Revie" until there is a review, then the rating', () => {
-    const { unmount } = renderHero();
-    expect(screen.getByTestId('new-badge')).toHaveTextContent('New to Revie');
-    unmount();
+  it('shows "New to Revie" with no reviews, a count with one or two, the score from three', () => {
+    const badge = reviews => {
+      const { unmount } = renderHero({ reviews });
+      const text = (screen.queryByTestId('rating-badge') || screen.getByTestId('new-badge'))
+        .textContent;
+      const isNew = !!screen.queryByTestId('new-badge');
+      unmount();
+      return { text, isNew };
+    };
 
-    renderHero({ reviews: [review('a', 5), review('b', 4)] });
-    expect(screen.queryByTestId('new-badge')).not.toBeInTheDocument();
-    expect(screen.getByTestId('rating-badge')).toHaveTextContent('4.5 · 2 reviews');
+    expect(badge([])).toEqual({ text: 'New to Revie', isNew: true });
+    // one or two: no score, just how many
+    expect(badge([review('a', 5)])).toEqual({ text: '1 review', isNew: false });
+    expect(badge([review('a', 5), review('b', 4)])).toEqual({ text: '2 reviews', isNew: false });
+    // three or more: the average, to one decimal
+    expect(badge([review('a', 5), review('b', 4), review('c', 4)])).toEqual({
+      text: '4.3 · 3 reviews',
+      isNew: false,
+    });
   });
 });
 
@@ -271,10 +282,21 @@ describe('the session section', () => {
     expect(screen.queryByText('Hidden paragraph.')).not.toBeInTheDocument();
   });
 
-  it('shows the "Before your session" card only when pre_work has text', () => {
-    render(<SessionAbout description="One." preWork="Fill in the form." />, { messages });
+  it('shows the "Before your session" card with the coach\'s own words, only when pre_work has text', () => {
+    const { unmount } = render(<SessionAbout description="One." preWork="Fill in the form." />, {
+      messages,
+    });
     expect(screen.getByTestId('prep-card')).toHaveTextContent('Before your session');
     expect(screen.getByText('Fill in the form.')).toBeInTheDocument();
+    unmount();
+
+    render(<SessionAbout description="One." preWork="   " />, { messages });
+    expect(screen.queryByTestId('prep-card')).not.toBeInTheDocument();
+  });
+
+  it('has no "The session" label above it', () => {
+    render(<SessionAbout description="One. Two." preWork="" />, { messages });
+    expect(screen.queryByText('The session')).not.toBeInTheDocument();
   });
 });
 
@@ -322,6 +344,91 @@ describe('the coach section', () => {
     const quote = screen.getByTestId('coach-quote');
     expect(quote).toHaveTextContent("Clients love working with me because I'm blunt, then I help.");
     expect(quote.querySelector('b')).toBeNull();
+  });
+
+  it('has no "The coach" label above its heading', () => {
+    render(<SessionCoach author={coach()} userFields={userFields} />, { messages });
+    expect(screen.queryByText('The coach')).not.toBeInTheDocument();
+  });
+
+  describe('quote card', () => {
+    const quoteCoach = (publicData = {}) =>
+      coach({ clients_love: 'I say the thing your friends will not.', ...publicData });
+
+    it("has the coach's name in the card, and her pronouns when she has set them", () => {
+      const { unmount } = render(<SessionCoach author={quoteCoach()} userFields={userFields} />, {
+        messages,
+        routeConfiguration,
+      });
+      const card = within(screen.getByTestId('coach-quote'));
+      expect(card.getByText('Maya R.')).toBeInTheDocument();
+      expect(card.getByText('she/her')).toBeInTheDocument();
+      unmount();
+
+      render(
+        <SessionCoach author={quoteCoach({ pronouns: undefined })} userFields={userFields} />,
+        {
+          messages,
+          routeConfiguration,
+        }
+      );
+      const withoutPronouns = within(screen.getByTestId('coach-quote'));
+      expect(withoutPronouns.getByText('Maya R.')).toBeInTheDocument();
+      expect(withoutPronouns.queryByText('she/her')).not.toBeInTheDocument();
+    });
+
+    it("has an outlined button to the coach's profile", () => {
+      render(<SessionCoach author={quoteCoach()} userFields={userFields} />, {
+        messages,
+        routeConfiguration,
+      });
+      const link = within(screen.getByTestId('coach-quote')).getByRole('link', {
+        name: "See Maya's profile",
+      });
+      expect(link).toHaveAttribute('href', '/u/coach-1');
+    });
+
+    it('shows her initials in the wave until she has a photo', () => {
+      render(<SessionCoach author={quoteCoach()} userFields={userFields} />, {
+        messages,
+        routeConfiguration,
+      });
+      expect(screen.getByTestId('wave-photo-initials')).toHaveTextContent('MR');
+    });
+
+    it('shows her photo in the wave when she has one', () => {
+      const author = {
+        ...quoteCoach(),
+        profileImage: {
+          id: { uuid: 'img' },
+          type: 'image',
+          attributes: {
+            variants: {
+              'scale-small': { url: 'https://example.com/s.jpg', width: 400, height: 550 },
+              'scale-large': { url: 'https://example.com/l.jpg', width: 800, height: 1100 },
+            },
+          },
+        },
+      };
+      render(<SessionCoach author={author} userFields={userFields} />, {
+        messages,
+        routeConfiguration,
+      });
+      expect(screen.getByTestId('wave-photo-image')).toHaveAttribute('alt', 'Maya R.');
+      expect(screen.queryByTestId('wave-photo-initials')).not.toBeInTheDocument();
+    });
+  });
+
+  it('opens with a hairline and extra space only when the session has reviews', () => {
+    const { unmount } = render(
+      <SessionCoach author={coach()} userFields={userFields} afterReviews={true} />,
+      { messages }
+    );
+    expect(screen.getByTestId('session-coach').className).toMatch(/coachAfterReviews/);
+    unmount();
+
+    render(<SessionCoach author={coach()} userFields={userFields} />, { messages });
+    expect(screen.getByTestId('session-coach').className).not.toMatch(/coachAfterReviews/);
   });
 
   it('shows coaching style and tools, and opens the story and social link', async () => {
@@ -395,6 +502,8 @@ describe('reviews', () => {
 
     const section = within(screen.getByTestId('session-reviews'));
     expect(section.getByRole('heading', { name: 'What clients say.' })).toBeInTheDocument();
+    expect(section.queryByText('The details')).not.toBeInTheDocument();
+    expect(section.queryByText('Reviews of this session')).not.toBeInTheDocument();
     expect(section.getByText('4.7')).toBeInTheDocument();
     expect(section.getByText('from 3 reviews')).toBeInTheDocument();
     expect(section.getAllByTestId('review-card')).toHaveLength(2);
@@ -403,5 +512,24 @@ describe('reviews', () => {
 
     await user.click(section.getByRole('button', { name: 'See all 3 reviews' }));
     expect(section.getAllByTestId('review-card')).toHaveLength(3);
+  });
+
+  it('show the cards but no score with one or two reviews', () => {
+    render(<SessionReviews reviews={[review('a', 5), review('b', 5)]} />, { messages });
+    const section = within(screen.getByTestId('session-reviews'));
+    expect(section.getAllByTestId('review-card')).toHaveLength(2);
+    expect(section.queryByTestId('reviews-average')).not.toBeInTheDocument();
+    expect(section.queryByText(/from 2 reviews/)).not.toBeInTheDocument();
+    expect(section.getByRole('heading', { name: 'What clients say.' })).toBeInTheDocument();
+  });
+});
+
+describe('Good to know', () => {
+  it('has no "The details" label above its heading', () => {
+    render(<SessionGoodToKnow firstName="Maya" authorId="coach-1" />, {
+      messages,
+      routeConfiguration,
+    });
+    expect(screen.queryByText('The details')).not.toBeInTheDocument();
   });
 });

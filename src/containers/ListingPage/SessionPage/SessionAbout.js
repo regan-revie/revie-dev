@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 
 import { IconPrep } from './SessionIcons';
-import { SectionLabel, ToggleButton } from './SessionParts';
+import { ToggleButton } from './SessionParts';
 import { hasText, splitDescription } from './sessionPageHelpers';
 
 import css from './SessionSections.module.css';
@@ -28,10 +28,6 @@ const SessionAbout = ({ description, preWork }) => {
       className={css.about}
       data-testid="session-about"
     >
-      <SectionLabel>
-        <FormattedMessage id="SessionPage.labelSession" />
-      </SectionLabel>
-
       {lead ? <p className={css.lead}>{lead}</p> : null}
       {body ? <p className={css.body}>{body}</p> : null}
       {more.length > 0 ? (

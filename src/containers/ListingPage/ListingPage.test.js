@@ -259,7 +259,9 @@ describe('ListingPage variants', () => {
       expect(screen.getByTestId('session-good')).toBeInTheDocument();
       const reviews = within(screen.getByTestId('session-reviews'));
       expect(reviews.getByText('“It was awesome!”')).toBeInTheDocument();
-      expect(getByText('from 1 review')).toBeInTheDocument();
+      // One review: the card shows, but no score yet (the average starts at three reviews).
+      expect(reviews.queryByTestId('reviews-average')).not.toBeInTheDocument();
+      expect(screen.getByTestId('rating-badge')).toHaveTextContent('1 review');
     });
   });
 });
