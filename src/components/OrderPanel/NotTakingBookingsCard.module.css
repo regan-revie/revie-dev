@@ -1,5 +1,6 @@
 .card {
-  gap: 20px;
+  /* BookingCard's inner wrapper holds the gap. */
+  --cardGap: 20px;
 }
 
 .prices {

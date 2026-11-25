@@ -1,4 +1,6 @@
 import React from 'react';
+import fs from 'fs';
+import path from 'path';
 import '@testing-library/jest-dom';
 
 import { createUser, createListing } from '../../util/testData';
@@ -370,5 +372,25 @@ describe('pronounWords', () => {
         possessive: 'their',
       });
     });
+  });
+});
+
+describe('the booking card scrolls an inner wrapper, never itself', () => {
+  const css = fs.readFileSync(path.join(__dirname, 'BookingPanelParts.module.css'), 'utf8');
+
+  it('the card clips to its rounded corners and does not scroll', () => {
+    const card = css.match(/\n\.card\s*\{([^}]*)\}/)[1];
+    expect(card).toMatch(/overflow:\s*hidden/);
+    expect(card).not.toMatch(/overflow-y/);
+    expect(card).toMatch(/border-radius/);
+  });
+
+  it('the inner wrapper scrolls only when taller than the window, with a thin overlay scrollbar and no track', () => {
+    const inner = css.match(/\.cardInner\s*\{([\s\S]*?)\n\}\n/)[1];
+    expect(inner).toMatch(/max-height:\s*calc\(100vh/);
+    expect(inner).toMatch(/overflow-y:\s*auto/);
+    expect(inner).toMatch(/scrollbar-width:\s*thin/);
+    expect(inner).toMatch(/scrollbar-color:[^;]*transparent/);
+    expect(inner).toMatch(/::-webkit-scrollbar-track\s*\{[^}]*transparent/);
   });
 });

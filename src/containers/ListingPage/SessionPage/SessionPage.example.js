@@ -2,10 +2,12 @@ import React, { useEffect } from 'react';
 
 import { types as sdkTypes } from '../../../util/sdkLoader';
 import { useConfiguration } from '../../../context/configurationContext';
-import { createUser, createListing, createReview } from '../../../util/testData';
+import { createCurrentUser, createUser, createListing, createReview } from '../../../util/testData';
 
 import { withPhoto } from '../../../components/CoachPhoto/CoachPhoto.fixture';
-import SessionTopbar from './SessionTopbar';
+import SessionTopbar, { AccountMenu } from './SessionTopbar';
+import { BookingCard } from '../../../components/OrderPanel/BookingPanelParts';
+import topbarCss from './SessionTopbar.module.css';
 import SessionHero from './SessionHero';
 import SessionAbout from './SessionAbout';
 import SessionCoach from './SessionCoach';
@@ -210,3 +212,47 @@ export const HeroWithPhotoAndWithInitials = {
   props: {},
   group: 'session page',
 };
+
+/**
+ * The signed-in account menu, opened, with the sticky booking panel's place just below it, to check
+ * the card's width (no wrapping), where it opens (its right edge on the avatar's) and that it sits
+ * above the panel.
+ */
+const MenuOpenOverPanel = () => {
+  useBareStyleguide();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const button = document.getElementById('session-profile-menu-label');
+      if (button) button.click();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div className={sessionCss.pageRoot}>
+      <div className={topbarCss.root}>
+        <header className={topbarCss.bar}>
+          <div style={{ marginLeft: 'auto' }}>
+            <AccountMenu
+              currentUser={createCurrentUser('example-client', {
+                profile: { firstName: 'Jess', lastName: 'Lee', abbreviatedName: 'JL' },
+              })}
+              kind="client"
+              inboxTab="orders"
+              onLogout={() => {}}
+            />
+          </div>
+        </header>
+      </div>
+      <div className={sessionCss.main}>
+        <div className={sessionCss.column} />
+        <div className={sessionCss.bookColumn}>
+          <BookingCard>
+            <p style={{ margin: 0, minHeight: 360 }}>The booking panel.</p>
+          </BookingCard>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const AccountMenuOpen = { component: MenuOpenOverPanel, props: {}, group: 'session page' };

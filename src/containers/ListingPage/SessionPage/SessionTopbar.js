@@ -111,11 +111,13 @@ export const accountMenuItems = (kind, inboxTab) =>
         },
       ];
 
-const AccountMenu = ({ currentUser, currentPage, onLogout, kind, inboxTab }) => {
+export const AccountMenu = ({ currentUser, currentPage, onLogout, kind, inboxTab }) => {
   const intl = useIntl();
   const items = accountMenuItems(kind, inboxTab);
   return (
-    <Menu skipFocusOnNavigation={true}>
+    // contentPosition="left": the card opens leftwards from the button, so its right edge lines up
+    // with the avatar's (the shared Menu otherwise opens it rightwards, off the page's edge).
+    <Menu skipFocusOnNavigation={true} contentPosition="left">
       <MenuLabel
         id="session-profile-menu-label"
         className={css.accountButton}

@@ -13,13 +13,14 @@ import RevieBookingPanel, { PANEL_STATES } from './RevieBookingPanel';
  * both, or open "Phone sheet" at phone width.
  */
 
-const slots = (minutes = 60) => {
+const slots = (minutes = 60, firstDay = 3) => {
   const out = [];
   const day = new Date();
   day.setHours(0, 0, 0, 0);
-  for (let d = 3; d < 40; d += 1) {
+  for (let d = firstDay; d < 40; d += 1) {
     const date = new Date(day.getTime() + d * 86400000);
-    if ([0, 6].includes(date.getDay()) || d % 5 === 4) continue;
+    // (With firstDay 1 every day is offered, so a time inside the 48 hours is always there.)
+    if (firstDay >= 3 && ([0, 6].includes(date.getDay()) || d % 5 === 4)) continue;
     for (let m = 9 * 60; m + minutes <= 17 * 60; m += 60) {
       const start = date.getTime() + m * 60000;
       out.push({ start, end: start + minutes * 60000 });
@@ -81,6 +82,11 @@ const Stubbed = withStubbedFetch(RevieBookingPanel, {
   '/api/nylas/availability': url => ({ slots: slots(lengthOf(url)), connected: true }),
 });
 
+// Times from tomorrow on, so one inside the 48 hours can be picked.
+const StubbedSoon = withStubbedFetch(RevieBookingPanel, {
+  '/api/nylas/availability': url => ({ slots: slots(lengthOf(url), 1), connected: true }),
+});
+
 const Narrow = ({ children }) => (
   <div style={{ maxWidth: 400, margin: '24px auto' }}>{children}</div>
 );
@@ -88,6 +94,11 @@ const Narrow = ({ children }) => (
 const Panel = () => (
   <Narrow>
     <Stubbed {...props(PANEL_STATES.FORM)} />
+  </Narrow>
+);
+const PanelSoon = () => (
+  <Narrow>
+    <StubbedSoon {...props(PANEL_STATES.FORM)} />
   </Narrow>
 );
 const PhoneSheet = () => <Stubbed {...props(PANEL_STATES.FORM, { isOrderOpen: true })} />;
@@ -146,6 +157,8 @@ const CoachReconnect = () => (
 );
 
 export const BookingPanelAndPhoneBar = { component: Panel, props: {}, group: 'booking' };
+// Times from tomorrow: pick one less than 48 hours away to see its fine print.
+export const BookingPanelTimesSoon = { component: PanelSoon, props: {}, group: 'booking' };
 export const BookingPhoneSheet = { component: PhoneSheet, props: {}, group: 'booking' };
 export const CannotBookClient = { component: ClientCannotBook, props: {}, group: 'booking' };
 export const CannotBookClientTheyThem = {

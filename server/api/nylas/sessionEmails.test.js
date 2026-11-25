@@ -1316,6 +1316,12 @@ describe('the 60-hour reminder (client only)', () => {
       expect(await queue60(59)).toEqual({ queued: 0, skipped: 'under-60h' });
       expect(rows60()).toHaveLength(0);
     });
+
+    it('never queues one for a session inside 48 hours: there is no free window left for it to talk about', async () => {
+      expect(await queue60(30)).toEqual({ queued: 0, skipped: 'under-60h' });
+      expect(await queue60(47)).toEqual({ queued: 0, skipped: 'under-60h' });
+      expect(rows60()).toHaveLength(0);
+    });
   });
 
   describe('a reschedule', () => {

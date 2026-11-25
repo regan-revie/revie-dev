@@ -43,7 +43,7 @@ export const PanelHeading = ({ name, className, as: Tag = 'h2' }) => (
 /** The card the panel and its states sit in. */
 export const BookingCard = ({ className, children, ...rest }) => (
   <aside className={classNames(css.card, className)} {...rest}>
-    {children}
+    <div className={css.cardInner}>{children}</div>
   </aside>
 );
 

@@ -43,13 +43,13 @@ const when = (dateVar, timeVar) =>
 const calendarButton = () =>
   `{{#calendarUrl}}${button('{{.}}', 'Add to calendar')}{{/calendarUrl}}`;
 
-// The refund rule in one line. Two sections rather than a section and its opposite.
+// The refund rule in one line. Two sections rather than a section and its opposite. The closed wording
+// is the checkout summary's (CheckoutPage.insideWindow in src/translations/en.json), built in
+// sessionEmailModel.js as one value so a section can print it with {{.}}.
 const policyLine = () =>
   `{{#freeUntilOpen}}${p(
     "Free to cancel or move until {{.}}. After that, it's charged in full."
-  )}{{/freeUntilOpen}}{{#freeWindowClosed}}${p(
-    "This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full."
-  )}{{/freeWindowClosed}}`;
+  )}{{/freeUntilOpen}}{{#freeWindowClosedText}}${p('{{.}}')}{{/freeWindowClosedText}}`;
 
 // Small print under the buttons.
 const small = text =>
@@ -194,9 +194,9 @@ Total paid: {{.}}
 {{#freeUntilOpen}}
 Free to cancel or move until {{.}}. After that, it's charged in full.
 {{/freeUntilOpen}}
-{{#freeWindowClosed}}
-This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full.
-{{/freeWindowClosed}}
+{{#freeWindowClosedText}}
+{{{.}}}
+{{/freeWindowClosedText}}
 
 Questions? Reply to this email or write to hello@heyrevie.com.
 
@@ -334,9 +334,9 @@ Apple Calendar or another app? Open the attached calendar file to update it.
 {{#freeUntilOpen}}
 Free to cancel or move until {{.}}. After that, it's charged in full.
 {{/freeUntilOpen}}
-{{#freeWindowClosed}}
-This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full.
-{{/freeWindowClosed}}
+{{#freeWindowClosedText}}
+{{{.}}}
+{{/freeWindowClosedText}}
 
 Nothing else to do.
 

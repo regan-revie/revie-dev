@@ -63,6 +63,12 @@ const formatZoneName = (date, timeZone) => {
 };
 
 const HOUR_MS = 3600000;
+
+/** "Less than 48 hours away. This session can't be moved, and cancelling is charged in full. If Maya cancels, you're refunded in full." */
+const insideFreeWindowText = coachName =>
+  `Less than 48 hours away. This session can't be moved, and cancelling is charged in full. If ${firstNameOf(
+    coachName
+  ) || 'your coach'} cancels, you're refunded in full.`;
 // The same 48 hours as the refund rule (server/api/nylas/scheduler.js): cancelling or moving is free
 // until then.
 const FREE_WINDOW_MS = 48 * HOUR_MS;
@@ -228,6 +234,10 @@ const buildSessionEmailModel = ({
   model.freeWindowOpen = open;
   model.freeUntilOpen = open ? model.freeUntil : '';
   model.freeWindowClosed = hasStart && !open;
+  // The wording when the free window has closed: the same sentence as the checkout summary
+  // (CheckoutPage.insideWindow in src/translations/en.json; freeWindowText.test.js keeps them in
+  // step). One value, so a Postmark section can print it with {{.}}.
+  model.freeWindowClosedText = model.freeWindowClosed ? insideFreeWindowText(coachName) : '';
 
   if (oldStart && oldEnd) {
     const was = new Date(oldStart);

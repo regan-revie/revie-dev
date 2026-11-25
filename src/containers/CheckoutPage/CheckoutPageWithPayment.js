@@ -16,6 +16,7 @@ import {
 import { ensureTransaction } from '../../util/data';
 import { formatMoney } from '../../util/currency';
 import { getDefaultTimeZoneOnBrowser } from '../../util/dates';
+import { isInsideFreeWindow } from '../../util/freeCancellationWindow';
 import { createSlug } from '../../util/urlHelpers';
 import { nylasCreateBooking, promoCheck } from '../../util/api';
 import {
@@ -826,6 +827,7 @@ export const CheckoutPageWithPayment = props => {
                 coachFirstName={coachFirstName}
                 coachWillWord={subjectWillOf(pronounsKey)}
                 termsHref={termsHref}
+                insideFreeWindow={isInsideFreeWindow(startMs)}
                 showInitialMessageInput={showInitialMessageInput}
                 initialValues={initialValuesForStripePayment}
                 initiateOrderError={initiateOrderError}
