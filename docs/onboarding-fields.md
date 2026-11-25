@@ -475,6 +475,14 @@ The keys the page reads are in `src/containers/ListingPage/SessionPage/coachFiel
 - **Help text:** none
 - **Where it is shown or used:** Session page, as a text section. Asked per session. Not a filter.
 
+### `prep_link`: Prep link (optional)
+
+- **Type / stored:** short text, listing `publicData` (Console has no URL type; the editor checks it as a web link)
+- **Required (Console):** no
+- **Search:** not a search filter. Not shown as a detail.
+- **Label:** "Prep link (optional)". **Help text** (in code, under the field): "A link to your own prep questionnaire, e.g. Typeform or Google Form."
+- **Where it is shown or used:** Session editor, Details tab. The client's booking page, "What happens next.", step 2: an outlined "Open your prep questionnaire" button beside the session's `pre_work` text (the step is left out when the session has neither). Nowhere else. Not a filter.
+
 ### `outcome_1`: Outcome 1
 
 - **Type / stored:** short text (90 characters, enforced in code), listing `publicData`

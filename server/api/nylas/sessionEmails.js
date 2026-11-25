@@ -682,6 +682,10 @@ module.exports = {
   cancelBookingEmails,
   backfillReminders,
   processDueSessionEmails,
+  // For the client's booking page (bookingStatusEndpoint.js): the Meet link and the "Add to calendar"
+  // link, found the same way as for the emails.
+  meetLinkFor,
+  calendarUrlFor,
   // For bookingSync: the same calls that cannot throw.
   buildBookingCalendar,
   safeScheduleReminders: safely('queue reminders', scheduleReminders),

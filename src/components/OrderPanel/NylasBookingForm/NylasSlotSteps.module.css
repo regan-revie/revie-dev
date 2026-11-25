@@ -244,3 +244,18 @@
 [data-layout='sheet'] .timeSelected {
   font-weight: 700;
 }
+
+/* The group labels when there are no numbered titles: for screen readers only. */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* "9:00 AM", as the reschedule panel on the booking page reads. */
+.timesUpper button {
+  text-transform: uppercase;
+}

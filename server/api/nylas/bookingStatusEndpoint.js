@@ -6,6 +6,11 @@
  * there (see bookingSync.js), never on Sharetribe's own immutable booking record. Falls back to
  * Sharetribe's booking dates when there is no row yet (e.g. the create-booking call has not
  * reached Nylas, or landed, yet) or no database configured at all (local dev).
+ *
+ * With `links=1` (the booking page's first load, not its polling) an active session also carries
+ * `meetLink` and `calendarUrl`: the Google Meet link and the "Add to calendar" link, found the same
+ * way as for the "You're booked" email (sessionEmails.js). Both are '' when there is none yet. The
+ * caller is already proven to be a party to the transaction (loadCalendarBookingTransaction).
  */
 
 const { createCookieTokenStore, getSdk, handleError } = require('../../api-util/sdk');
@@ -13,6 +18,32 @@ const { isConfigured } = require('./config');
 const { loadCalendarBookingTransaction } = require('./manageBookingShared');
 const db = require('./db');
 const { isFreeCancellation, canClientReschedule } = require('./scheduler');
+const { meetLinkFor, calendarUrlFor } = require('./sessionEmails');
+
+/**
+ * The two links the booking page shows beside the time. Neither can fail the response: the page
+ * simply shows no button for a link it does not have, and the invite carries it anyway.
+ */
+const linksFor = async ({ mapping, listing }) => {
+  let meetLink = '';
+  let calendarUrl = '';
+  try {
+    meetLink = await meetLinkFor({
+      bookingId: mapping.nylas_booking_id,
+      transactionId: mapping.sharetribe_transaction_id,
+      grantId: mapping.nylas_grant_id,
+      calendarId: listing?.attributes?.publicData?.nylasCalendarId,
+    });
+  } catch (e) {
+    meetLink = '';
+  }
+  try {
+    calendarUrl = await calendarUrlFor(mapping.nylas_booking_id);
+  } catch (e) {
+    calendarUrl = '';
+  }
+  return { meetLink, calendarUrl };
+};
 
 /** isFreeCancellation throws on a bad time; for display, "unknown" (null) is the honest answer. */
 const freeAt = (bookingStart, at) => {
@@ -38,7 +69,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const { transactionId } = req.query || {};
+  const { transactionId, links } = req.query || {};
   if (!transactionId) {
     res.status(400).json({ error: 'transactionId is required' });
     return;
@@ -48,7 +79,7 @@ module.exports = async (req, res) => {
   const sdk = getSdk(req, res, tokenStore);
 
   try {
-    const { booking } = await loadCalendarBookingTransaction(sdk, transactionId);
+    const { booking, listing } = await loadCalendarBookingTransaction(sdk, transactionId);
 
     if (db.isAvailable()) {
       const mappings = await db.findByTransactionId(transactionId);
@@ -69,6 +100,7 @@ module.exports = async (req, res) => {
           // The coach has deleted the event and the five-minute wait is running: the session is about
           // to be cancelled (and the client refunded in full), so the page offers no changes.
           cancellationPending: await db.hasPendingEventCancellation(active.nylas_booking_id),
+          ...(links ? await linksFor({ mapping: active, listing }) : {}),
         });
         return;
       }

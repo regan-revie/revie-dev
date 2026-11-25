@@ -87,6 +87,7 @@ import * as SessionPage from './containers/ListingPage/SessionPage/SessionPage.e
 import * as RevieBookingPanel from './components/OrderPanel/RevieBookingPanel.example';
 import * as CoachPhoto from './components/CoachPhoto/CoachPhoto.example';
 import * as CheckoutPage from './containers/CheckoutPage/CheckoutPage.example';
+import * as BookingConfirmation from './containers/TransactionPage/BookingConfirmation/BookingConfirmation.example';
 import * as ManageCalendarBooking from './containers/TransactionPage/ManageCalendarBooking/ManageCalendarBooking.example';
 import * as OutsideClickHandler from './components/OutsideClickHandler/OutsideClickHandler.example';
 import * as PaginationLinks from './components/PaginationLinks/PaginationLinks.example';
@@ -249,6 +250,7 @@ export {
   RevieBookingPanel,
   CoachPhoto,
   CheckoutPage,
+  BookingConfirmation,
   ManageCalendarBooking,
   OutsideClickHandler,
   PageBuilder,

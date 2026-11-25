@@ -20,7 +20,8 @@ const preview = body =>
 
 const props = { transactionId: 'tx-preview', listingId: 'listing-preview' };
 
-// "Your session" panel on the customer's order page, in each state it can be in.
+// "Your session" card on the customer's booking page. (A cancelled session shows no card: the page
+// shows its refund section instead, see BookingConfirmation.)
 export const MoreThan48HoursAway = { component: preview({}), props, group: 'booking' };
 export const InsideTheFreeWindow = {
   component: preview({
@@ -28,11 +29,6 @@ export const InsideTheFreeWindow = {
     bookingEnd: hours(13),
     freeCancellationNow: false,
   }),
-  props,
-  group: 'booking',
-};
-export const Cancelled = {
-  component: preview({ status: 'cancelled', freeCancellation: true }),
   props,
   group: 'booking',
 };

@@ -2,6 +2,10 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 import appSettings from '../../config/settings';
 import { isEmpty, pickBy } from '../../util/common';
+import {
+  PROFILE_PHOTO_IMAGE_FIELDS,
+  profilePhotoVariantParams,
+} from '../../util/profileImageVariants';
 import { types as sdkTypes, file as sdkFile, createImageVariantConfig } from '../../util/sdkLoader';
 import {
   bookingTimeUnits,
@@ -58,10 +62,15 @@ const getImageVariants = listingImageConfig => {
       'variants.square-small',
       'variants.square-small2x',
 
+      // Revie: the coach's and the client's photo in their original shape, for the booking page's
+      // hero (cropped in the browser, like the session page's).
+      ...PROFILE_PHOTO_IMAGE_FIELDS,
+
       // Listing images:
       `variants.${variantPrefix}`,
       `variants.${variantPrefix}-2x`,
     ],
+    ...profilePhotoVariantParams(),
     ...createImageVariantConfig(`${variantPrefix}`, 400, aspectRatio),
     ...createImageVariantConfig(`${variantPrefix}-2x`, 800, aspectRatio),
   };

@@ -74,7 +74,10 @@ import RequestChangesModal from './RequestChangesModal/RequestChangesModal';
 import MakeCounterOfferModal from './MakeCounterOfferModal/MakeCounterOfferModal';
 import SendMessageForm from './SendMessageForm/SendMessageForm';
 import TransactionPanel from './TransactionPanel/TransactionPanel';
-import ManageCalendarBooking from './ManageCalendarBooking/ManageCalendarBooking';
+import SessionTopbar from '../ListingPage/SessionPage/SessionTopbar';
+import { firstNameOf } from '../ListingPage/SessionPage/sessionPageHelpers';
+import BookingConfirmation from './BookingConfirmation/BookingConfirmation';
+import { getBookingPageState } from './BookingConfirmation/bookingState';
 
 import {
   makeTransition,
@@ -808,13 +811,20 @@ export const TransactionPageComponent = props => {
     process?.hasPassedState(process?.states?.ACCEPTED, transaction) &&
     foundListingTypeConfig?.defaultListingFields.location;
 
-  // Cancel/reschedule is customer-only, and only once the booking is actually confirmed
-  // (operator-accept has run) - before that there is nothing on Nylas yet to cancel or move.
-  const showManageCalendarBooking =
+  // Revie: a client's page for a calendar-booked session is the booking page
+  // (docs/design/booking-confirmation/), for every state it has a design for. Cancel and reschedule
+  // live in its "Your session" card, customer-only and only once the booking is confirmed
+  // (operator-accept has run): before that there is nothing on Nylas yet to cancel or move.
+  // Anything else (a coach, an inquiry, another process) keeps the template's page.
+  const showBookingConfirmation =
+    isDataAvailable &&
     isCustomerRole &&
     isBookingProcess(stateData.processName) &&
     !!listing?.attributes?.publicData?.calendarBookingEnabled &&
-    process?.hasPassedState(process?.states?.ACCEPTED, transaction);
+    getBookingPageState({
+      processState: stateData.processState,
+      metadata: transaction?.attributes?.metadata,
+    }).kind !== null;
 
   const isNegotiationProcess = processName === NEGOTIATION_PROCESS_NAME;
   const isRegularNegotiation =
@@ -848,6 +858,39 @@ export const TransactionPageComponent = props => {
   });
 
   const actionButtonContainer = isMobile ? 'mobile' : 'desktop';
+  const renderActionButtons = containerId => (
+    <ActionButtons
+      containerId={containerId}
+      listingTypeConfig={foundListingTypeConfig}
+      showButtons={stateData.showActionButtons}
+      primaryButtonProps={stateData?.primaryButtonProps}
+      secondaryButtonProps={stateData?.secondaryButtonProps}
+      tertiaryButtonProps={stateData?.tertiaryButtonProps}
+      actionButtonOrder={stateData?.actionButtonOrder}
+      isListingDeleted={listingDeleted}
+      isProvider={isProviderRole}
+      transitions={txTransitions}
+      {...getDataValidationResult(transaction, process)}
+      timeZone={listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC'}
+      isCounterpartyInactive={isCounterpartyInactive}
+    />
+  );
+  const activityFeedNode = isDataAvailable ? (
+    <ActivityFeed
+      messages={messages}
+      transaction={transaction}
+      stateData={stateData}
+      intl={intl}
+      currentUser={currentUser}
+      hasOlderMessages={totalMessagePages > oldestMessagePageFetched && !fetchMessagesInProgress}
+      onOpenReviewModal={onOpenReviewModal}
+      onShowOlderMessages={() => onShowMoreMessages(transaction.id, config)}
+      fetchMessagesInProgress={fetchMessagesInProgress}
+      allowFiles={allowFiles}
+      onDownloadFile={onDownloadFile}
+      fileDownloads={fileDownloads}
+    />
+  ) : null;
   // TransactionPanel is presentational component
   // that currently handles showing everything inside layout's main view area.
   const panel = isDataAvailable ? (
@@ -895,23 +938,7 @@ export const TransactionPageComponent = props => {
           />
         ) : null
       }
-      actionButtons={containerId => (
-        <ActionButtons
-          containerId={containerId}
-          listingTypeConfig={foundListingTypeConfig}
-          showButtons={stateData.showActionButtons}
-          primaryButtonProps={stateData?.primaryButtonProps}
-          secondaryButtonProps={stateData?.secondaryButtonProps}
-          tertiaryButtonProps={stateData?.tertiaryButtonProps}
-          actionButtonOrder={stateData?.actionButtonOrder}
-          isListingDeleted={listingDeleted}
-          isProvider={isProviderRole}
-          transitions={txTransitions}
-          {...getDataValidationResult(transaction, process)}
-          timeZone={listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC'}
-          isCounterpartyInactive={isCounterpartyInactive}
-        />
-      )}
+      actionButtons={renderActionButtons}
       fileAttachments={
         <FileAttachments
           isDownloadProcess={isDownloadProcess(processName)}
@@ -924,24 +951,7 @@ export const TransactionPageComponent = props => {
           marketplaceName={config.marketplaceName}
         />
       }
-      activityFeed={
-        <ActivityFeed
-          messages={messages}
-          transaction={transaction}
-          stateData={stateData}
-          intl={intl}
-          currentUser={currentUser}
-          hasOlderMessages={
-            totalMessagePages > oldestMessagePageFetched && !fetchMessagesInProgress
-          }
-          onOpenReviewModal={onOpenReviewModal}
-          onShowOlderMessages={() => onShowMoreMessages(transaction.id, config)}
-          fetchMessagesInProgress={fetchMessagesInProgress}
-          allowFiles={allowFiles}
-          onDownloadFile={onDownloadFile}
-          fileDownloads={fileDownloads}
-        />
-      }
+      activityFeed={activityFeedNode}
       transactionFieldsComponent={
         <TransactionFields {...customTransactionFieldProps('customer')} />
       }
@@ -1013,6 +1023,25 @@ export const TransactionPageComponent = props => {
   ) : (
     loadingOrFailedFetching
   );
+  const bookingConfirmation = showBookingConfirmation ? (
+    <BookingConfirmation
+      transaction={transaction}
+      listing={listing}
+      provider={provider}
+      currentUser={currentUser}
+      processState={stateData.processState}
+      messages={messages}
+      showSendMessageForm={showSendMessageForm}
+      onMessageSubmit={onMessageSubmit}
+      sendMessageInProgress={sendMessageInProgress}
+      sendMessageError={sendMessageError}
+      reviewButtons={
+        stateData.showActionButtons ? renderActionButtons(actionButtonContainer) : null
+      }
+      activityFeed={activityFeedNode}
+      onCancelledOnCalendar={onTransactionCancelledOnCalendar}
+    />
+  ) : null;
   const marketplaceCurrency = config.currency;
   const currency = transaction?.attributes?.payinTotal?.currency || marketplaceCurrency;
   const currencyConfig = currency ? appSettings.getCurrencyFormatting(currency) : null;
@@ -1041,26 +1070,25 @@ export const TransactionPageComponent = props => {
       )
     : null;
 
-  return (
-    <Page
-      title={intl.formatMessage(
+  // Revie: the client's booking page has its own title ("Your booking with Maya | Revie") and the
+  // session page's topbar.
+  const pageTitle = showBookingConfirmation
+    ? intl.formatMessage(
+        { id: 'BookingConfirmation.pageTitle' },
+        { name: firstNameOf(provider?.attributes?.profile?.displayName) }
+      )
+    : intl.formatMessage(
         { id: 'TransactionPage.schemaTitle' },
         { title: listingTitle, h1: pageHeading }
-      )}
-      scrollingDisabled={scrollingDisabled}
-    >
-      <LayoutSingleColumn topbar={<TopbarContainer />} footer={<FooterContainer />}>
-        <div className={css.root}>
-          {panel}
-          {showManageCalendarBooking ? (
-            <ManageCalendarBooking
-              transactionId={transaction?.id}
-              listingId={listing?.id}
-              onCancelled={onTransactionCancelledOnCalendar}
-              onManageDisableScrolling={onManageDisableScrolling}
-            />
-          ) : null}
-        </div>
+      );
+
+  return (
+    <Page title={pageTitle} scrollingDisabled={scrollingDisabled}>
+      <LayoutSingleColumn
+        topbar={showBookingConfirmation ? <SessionTopbar /> : <TopbarContainer />}
+        footer={<FooterContainer />}
+      >
+        <div className={css.root}>{showBookingConfirmation ? bookingConfirmation : panel}</div>
         <ReviewModal
           id="ReviewOrderModal"
           isOpen={isReviewModalOpen}

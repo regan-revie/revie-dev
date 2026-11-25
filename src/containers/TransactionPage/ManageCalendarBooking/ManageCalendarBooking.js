@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { getDefaultTimeZoneOnBrowser } from '../../../util/dates';
@@ -8,15 +9,21 @@ import {
   nylasCancelBooking,
   nylasRescheduleBooking,
 } from '../../../util/api';
-import NylasSlotPicker from '../../../components/OrderPanel/NylasBookingForm/NylasSlotPicker';
-import { formatTimeZoneName } from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
-
-import { H4, Modal, PrimaryButton, SecondaryButton, InlineTextButton } from '../../../components';
+import NylasSlotSteps from '../../../components/OrderPanel/NylasBookingForm/NylasSlotSteps';
+import { IconCalendarStar, IconVideoCall } from '../../ListingPage/SessionPage/SessionIcons';
+import {
+  formatFreeUntil,
+  formatSessionDay,
+  formatSessionTimes,
+  formatSessionWhen,
+  sessionMinutes,
+} from '../BookingConfirmation/bookingFormat';
 
 import css from './ManageCalendarBooking.module.css';
 
 /**
- * Cancel/reschedule for a calendar-booking session, on the customer's own transaction page.
+ * The "Your session" card on a client's booking page (docs/design/booking-confirmation/): when the
+ * session is, how to join it, adding it to a calendar, and moving or cancelling it.
  *
  * Exists as a self-contained component with its own local state rather than threading into
  * TransactionPage's Redux duck and generic transition-button machinery, because neither cancel nor
@@ -28,6 +35,9 @@ import css from './ManageCalendarBooking.module.css';
  * The displayed time comes from GET /api/nylas/booking-status, not from the transaction's own
  * booking dates: a reschedule updates our database, never Sharetribe's immutable booking record,
  * so that is the only place the current time can be read from once one has happened.
+ *
+ * The page's hero and its "cancelled" section need to know what this card knows (the time now, and
+ * whether the session was just cancelled), so it reports them through `onViewChange`.
  */
 // What the server's error codes (rescheduleBookingEndpoint.js) say to the client.
 const ERROR_MESSAGE_IDS = {
@@ -38,19 +48,22 @@ const ERROR_MESSAGE_IDS = {
   'being-cancelled-by-coach': 'ManageCalendarBooking.beingCancelledByCoach',
 };
 
-// How long after the confirm dialog opens a click on "Confirm new time" is ignored. A double-click on
-// a time opens the dialog with its second click, which would otherwise land on the confirm button.
+// How long after the confirm panel opens a click on "Confirm new time" is ignored. A double-click on
+// a time opens the panel with its second click, which would otherwise land on the confirm button.
 const CONFIRM_GUARD_MS = 500;
 // A session this close to its start is inside the window where it cannot be moved again and
 // cancelling is charged (the same 48 hours the server applies, server/api/nylas/scheduler.js).
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000;
-const MODAL_ID = 'ManageCalendarBookingConfirmMove';
+
+const boldTag = chunks => <b>{chunks}</b>;
 
 const ManageCalendarBooking = ({
   transactionId: transactionIdMaybe,
   listingId: listingIdMaybe,
   onCancelled,
-  onManageDisableScrolling = () => {},
+  onViewChange,
+  // What a free cancellation gives back, as money text ("$93.50"), for the confirm panel.
+  refundText,
 }) => {
   // Callers pass the SDK entities' own .id (transaction.id, listing.id), which may be a UUID
   // object or already a plain string - normalised here rather than pushed onto every caller.
@@ -74,14 +87,16 @@ const ManageCalendarBooking = ({
   // the handler) before the first has answered could still get through; a ref cannot be late.
   const rescheduleInFlight = useRef(false);
   // The time the client has clicked and not yet confirmed (nothing is sent until they do). It is what
-  // the confirm dialog is open for. The picker underneath is left exactly as it was.
+  // the confirm panel is open for. The picker underneath is kept, exactly as it was.
   const [pendingSlot, setPendingSlot] = useState(null);
   // When clicks on "Confirm new time" start to count (see CONFIRM_GUARD_MS).
   const confirmReadyAt = useRef(0);
 
+  // The first load also asks for the Meet link and the "Add to calendar" link; the polling after a
+  // reschedule does not (it would ask Nylas every few seconds), and keeps what it has.
   const loadStatus = () => {
     setStatus({ state: 'loading' });
-    nylasBookingStatus({ transactionId })
+    nylasBookingStatus({ transactionId, links: true })
       .then(data => setStatus({ state: 'loaded', ...data }))
       .catch(() => setStatus({ state: 'error' }));
   };
@@ -107,7 +122,7 @@ const ManageCalendarBooking = ({
             data.bookingStart &&
             Math.abs(new Date(data.bookingStart) - new Date(justRescheduled.start)) < 60000;
           if (arrived) {
-            setStatus({ state: 'loaded', ...data });
+            setStatus(current => ({ ...current, state: 'loaded', ...data }));
             setJustRescheduled(current => (current ? { ...current, settled: true } : current));
           } else if (attempts < 20) {
             timer = setTimeout(check, 3000);
@@ -130,15 +145,41 @@ const ManageCalendarBooking = ({
       ? Math.round((new Date(status.bookingEnd) - new Date(status.bookingStart)) / 60000)
       : null;
 
-  // A click on a time only opens the confirm dialog: the request is sent by its confirm button.
+  // Until the status endpoint has caught up with a reschedule, show the time just chosen.
+  const showingChosen = !!justRescheduled && !justRescheduled.settled;
+  const sessionStart = showingChosen ? justRescheduled.start : status.bookingStart;
+  const sessionEnd = showingChosen ? justRescheduled.end : status.bookingEnd;
+
+  const cancelledState = justCancelled
+    ? justCancelled.free
+    : status.status === 'cancelled'
+    ? status.freeCancellation ?? null
+    : undefined;
+  const isCancelled = cancelledState !== undefined;
+
+  // What the page around this card needs: the time now, and the cancellation if there is one.
+  const startMs = sessionStart ? new Date(sessionStart).getTime() : null;
+  const endMs = sessionEnd ? new Date(sessionEnd).getTime() : null;
+  useEffect(() => {
+    if (!onViewChange || status.state !== 'loaded') return;
+    onViewChange({
+      start: startMs,
+      end: endMs,
+      isCancelled,
+      // true: refunded; false: charged; null: not known
+      cancelFree: isCancelled ? cancelledState : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status.state, startMs, endMs, isCancelled, cancelledState]);
+
+  // A click on a time only opens the confirm panel: the request is sent by its confirm button.
   const chooseSlot = slot => {
     setActionError(null);
     confirmReadyAt.current = Date.now() + CONFIRM_GUARD_MS;
     setPendingSlot(slot);
   };
 
-  // "Cancel" in the dialog, its close button and Escape: back to the picker, as it was. Not while the
-  // request is in flight.
+  // "Pick a different time": back to the picker, as it was. Not while the request is in flight.
   const closeConfirm = () => {
     if (rescheduleInFlight.current) return;
     const tooLate = actionError && actionError.code === 'reschedule-too-late';
@@ -219,7 +260,7 @@ const ManageCalendarBooking = ({
         setActionError(e);
         if (code === 'reschedule-slot-unavailable') {
           // Someone else took that time (or Nylas no longer offers it). The message stays in the
-          // dialog; the free times are fetched again quietly, ready for the picker behind it.
+          // panel; the free times are fetched again quietly, ready for the picker behind it.
           nylasAvailability({
             listingId,
             ...(durationMinutes ? { lengthMinutes: durationMinutes } : {}),
@@ -232,7 +273,7 @@ const ManageCalendarBooking = ({
             })
             .catch(() => {});
         } else if (code === 'reschedule-too-late') {
-          // Inside the 48 hours now: said in the dialog, and the card behind it is brought up to date.
+          // Inside the 48 hours now: said in the panel, and the card behind it is brought up to date.
           setStatus(current => ({ ...current, rescheduleAllowed: false }));
         } else if (['booking-cancelled', 'being-cancelled-by-coach'].includes(code)) {
           // The session is not what the page thought: say so and show it as it really is.
@@ -249,27 +290,9 @@ const ManageCalendarBooking = ({
   }
 
   const timeZone = getDefaultTimeZoneOnBrowser();
-  // "Fri, Nov 20, 2:30 – 3:30 PM", in the client's own timezone.
-  const formatSession = (start, end) =>
-    intl.formatDateTimeRange(new Date(start), new Date(end), {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  // The same, with the zone named the way people say it: "... (Pacific Time)".
-  const formatSessionWithZone = (start, end) =>
-    `${formatSession(start, end)} (${formatTimeZoneName(timeZone, start, intl.locale)})`;
-
-  // Until the status endpoint has caught up with a reschedule, show the time just chosen.
-  const showingChosen = justRescheduled && !justRescheduled.settled;
-  const sessionStart = showingChosen ? justRescheduled.start : status.bookingStart;
-  const sessionEnd = showingChosen ? justRescheduled.end : status.bookingEnd;
-  const formattedTime =
-    sessionStart && sessionEnd ? formatSessionWithZone(sessionStart, sessionEnd) : null;
+  const hasTime = Number.isFinite(startMs) && Number.isFinite(endMs);
   // Moving a session is allowed while cancelling it is still free; the server decides and enforces
-  // it (rescheduleBookingEndpoint.js). Only a definite "no" disables the button.
+  // it (rescheduleBookingEndpoint.js). Only a definite "no" hides the button.
   const rescheduleLocked = status.rescheduleAllowed === false;
   // The coach has deleted the event and the five-minute wait is running: the session is about to be
   // cancelled and refunded in full, so nothing is offered. If the coach puts the event back, the
@@ -285,56 +308,102 @@ const ManageCalendarBooking = ({
     />
   ) : null;
 
-  const cancelledState = justCancelled
-    ? justCancelled.free
-    : status.status === 'cancelled'
-    ? status.freeCancellation ?? null
-    : undefined;
-  const isCancelled = cancelledState !== undefined;
-
-  // A session that has already happened has nothing left to change.
-  const sessionIsOver = status.bookingEnd && new Date(status.bookingEnd) < new Date();
-  if (!isCancelled && sessionIsOver) {
+  // The cancelled session is shown by the page itself (its heading, and the refund section).
+  if (isCancelled) {
     return null;
   }
 
-  if (isCancelled) {
-    const messageId =
-      cancelledState === true
-        ? 'ManageCalendarBooking.cancelledFree'
-        : cancelledState === false
-        ? 'ManageCalendarBooking.cancelledCharged'
-        : 'ManageCalendarBooking.cancelledUnknown';
-    return (
-      <div className={css.root}>
-        <H4 as="h2" className={css.heading}>
-          <FormattedMessage id="ManageCalendarBooking.heading" />
-        </H4>
-        {formattedTime ? <p className={css.time}>{formattedTime}</p> : null}
-        <p className={css.cancelledMessage} role="status">
-          <FormattedMessage id={messageId} />
-        </p>
-      </div>
-    );
+  // A session that has already happened has nothing left to change.
+  const sessionIsOver = status.bookingEnd && new Date(status.bookingEnd) < new Date();
+  if (sessionIsOver) {
+    return null;
   }
 
-  return (
-    <div className={css.root}>
-      <H4 as="h2" className={css.heading}>
-        <FormattedMessage id="ManageCalendarBooking.heading" />
-      </H4>
+  const minutes = hasTime ? sessionMinutes(startMs, endMs) : null;
+  const confirmingMove = mode === 'reschedule' && !!pendingSlot;
+  const pickingTime = mode === 'reschedule';
+  const showButtons = !coachCancelling;
 
-      {formattedTime ? <p className={css.time}>{formattedTime}</p> : null}
+  return (
+    <section className={css.root} aria-labelledby="your-session-title">
+      <div className={css.eyebrow}>
+        <span id="your-session-title">
+          <FormattedMessage id="ManageCalendarBooking.heading" />
+        </span>
+        <span aria-hidden="true" className={css.eyebrowRule} />
+      </div>
+
+      {hasTime ? (
+        <div className={css.whenBlock}>
+          <p className={css.when} data-testid="session-when">
+            <span>{formatSessionDay(startMs, timeZone)}</span>
+            <span aria-hidden="true" className={css.whenDot}>
+              {' · '}
+            </span>
+            <span>{formatSessionTimes(startMs, endMs, timeZone)}</span>
+          </p>
+          {minutes ? (
+            <span className={css.quiet}>
+              <FormattedMessage id="ManageCalendarBooking.videoCall" values={{ minutes }} />
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       {justRescheduled ? (
         // Only after a reschedule in this visit: on reload it is gone, and the Activity list keeps
         // the record.
-        <p className={css.rescheduledNote} role="status">
+        <p className={css.moved} role="status">
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+          </svg>
           <FormattedMessage id="ManageCalendarBooking.rescheduledNote" />
         </p>
       ) : null}
 
-      {actionError && !pendingSlot ? <p className={css.error}>{errorLine}</p> : null}
+      <div className={css.linkButtons}>
+        {status.meetLink ? (
+          <a
+            href={status.meetLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={css.joinButton}
+          >
+            <IconVideoCall size={22} />
+            <FormattedMessage id="ManageCalendarBooking.join" />
+          </a>
+        ) : null}
+        {status.calendarUrl ? (
+          <a href={status.calendarUrl} className={css.calendarButton}>
+            <IconCalendarStar size={20} />
+            <FormattedMessage id="ManageCalendarBooking.addToCalendar" />
+          </a>
+        ) : null}
+      </div>
+      {status.calendarUrl ? (
+        <span className={css.help}>
+          <FormattedMessage id="ManageCalendarBooking.calendarHelp" />
+        </span>
+      ) : null}
+
+      <hr className={css.rule} />
+
+      {actionError && !pendingSlot && mode !== 'confirm-cancel' ? (
+        <p className={css.error} role="alert">
+          {errorLine}
+        </p>
+      ) : null}
 
       {coachCancelling ? (
         <p className={css.lockedNote} role="status">
@@ -343,43 +412,82 @@ const ManageCalendarBooking = ({
       ) : null}
 
       {rescheduleLocked && !coachCancelling && mode === 'idle' ? (
-        <p className={css.lockedNote}>
-          <FormattedMessage id="ManageCalendarBooking.rescheduleLocked" />
-        </p>
+        <div className={css.lockedBox}>
+          <span aria-hidden="true" className={css.lockedMark}>
+            !
+          </span>
+          <span>
+            <FormattedMessage id="ManageCalendarBooking.rescheduleLocked" />
+          </span>
+        </div>
       ) : null}
 
-      {mode === 'idle' && !coachCancelling ? (
-        <div className={css.actions}>
-          <SecondaryButton onClick={startReschedule} disabled={rescheduleLocked}>
-            <FormattedMessage id="ManageCalendarBooking.rescheduleButton" />
-          </SecondaryButton>
-          <InlineTextButton
-            className={css.cancelLink}
-            onClick={() => {
-              setActionError(null);
-              setMode('confirm-cancel');
-            }}
-          >
-            <FormattedMessage id="ManageCalendarBooking.cancelButton" />
-          </InlineTextButton>
+      {mode === 'idle' && showButtons ? (
+        <div className={css.actionRow}>
+          {!rescheduleLocked && hasTime ? (
+            <span className={css.freeUntil}>
+              <FormattedMessage
+                id="ManageCalendarBooking.freeUntil"
+                values={{ date: formatFreeUntil(startMs, timeZone), b: boldTag }}
+              />
+            </span>
+          ) : null}
+          <div className={css.actionLinks}>
+            {!rescheduleLocked ? (
+              <button type="button" className={css.linkButton} onClick={startReschedule}>
+                <FormattedMessage id="ManageCalendarBooking.rescheduleButton" />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={css.linkButton}
+              onClick={() => {
+                setActionError(null);
+                setMode('confirm-cancel');
+              }}
+            >
+              <FormattedMessage id="ManageCalendarBooking.cancelButton" />
+            </button>
+          </div>
         </div>
       ) : null}
 
       {mode === 'confirm-cancel' ? (
-        <div className={css.confirmCancel}>
-          <p>
+        <div className={css.cancelPanel}>
+          <h3 className={css.panelHeading}>
             <FormattedMessage
-              id={
-                status.freeCancellationNow === true
-                  ? 'ManageCalendarBooking.confirmCancelTextFree'
-                  : status.freeCancellationNow === false
-                  ? 'ManageCalendarBooking.confirmCancelTextCharged'
-                  : 'ManageCalendarBooking.confirmCancelText'
-              }
+              id="ManageCalendarBooking.confirmCancelHeading"
+              values={{ b: boldTag }}
             />
+          </h3>
+          <p className={css.panelText}>
+            {status.freeCancellationNow === true ? (
+              refundText ? (
+                <FormattedMessage
+                  id="ManageCalendarBooking.confirmCancelTextFree"
+                  values={{ amount: refundText }}
+                />
+              ) : (
+                <FormattedMessage id="ManageCalendarBooking.confirmCancelTextFreeNoAmount" />
+              )
+            ) : status.freeCancellationNow === false ? (
+              <FormattedMessage id="ManageCalendarBooking.confirmCancelTextCharged" />
+            ) : (
+              <FormattedMessage id="ManageCalendarBooking.confirmCancelText" />
+            )}
           </p>
-          <div className={css.actions}>
-            <PrimaryButton inProgress={actionInProgress} onClick={handleCancel}>
+          {actionError ? (
+            <p className={css.panelError} role="alert">
+              {errorLine}
+            </p>
+          ) : null}
+          <div className={css.panelActions}>
+            <button
+              type="button"
+              className={css.lavenderButton}
+              disabled={actionInProgress}
+              onClick={handleCancel}
+            >
               <FormattedMessage
                 id={
                   status.freeCancellationNow === false
@@ -387,100 +495,137 @@ const ManageCalendarBooking = ({
                     : 'ManageCalendarBooking.confirmCancelButton'
                 }
               />
-            </PrimaryButton>
-            <SecondaryButton disabled={actionInProgress} onClick={() => setMode('idle')}>
+            </button>
+            <button
+              type="button"
+              className={classNames(css.linkButton, css.onDark)}
+              disabled={actionInProgress}
+              onClick={() => setMode('idle')}
+            >
               <FormattedMessage id="ManageCalendarBooking.keepBookingButton" />
-            </SecondaryButton>
+            </button>
           </div>
         </div>
       ) : null}
 
-      {mode === 'reschedule' ? (
+      {pickingTime ? (
         <div className={css.reschedule}>
-          {availability.state === 'loading' ? (
-            <p>
-              <FormattedMessage id="ManageCalendarBooking.loadingSlots" />
-            </p>
-          ) : availability.state === 'error' || availability.slots.length === 0 ? (
-            <p className={css.error}>
-              <FormattedMessage id="ManageCalendarBooking.noSlots" />
-            </p>
-          ) : (
-            // Same calendar + time-list picker as the original booking flow (NylasBookingForm),
-            // so a client picks a new time the same way they picked the first one.
-            <NylasSlotPicker
-              slots={availability.slots}
-              timeZone={timeZone}
-              onSelectSlot={chooseSlot}
-            />
-          )}
-          <SecondaryButton disabled={actionInProgress} onClick={() => setMode('idle')}>
-            <FormattedMessage id="ManageCalendarBooking.cancelRescheduleButton" />
-          </SecondaryButton>
+          {/* Kept in place while the confirm panel is open, so "Pick a different time" brings back
+              the picker exactly as it was (the day that was open). */}
+          <div className={css.pickPanel} hidden={confirmingMove}>
+            <h3 className={css.pickHeading}>
+              <FormattedMessage id="ManageCalendarBooking.pickNewTime" />
+            </h3>
+            {availability.state === 'loading' ? (
+              <p>
+                <FormattedMessage id="ManageCalendarBooking.loadingSlots" />
+              </p>
+            ) : availability.state === 'error' || availability.slots.length === 0 ? (
+              <p className={css.error}>
+                <FormattedMessage id="ManageCalendarBooking.noSlots" />
+              </p>
+            ) : (
+              // The same days and times as the original booking panel, so a client picks a new time
+              // the way they picked the first one.
+              <NylasSlotSteps
+                slots={availability.slots}
+                timeZone={timeZone}
+                plainTitles
+                dayStepNumber={1}
+                onSelectSlot={chooseSlot}
+              />
+            )}
+            <div>
+              <button
+                type="button"
+                className={css.linkButton}
+                disabled={actionInProgress}
+                onClick={() => setMode('idle')}
+              >
+                <FormattedMessage id="ManageCalendarBooking.cancelRescheduleButton" />
+              </button>
+            </div>
+          </div>
+
+          {confirmingMove ? (
+            <div className={css.movePanel} data-testid="confirm-move">
+              {actionInProgress ? (
+                <p className={css.panelText} role="status">
+                  <FormattedMessage id="ManageCalendarBooking.reschedulingInProgress" />
+                </p>
+              ) : (
+                <>
+                  <h3 className={css.panelHeading}>
+                    <FormattedMessage
+                      id="ManageCalendarBooking.confirmMoveHeading"
+                      values={{ b: boldTag }}
+                    />
+                  </h3>
+                  <div className={css.moveTimes}>
+                    <s className={css.oldTime}>
+                      <span className={css.visuallyHidden}>
+                        <FormattedMessage id="ManageCalendarBooking.currentTime" />{' '}
+                      </span>
+                      {formatSessionWhen(startMs, endMs, timeZone)}
+                    </s>
+                    <span className={css.newTime}>
+                      <svg
+                        aria-hidden="true"
+                        focusable="false"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M5 12h14M13 6l6 6-6 6" />
+                      </svg>
+                      <span className={css.visuallyHidden}>
+                        <FormattedMessage id="ManageCalendarBooking.newTime" />{' '}
+                      </span>
+                      {formatSessionWhen(
+                        new Date(pendingSlot.start).getTime(),
+                        new Date(pendingSlot.end).getTime(),
+                        timeZone
+                      )}
+                    </span>
+                  </div>
+                  {new Date(pendingSlot.start).getTime() - Date.now() < LOCK_WINDOW_MS ? (
+                    <p className={css.panelNote}>
+                      <FormattedMessage id="ManageCalendarBooking.confirmMoveInsideLockWindow" />
+                    </p>
+                  ) : null}
+                  {actionError ? (
+                    <p className={css.panelError} role="alert">
+                      {errorLine}
+                    </p>
+                  ) : null}
+                  <div className={css.panelActions}>
+                    {!['reschedule-slot-unavailable', 'reschedule-too-late'].includes(
+                      actionError?.code
+                    ) ? (
+                      <button type="button" className={css.chartreuseButton} onClick={confirmMove}>
+                        <FormattedMessage id="ManageCalendarBooking.confirmMoveButton" />
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={classNames(css.linkButton, css.onDarkBlue)}
+                      onClick={closeConfirm}
+                    >
+                      <FormattedMessage id="ManageCalendarBooking.confirmMoveCancel" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
       ) : null}
-
-      <Modal
-        id={MODAL_ID}
-        containerClassName={css.modalRoot}
-        contentClassName={css.modalContent}
-        isOpen={mode === 'reschedule' && !!pendingSlot}
-        onClose={closeConfirm}
-        onManageDisableScrolling={onManageDisableScrolling}
-        usePortal
-      >
-        {pendingSlot ? (
-          actionInProgress ? (
-            <p className={css.modalMessage} role="status">
-              <FormattedMessage id="ManageCalendarBooking.reschedulingInProgress" />
-            </p>
-          ) : (
-            <>
-              <H4 as="h2" className={css.modalTitle}>
-                <FormattedMessage id="ManageCalendarBooking.confirmMoveHeading" />
-              </H4>
-              <p className={css.modalMessage}>
-                <FormattedMessage
-                  id="ManageCalendarBooking.confirmMoveFrom"
-                  values={{ time: formatSession(sessionStart, sessionEnd) }}
-                />
-              </p>
-              <p className={css.modalMessage}>
-                <FormattedMessage
-                  id="ManageCalendarBooking.confirmMoveTo"
-                  values={{
-                    time: formatSession(pendingSlot.start, pendingSlot.end),
-                    timeZone: formatTimeZoneName(timeZone, pendingSlot.start, intl.locale),
-                  }}
-                />
-              </p>
-              {new Date(pendingSlot.start).getTime() - Date.now() < LOCK_WINDOW_MS ? (
-                <p className={css.modalMessage}>
-                  <FormattedMessage id="ManageCalendarBooking.confirmMoveInsideLockWindow" />
-                </p>
-              ) : null}
-              {actionError ? (
-                <p className={css.error} role="alert">
-                  {errorLine}
-                </p>
-              ) : null}
-              <div className={css.actions}>
-                {!['reschedule-slot-unavailable', 'reschedule-too-late'].includes(
-                  actionError?.code
-                ) ? (
-                  <PrimaryButton onClick={confirmMove}>
-                    <FormattedMessage id="ManageCalendarBooking.confirmMoveButton" />
-                  </PrimaryButton>
-                ) : null}
-                <SecondaryButton onClick={closeConfirm}>
-                  <FormattedMessage id="ManageCalendarBooking.confirmMoveCancel" />
-                </SecondaryButton>
-              </div>
-            </>
-          )
-        ) : null}
-      </Modal>
-    </div>
+    </section>
   );
 };
 

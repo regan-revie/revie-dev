@@ -29,6 +29,8 @@ import {
 // Revie: the three session outcomes get one purpose-built block (live character count, help text)
 // instead of three generic inputs; added as its own file to keep this core file's diff small.
 import SessionOutcomesField from '../../../../components/SessionOutcomes/SessionOutcomesField';
+import PrepLinkField from '../../../../components/PrepLinkField/PrepLinkField';
+import { PREP_LINK_KEY } from '../../../../util/prepLink';
 // Import modules from this directory
 import css from './EditListingDetailsForm.module.css';
 
@@ -282,6 +284,23 @@ const AddListingFields = props => {
               key="session-outcomes"
               formId={formId}
               fieldConfigs={outcomeConfigs}
+            />,
+          ]
+        : pickedFields;
+    }
+
+    // Revie: prep_link is a short text field in Console, drawn with its help line and checked as a
+    // web link. Nothing shows until it exists in Console for this listing type.
+    if (key === PREP_LINK_KEY) {
+      return isFieldForListingType(listingType, fieldConfig) &&
+        isFieldForCategory(targetCategoryIds, fieldConfig)
+        ? [
+            ...pickedFields,
+            <PrepLinkField
+              key={namespacedKey}
+              formId={formId}
+              name={namespacedKey}
+              fieldConfig={fieldConfig}
             />,
           ]
         : pickedFields;
