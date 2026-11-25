@@ -10,9 +10,9 @@ import enMessages from '../../translations/en.json';
 
 import NylasBookingForm from './NylasBookingForm/NylasBookingForm';
 import RevieBookingPanel, { PANEL_STATES } from './RevieBookingPanel';
-import { pronounWords } from './BookingPanelParts';
+import { BookingCard, pronounWords } from './BookingPanelParts';
 
-const { screen, waitFor, userEvent, within } = testingLibrary;
+const { screen, waitFor, userEvent, within, fireEvent } = testingLibrary;
 const messages = enMessages;
 
 const VIEWER_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -377,20 +377,80 @@ describe('pronounWords', () => {
 
 describe('the booking card scrolls an inner wrapper, never itself', () => {
   const css = fs.readFileSync(path.join(__dirname, 'BookingPanelParts.module.css'), 'utf8');
+  const rule = selector =>
+    css.match(new RegExp(`\\n${selector.replace('.', '\\.')}\\s*\\{([\\s\\S]*?)\\n\\}\\n`))[1];
 
-  it('the card clips to its rounded corners and does not scroll', () => {
-    const card = css.match(/\n\.card\s*\{([^}]*)\}/)[1];
+  it('the card clips to its rounded corners, has no padding of its own and does not scroll', () => {
+    const card = rule('.card');
     expect(card).toMatch(/overflow:\s*hidden/);
     expect(card).not.toMatch(/overflow-y/);
     expect(card).toMatch(/border-radius/);
+    expect(card).toMatch(/padding:\s*0;/);
   });
 
-  it('the inner wrapper scrolls only when taller than the window, with a thin overlay scrollbar and no track', () => {
-    const inner = css.match(/\.cardInner\s*\{([\s\S]*?)\n\}\n/)[1];
+  it("the padding is the wrapper's, and everything in it is held to its width (nothing scrolls sideways)", () => {
+    const inner = rule('.cardInner');
+    expect(inner).toMatch(/padding:\s*28px/);
+    expect(inner).toMatch(/box-sizing:\s*border-box/);
+    expect(inner).toMatch(/& \*\s*\{[^}]*box-sizing:\s*border-box/);
+    expect(inner).toMatch(/& > \*\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%/);
+    expect(inner).toMatch(/overflow-x:\s*hidden/);
+  });
+
+  it('the wrapper scrolls only when taller than the window, with the scrollbar hidden altogether', () => {
+    const inner = rule('.cardInner');
     expect(inner).toMatch(/max-height:\s*calc\(100vh/);
     expect(inner).toMatch(/overflow-y:\s*auto/);
-    expect(inner).toMatch(/scrollbar-width:\s*thin/);
-    expect(inner).toMatch(/scrollbar-color:[^;]*transparent/);
-    expect(inner).toMatch(/::-webkit-scrollbar-track\s*\{[^}]*transparent/);
+    expect(inner).toMatch(/scrollbar-width:\s*none/);
+    expect(inner).toMatch(/::-webkit-scrollbar\s*\{[^}]*display:\s*none/);
+  });
+});
+
+describe("the fade along the card's bottom edge", () => {
+  const setLayout = ({ scrollHeight, clientHeight }) => {
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get: () => clientHeight,
+    });
+  };
+  afterEach(() => {
+    delete HTMLElement.prototype.scrollHeight;
+    delete HTMLElement.prototype.clientHeight;
+  });
+
+  it('shows while there is more below', () => {
+    setLayout({ scrollHeight: 1000, clientHeight: 600 });
+    render(<BookingCard>content</BookingCard>);
+    expect(screen.getByTestId('card-fade')).toBeInTheDocument();
+  });
+
+  it('is not there when the content fits', () => {
+    setLayout({ scrollHeight: 600, clientHeight: 600 });
+    render(<BookingCard>content</BookingCard>);
+    expect(screen.queryByTestId('card-fade')).not.toBeInTheDocument();
+  });
+
+  it('goes at the bottom, and comes back on scrolling up', () => {
+    setLayout({ scrollHeight: 1000, clientHeight: 600 });
+    render(<BookingCard>content</BookingCard>);
+    const inner = screen.getByText('content');
+    inner.scrollTop = 400;
+    fireEvent.scroll(inner);
+    expect(screen.queryByTestId('card-fade')).not.toBeInTheDocument();
+    inner.scrollTop = 0;
+    fireEvent.scroll(inner);
+    expect(screen.getByTestId('card-fade')).toBeInTheDocument();
+  });
+
+  it('is decoration only: hidden from screen readers and not clickable', () => {
+    setLayout({ scrollHeight: 1000, clientHeight: 600 });
+    render(<BookingCard>content</BookingCard>);
+    expect(screen.getByTestId('card-fade')).toHaveAttribute('aria-hidden', 'true');
+    const css = fs.readFileSync(path.join(__dirname, 'BookingPanelParts.module.css'), 'utf8');
+    expect(css.match(/\n\.fade\s*\{([\s\S]*?)\n\}\n/)[1]).toMatch(/pointer-events:\s*none/);
   });
 });

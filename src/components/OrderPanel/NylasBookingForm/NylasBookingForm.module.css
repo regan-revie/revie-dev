@@ -34,10 +34,25 @@
 }
 
 .timeZoneLine {
+  display: flex;
+  max-width: 100%;
   font-size: 14px;
   color: rgba(49, 4, 22, 0.74);
   /* "Times in your timezone (London) · Change" stays on one line: it never leaves "Change" alone. */
   white-space: nowrap;
+}
+
+/* If a zone's name is so long that the line cannot fit, the sentence is shortened with an ellipsis;
+   "· Change" is always shown and the line never makes the panel scroll sideways. */
+.timeZoneText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeZoneChange {
+  flex: none;
+  padding-left: 0.3em;
 }
 
 .linkButton {

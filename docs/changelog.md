@@ -19,6 +19,28 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-27 (booking panel scroll, second pass, after PR #56)
+
+**Branch / PR:** `panel-scroll-fix`, one PR against `main`.
+
+**What was wrong (on a Mac with scrollbars always shown).** In #56 the card's padding stayed on the card while the inner wrapper scrolled with a visible thin scrollbar. An always-visible scrollbar takes room from the content, and anything slightly too wide (the timezone line, which I had made `nowrap`) then made the wrapper scroll sideways, cutting off the left edge and adding a horizontal scrollbar. I did not catch it because my screenshots ran with scrollbars hidden. **This time every screenshot is taken with Chrome's classic scrollbars forced on** (`--disable-features=OverlayScrollbar`, 1440x900; the styleguide page's own grey bar shows at the right of the screenshots, which is how you can tell), and the panel's scroll width is measured.
+
+**What changed** (`BookingPanelParts.js` and `.module.css`, `NylasBookingForm`)
+1. **No sideways scroll possible:** the card has no padding of its own; the 28px padding is the wrapper's. `box-sizing: border-box` on the wrapper and everything inside, `min-width: 0; max-width: 100%` on its children, `overflow-x: hidden`. Measured with classic scrollbars: scroll width = client width (398 = 398), scrollLeft 0, nothing outside the wrapper's edges.
+2. **The scrollbar is gone, the scrolling stays:** `scrollbar-width: none` and `::-webkit-scrollbar { display: none }` on the wrapper (from 1024px up, and only when the content is taller than the window).
+3. **A soft fade along the bottom edge only while there is more below** (cream gradient, 56px, `aria-hidden`, not clickable); it goes when you reach the bottom and comes back on scrolling up, and it follows content changes (opening "More dates", picking a time).
+4. **The timezone line** is one flex line: the sentence shortens with an ellipsis if a zone name is very long, "· Change" is always shown, and the line can no longer push the panel wider.
+
+**Screenshots** (1440x900, classic scrollbars, `/styleguide/c/RevieBookingPanel/BookingPanelAndPhoneBar/raw`, sent with this report): before (#56's code), after at the top of the panel (fade visible), after scrolled to the bottom (no fade, Book and "Message Maya" fully visible). I could **not** reproduce the left clipping on this machine with #56's code (the sample zone, "Los Angeles", fits); the panel measured clean both before and after, so this fix removes the causes rather than a cut I saw. If it still shows on your Mac, send a screenshot and your zone.
+
+**Tests:** `yarn format-ci` clean; client 1640 and server 1148 tests pass. New: the card's CSS rules (padding, border-box, max-width, overflow-x, hidden scrollbar), the fade (shows with more below, goes at the bottom, comes back, decoration only), the timezone line's parts.
+
+**Console / Render steps:** none.
+
+**Dev test steps:** on a Mac with Show scroll bars: Always (System Settings, Appearance), open a session page at desktop width in Chrome, open "More dates" and pick a time. The panel scrolls with the trackpad or wheel with no scrollbar, nothing is cut at the left edge, there is no horizontal scrollbar, the fade shows along the bottom while there is more and disappears at the bottom. Change the zone to a long one ("America/Argentina/Buenos_Aires") and see the line stays on one line with "Change" intact.
+
+---
+
 ## HANDOFF — 2026-11-26 (review fixes for the session page and checkout, PRs #52 to #54)
 
 **Branch / PR:** `review-fixes`, one PR against `main`. The "Message {coach}" pop-up is not in it (waiting for a design). Rebased on `main` after the booking confirmation PR (#55) merged; the only conflicts were the two docs files, resolved by keeping both sides.
