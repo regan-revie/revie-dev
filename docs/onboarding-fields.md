@@ -364,9 +364,9 @@ Never copied: the user's private `identity` ("How do you identify?", gender). It
 
 ### `clients_love`: "Clients love working with me because..."
 - **Type / stored:** long text, user `publicData`. **In Dev Console since Nov 24.**
-- **Who:** coach. **Optional.** Not at sign-up.
+- **Who:** coach. **Required of coaches in code** since Nov 25 (profile form), like `coach_title` and the four traits, and counts toward "Finish your profile"; leave Console's `required` off. Not at sign-up.
 - **Limit:** about **200 characters**, enforced in code (same place); Console's long text has none.
-- **Where it is shown or used:** the orange quote card in "Get to know {Name}" on the session page, shown as the whole quote in one weight. No card while empty. The coach's answer should be the full sentence.
+- **Where it is shown or used:** the orange quote card in "Get to know {Name}" on the session page, shown as the whole quote in one weight. No card while empty. The coach's answer should be the full sentence. Required, so every bookable coach has the card.
 
 The keys the page reads are in `src/containers/ListingPage/SessionPage/coachFields.js`.
 

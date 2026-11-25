@@ -1,0 +1,34 @@
+/* The error red is --revieError (5.96 : 1 on cream). Values: docs/design/checkout/ States. */
+
+.root {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: var(--fontWeightBold);
+  line-height: 1.5;
+  color: var(--revieError);
+}
+
+.icon {
+  flex: none;
+  margin-top: 3px;
+  /* Drawn as an outline in the text colour; the page's global svg rules must not fill it. */
+  fill: none;
+  stroke: currentColor;
+}
+
+.boxed {
+  display: flex;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 2px solid var(--revieError);
+  border-radius: 12px;
+  background-color: var(--revieCream);
+  font-size: 15px;
+
+  & .icon {
+    margin-top: 1px;
+  }
+}

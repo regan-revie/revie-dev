@@ -5,6 +5,7 @@ import { renderWithProviders as render, testingLibrary } from '../../../util/tes
 import * as api from '../../../util/api';
 import { BookingLayoutContext, LAYOUT_SHEET } from '../BookingPanelParts';
 import NylasBookingForm from './NylasBookingForm';
+import { dayKeyOf } from './nylasSlots';
 
 const { screen, waitFor, userEvent, within } = testingLibrary;
 
@@ -119,6 +120,35 @@ describe('NylasBookingForm: the three steps keep the booking behaviour', () => {
     await waitFor(() => expect(screen.getByText(timeText(start))).toBeInTheDocument());
     expect(availability).toHaveBeenCalledTimes(2);
     expect(bookButton()).toBeDisabled();
+  });
+
+  it('opens on the day it is asked to (the checkout\'s "Find a new time"), and on the first day without one', async () => {
+    const first = Date.parse('2026-09-11T10:00:00Z');
+    const later = Date.parse('2026-09-18T14:00:00Z');
+    jest.spyOn(api, 'nylasAvailability').mockResolvedValue({
+      slots: [{ start: first, end: first + 3600000 }, { start: later, end: later + 3600000 }],
+      connected: true,
+    });
+
+    const withDay = render(
+      <NylasBookingForm {...baseProps} preselectedDayKey={dayKeyOf(later, VIEWER_ZONE)} />
+    );
+    await waitFor(() => expect(screen.getByText(timeText(later))).toBeInTheDocument());
+    expect(screen.queryByText(timeText(first))).toBeNull();
+    withDay.unmount();
+
+    render(<NylasBookingForm {...baseProps} />);
+    await waitFor(() => expect(screen.getByText(timeText(first))).toBeInTheDocument());
+    expect(screen.queryByText(timeText(later))).toBeNull();
+  });
+
+  it('ignores a day it has no times for', async () => {
+    jest.spyOn(api, 'nylasAvailability').mockResolvedValue({
+      slots: [{ start, end: start + 3600000 }],
+      connected: true,
+    });
+    render(<NylasBookingForm {...baseProps} preselectedDayKey="2030-01-01" />);
+    await waitFor(() => expect(screen.getByText(timeText(start))).toBeInTheDocument());
   });
 
   it('cannot be submitted until a slot is chosen, then says what was chosen and what it costs', async () => {

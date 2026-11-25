@@ -1,0 +1,167 @@
+@import '../../../styles/customMediaQueries.css';
+
+/* Values: docs/design/checkout/ Main (desktop) and Phone. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+  padding: 20px;
+  border-radius: var(--borderRadiusLarge);
+  background-color: var(--revieMaroon);
+  box-shadow: 0 16px 40px rgba(49, 4, 22, 0.12);
+  color: var(--revieCream);
+  font-size: 15px;
+  line-height: 1.55;
+
+  @media (min-width: 861px) {
+    padding: 28px;
+  }
+}
+
+.coach {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.photo {
+  flex: none;
+  width: 58px;
+  margin-right: 12px;
+}
+
+.coachText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.title {
+  font-family: var(--fontFamilyHeadline);
+  font-size: 19px;
+  line-height: 1.2;
+
+  @media (min-width: 861px) {
+    font-size: 21px;
+  }
+
+  & b {
+    font-weight: 700;
+  }
+}
+
+.with {
+  font-size: 14px;
+}
+
+.link {
+  color: var(--revieCream);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:hover {
+    color: var(--revieCream);
+    text-decoration-thickness: 2px;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fact {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+}
+
+.quiet {
+  opacity: 0.85;
+}
+
+.rule {
+  height: 1px;
+  margin: 0;
+  border: none;
+  background-color: rgba(239, 238, 237, 0.25);
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(239, 238, 237, 0.25);
+}
+
+.totalLabels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.totalLabel {
+  font-weight: var(--fontWeightBold);
+}
+
+.noFees {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.total {
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 1;
+
+  @media (min-width: 861px) {
+    font-size: 40px;
+  }
+}
+
+.cancelBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--reviePeriwinkle);
+  color: var(--revieGreen);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* The error red is unreadable on maroon (1.7 : 1), so a message in the card sits on a cream chip. */
+.errorChip {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background-color: var(--revieCream);
+}

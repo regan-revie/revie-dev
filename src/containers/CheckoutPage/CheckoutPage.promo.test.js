@@ -121,9 +121,15 @@ describe('PromoCodeSection', () => {
 
   it('shows an applied code with a Remove button', async () => {
     const { onRemove } = setup({ appliedCode: 'NEWYEAR15', appliedPercent: 15 });
-    expect(screen.getByTestId('promoApplied')).toHaveTextContent('NEWYEAR15 applied: 15% off');
+    expect(screen.getByTestId('promoApplied')).toHaveTextContent('Promo discount (NEWYEAR15)');
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
     expect(onRemove).toHaveBeenCalled();
+  });
+
+  it('shows the discount as money beside the line, and has no Remove once the price is fixed', () => {
+    setup({ appliedCode: 'NEWYEAR15', discountText: '−$15.00', onRemove: undefined });
+    expect(screen.getByTestId('promoDiscount')).toHaveTextContent('−$15.00');
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
   });
 
   it('when the server refuses an applied code later, says why and offers to carry on without it', async () => {

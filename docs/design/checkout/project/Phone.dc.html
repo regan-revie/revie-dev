@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Checkout — phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/777a3592ed78484b92a77984f394a4cb) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/c459a03d649b6d6a09f1584457a7b466) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/c36d98ccd1c3a28c0b417ecd8185ceda) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/b71f9418de94b71d0e352029e4f2616b) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Schibsted Grotesk';src:url(/_blob/5b12d3152062fa945c237bf31b084af5) format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+</style>
+<style>
+body{margin:0;background:#EFEEED}
+a{color:#310416}a:hover{color:#310416;text-decoration-thickness:2px}
+button{font:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #DBABF5;outline-offset:2px}
+.card{transition:transform 200ms, box-shadow 200ms}
+.card:hover,.card:focus-visible{transform:rotate(var(--tilt)) translateY(-4px);box-shadow:0 16px 40px rgba(49,4,22,0.14)}
+.card .go{transition:background-color 150ms}
+.card:hover .go{background:#FF90C2 !important}
+.pbtn:hover{background:#FF90C2 !important}
+@media (max-width: 1100px){.fgrid{grid-template-columns:repeat(2, minmax(0, 1fr)) !important}}
+@media (max-width: 640px){.fgrid{grid-template-columns:minmax(0, 1fr) !important}}
+.sgrid > :last-child:nth-child(odd){grid-column:1/-1;min-height:280px !important}
+@media (max-width: 760px){.sgrid{grid-template-columns:minmax(0,1fr) !important}}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #EFEEED; color: #310416; font-family: 'Bio Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.55">
+<div style="height: 844px; overflow-y: auto; box-sizing: border-box; padding-bottom: 120px">
+<header style="background: #310416; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<a href="#" aria-label="Revie home" style="display: block; line-height: 0"><img src="/_blob/733d757c7635337ebf695f3dd4f352b2" alt="Revie" style="display: block; width: 44px; height: 44px"></a>
+<span style="display: inline-flex; align-items: center; gap: 8px; color: #EFEEED; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 13px"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 400 400" fill="#EFEEED" style="flex: none"><path d="M277.24,174.59c17.19-2.24,32.65,3.99,37.55,21.51-2.33,30.9,3.52,67.23.12,97.46-1.99,17.68-19.11,34.81-36.8,36.8-49.61-2.84-103.3,3.76-152.42.07-22.7-1.71-38.27-17.73-40.21-40.24-1.59-18.37-2.59-78.92.82-95.15,3.31-15.72,20.33-22.73,35.18-20.45v-38.51c0-2.54,4.25-15.03,5.55-18.42,22.75-59.52,105.49-66.69,138.57-12.72,2.78,4.54,11.65,23.47,11.65,27.72v41.94ZM136.88,174.59h122.39c.42,0,1.02,1.39,1.71,1.34l2.57-2.2v-30.81c0-50.39-69.53-79.71-107.87-42.83-5.96,5.73-18.79,26.62-18.79,34.27v40.22ZM107.29,190.36c-4.71,2.09-6.67,6.46-7.11,11.35,1.72,26.5-3.03,53.36-1.02,79.93,1.41,18.75,6.85,30.76,26.56,35.06,46.68-3.92,101.57,5.11,147.25-.04,17.45-1.96,27.49-14.46,27.88-31.68.06-2.61-1.47-5.5-1.43-8.48.28-22.08,2.86-56.62.16-77.18-.53-4.04-1.81-6.16-5.26-8.43l-187.03-.53Z"></path><path d="M213.32,229.96c-14.82-14.97-39.35,2.49-29.82,22.12,2.27,4.67,9.58,8.11,9.9,9.31,1.8,6.68-4.78,23.56,4.59,25.94,13.07,3.32,7.61-19.77,9.42-25.94,1.16-3.96,8.39-7,9.56-10.97,1.74-5.91.85-15.9-3.66-20.46Z"></path></svg>Secure checkout</span>
+</header>
+<main style="padding: 8px 20px 32px; display: flex; flex-direction: column; gap: 22px">
+<a href="#" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: #310416; text-decoration: none; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 16px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#310416" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>Back to the session</a>
+<h1 style="margin: 0; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 36px; line-height: 1.05">Complete your <b>booking.</b></h1>
+<aside aria-label="Your booking" style="box-sizing: border-box; padding: 20px; border-radius: 20px; background: #310416; color: #EFEEED; box-shadow: 0 16px 40px rgba(49,4,22,0.12); display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; gap: 16px; align-items: center"><div aria-hidden="true" style="flex: none; position: relative; width: 58px; height: 78px; margin-right: 12px"><div style="position: absolute; inset: 0; border-radius: 999px; background: #EAEA73; transform: translate(9px, 7px) rotate(5deg)"></div><img src="/_blob/bca340e48cda99e29b79cea0b2d731e1" alt="Maya" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; border-radius: 999px; transform: rotate(-3deg)"></div><div style="display: flex; flex-direction: column; gap: 4px"><div style="font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-size: 19px; line-height: 1.2">Get clear on your next career move, <b>then make it.</b></div><span style="font-size: 14px">with <a href="#" style="color: #EFEEED">Maya R.</a></span></div></div>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; font-size: 15px"><li style="display: flex; align-items: flex-start; gap: 12px"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 400 400" fill="#EFEEED" style="flex: none"><path d="M138.23,97.16h125.81v-26.8c0-3.33,10.94-4.33,10.94,1.09v25.71h34.46c12.61,0,28.6,17.49,28.87,30.2-3.09,55.69,4.52,116.59.16,171.68-1.26,15.89-10.97,28.58-26.68,32.4l-220.06.94c-17.92-2.87-28.73-16.74-30.12-34.43,3.64-54.37-4.74-114.85.06-168.5,1.22-13.69,14.15-32.29,28.97-32.29h36.65v-26.8c0-3.57,10.94-3.57,10.94,0v26.8ZM127.29,108.1h-34.46c-6.6,0-19.14,11.64-19.14,18.05v25.71h253.81v-22.43c0-8.01-12.05-21.33-20.24-21.33h-32.27v21.33c0,3.8-10.94,5.53-10.94,0v-21.33h-125.81v21.33c0,.98-4.06,4.07-5.96,3.89-1.38-.13-4.98-3.32-4.98-3.89v-21.33ZM327.49,162.8H73.69v139.48c0,7,10.66,17.78,18.02,18.08l219.4-.54c7.63-1.94,16.38-13.08,16.38-20.82v-136.2Z"></path><path d="M204.05,183.91c3.95,3.29,13.49,33.09,15.8,34.5,7.67,2.31,36.73,1.18,41.35,5.14,2.08,1.79,2.58,4.75,2.04,7.36-1.28,6.22-25.25,20.49-29.84,27-1.14,3.05,6.36,27.73,6.94,33.54.56,5.65-.8,11.31-7.81,10.1-7.21-1.25-28.13-18.01-33.1-18.01l-31.5,17.35c-2.57,1.85-7.77.09-8.98-2.44-3.28-6.85,7.42-31.93,6.97-40.81-.99-3.56-25.19-18.75-28.36-24.23-2-3.45-1.05-10.11,3.01-11.33,8.45-2.54,33.03-.58,38.6-4.06l15.6-34.17c2.57-1.76,6.82-1.99,9.27.04ZM245.93,231.73c-7.6-1.69-26.23-.1-32.15-3.42-4.55-2.55-12.75-28.33-14.35-28.33-3.47,5.12-10.04,26.86-14.78,28.99l-31.72,3.3,24.73,21.3-6.11,32.85,27.89-15.24,27.89,15.24-5.24-33.14,23.85-21.55Z"></path></svg><span><b>Thu 3 Dec · 10:00 to 11:00 am</b> · <a href="#" style="color: {C}">Find a new time</a><br><span style="opacity: 0.85">In your timezone (London)</span></span></li><li style="display: flex; align-items: flex-start; gap: 12px"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 400 400" fill="#EFEEED" style="flex: none"><path d="M182.19,68.97c136.36-13.9,203.05,146.54,100.44,232.24-90.34,75.44-223.23,1.86-214.74-113.75,4.37-59.6,54.54-112.39,114.31-118.48ZM292.11,275.58c57.93-66.14,24.62-170.59-60.3-192.19-116.41-29.61-198.83,99.2-125.43,192.18,7.4-18.86,21.31-34.72,41.01-41.14,17.32-5.64,66-4.81,85.73-3.44,26.82,1.87,51.12,18.39,59,44.58ZM156.46,243.51c-17.48,2.53-39.93,23.13-39.12,41.53.22,5,12.08,12.99,16.73,15.91,36.28,22.78,80.54,25.84,119.21,6.85,5.98-2.94,26.5-15.7,28.23-21.46,5.03-16.78-21.5-38.62-35.94-42.11-13.02-3.15-74.6-2.82-89.1-.72Z"></path><path d="M187.24,115.1c78-12.34,85.92,94.08,21.39,103.55-74.09,10.87-81.56-94.04-21.39-103.55ZM195.92,125.35c-49.32,3.5-49,75.62-5.52,81.62,67,9.24,64.5-85.81,5.52-81.62Z"></path></svg><span>60-minute video call on Google Meet</span></li></ul>
+<div style="height: 1px; background: rgba(239,238,237,0.25)"></div>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 15px">
+<div style="display: flex; justify-content: space-between; gap: 12px"><span>60-minute session</span><span>$110.00</span></div>
+<sc-if value="{{promoApplied}}" hint-placeholder-val="{{false}}"><div style="display: flex; justify-content: space-between; gap: 12px"><span>Promo discount (NEWYEAR15) · <button type="button" onClick="{{removePromo}}" style="padding: 0; border: none; background: none; color: #EFEEED; font-size: 14px; text-decoration: underline; text-underline-offset: 3px">Remove</button></span><b>−$16.50</b></div></sc-if>
+<sc-if value="{{promoIdle}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{openPromo}}" style="align-self: flex-start; min-height: 36px; padding: 0; border: none; background: none; color: #EFEEED; font-size: 15px; text-decoration: underline; text-underline-offset: 3px">Have a code?</button>
+</sc-if>
+<sc-if value="{{promoOpen}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="code" style="font-size: 14px; font-weight: 700; color: #EFEEED">Promo code</label><div style="display: flex; gap: 8px"><input id="code" type="text" value="NEWYEAR15" style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416; height: 46px; flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: 0.5px"><button type="button" onClick="{{applyPromo}}" class="pbtn" style="flex: none; height: 46px; padding: 0 20px; border: none; border-radius: 999px; background: #DBABF5; color: #310416; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 13px">Apply</button></div></div>
+</sc-if>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding-top: 16px; border-top: 1px solid rgba(239,238,237,0.25)"><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Total</span><span style="font-size: 13px; opacity: 0.85">No booking fees</span></div><span style="font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 34px; line-height: 1">{{total}}</span></div>
+<div style="display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-radius: 12px; background: #D8E6FF; color: #032723; font-size: 14px; line-height: 1.5"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 400 400" fill="#032723" style="flex: none"><path d="M277.24,174.59c17.19-2.24,32.65,3.99,37.55,21.51-2.33,30.9,3.52,67.23.12,97.46-1.99,17.68-19.11,34.81-36.8,36.8-49.61-2.84-103.3,3.76-152.42.07-22.7-1.71-38.27-17.73-40.21-40.24-1.59-18.37-2.59-78.92.82-95.15,3.31-15.72,20.33-22.73,35.18-20.45v-38.51c0-2.54,4.25-15.03,5.55-18.42,22.75-59.52,105.49-66.69,138.57-12.72,2.78,4.54,11.65,23.47,11.65,27.72v41.94ZM136.88,174.59h122.39c.42,0,1.02,1.39,1.71,1.34l2.57-2.2v-30.81c0-50.39-69.53-79.71-107.87-42.83-5.96,5.73-18.79,26.62-18.79,34.27v40.22ZM107.29,190.36c-4.71,2.09-6.67,6.46-7.11,11.35,1.72,26.5-3.03,53.36-1.02,79.93,1.41,18.75,6.85,30.76,26.56,35.06,46.68-3.92,101.57,5.11,147.25-.04,17.45-1.96,27.49-14.46,27.88-31.68.06-2.61-1.47-5.5-1.43-8.48.28-22.08,2.86-56.62.16-77.18-.53-4.04-1.81-6.16-5.26-8.43l-187.03-.53Z"></path><path d="M213.32,229.96c-14.82-14.97-39.35,2.49-29.82,22.12,2.27,4.67,9.58,8.11,9.9,9.31,1.8,6.68-4.78,23.56,4.59,25.94,13.07,3.32,7.61-19.77,9.42-25.94,1.16-3.96,8.39-7,9.56-10.97,1.74-5.91.85-15.9-3.66-20.46Z"></path></svg><span>Free to cancel until <b>Tue 1 Dec, 10:00 am</b>. After that, the full price is charged. If Maya cancels, you're refunded in full.</span></div>
+</aside>
+<section aria-labelledby="s1" style="display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; display: flex; align-items: center; gap: 12px; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 20px"><span aria-hidden="true" style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 999px; background: #310416; color: #EFEEED; font-size: 15px">1</span><span id="s1">Anything Maya should know? <span style="font-family: Bio Sans, sans-serif; font-weight: 400; font-size: 15px; color: rgba(49,4,22,0.74)">Optional</span></span></h2>
+<label for="msg" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">A note for Maya, optional</label>
+<textarea id="msg" rows="4" placeholder="What's on your mind, or what you'd like to get out of the session." style="box-sizing: border-box; width: 100%; padding: 14px 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; line-height: 1.5; color: #310416; resize: vertical"></textarea>
+<span style="font-size: 14px; color: rgba(49,4,22,0.74)">She'll see it before your session. You can keep chatting in your inbox after you book.</span>
+</section>
+<section aria-labelledby="s2" style="display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; display: flex; align-items: center; gap: 12px; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 20px"><span aria-hidden="true" style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 999px; background: #310416; color: #EFEEED; font-size: 15px">2</span><span id="s2">Payment</span></h2>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="card" style="font-size: 14px; font-weight: 700">Card</label><div id="card" role="group" aria-label="Card details" style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416; display: flex; align-items: center; gap: 12px"><svg aria-hidden="true" width="26" height="18" viewBox="0 0 26 18" fill="none" stroke="#310416" stroke-width="1.6"><rect x="1" y="1" width="24" height="16" rx="3"></rect><path d="M1 6h24"></path></svg><span style="flex: 1; color: rgba(49,4,22,0.6)">Card number</span><span style="color: rgba(49,4,22,0.6)">MM / YY</span><span style="color: rgba(49,4,22,0.6)">CVC</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="name" style="font-size: 14px; font-weight: 700">Name on card</label><input id="name" type="text" autocomplete="cc-name" style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416"></div>
+<span style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: rgba(49,4,22,0.74)"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 400 400" fill="#310416" style="flex: none"><path d="M277.24,174.59c17.19-2.24,32.65,3.99,37.55,21.51-2.33,30.9,3.52,67.23.12,97.46-1.99,17.68-19.11,34.81-36.8,36.8-49.61-2.84-103.3,3.76-152.42.07-22.7-1.71-38.27-17.73-40.21-40.24-1.59-18.37-2.59-78.92.82-95.15,3.31-15.72,20.33-22.73,35.18-20.45v-38.51c0-2.54,4.25-15.03,5.55-18.42,22.75-59.52,105.49-66.69,138.57-12.72,2.78,4.54,11.65,23.47,11.65,27.72v41.94ZM136.88,174.59h122.39c.42,0,1.02,1.39,1.71,1.34l2.57-2.2v-30.81c0-50.39-69.53-79.71-107.87-42.83-5.96,5.73-18.79,26.62-18.79,34.27v40.22ZM107.29,190.36c-4.71,2.09-6.67,6.46-7.11,11.35,1.72,26.5-3.03,53.36-1.02,79.93,1.41,18.75,6.85,30.76,26.56,35.06,46.68-3.92,101.57,5.11,147.25-.04,17.45-1.96,27.49-14.46,27.88-31.68.06-2.61-1.47-5.5-1.43-8.48.28-22.08,2.86-56.62.16-77.18-.53-4.04-1.81-6.16-5.26-8.43l-187.03-.53Z"></path><path d="M213.32,229.96c-14.82-14.97-39.35,2.49-29.82,22.12,2.27,4.67,9.58,8.11,9.9,9.31,1.8,6.68-4.78,23.56,4.59,25.94,13.07,3.32,7.61-19.77,9.42-25.94,1.16-3.96,8.39-7,9.56-10.97,1.74-5.91.85-15.9-3.66-20.46Z"></path></svg>Payments go through Stripe. Revie never sees your card number.</span>
+</section>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: rgba(49,4,22,0.74)">By booking you agree to Revie's <a href="#">terms</a>. You pay now; cancel up to 48 hours before for a full refund.</p>
+</main>
+<footer style="padding: 20px; border-top: 1px solid rgba(49,4,22,0.14); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px"><span>Questions? <a href="mailto:hello@heyrevie.com">hello@heyrevie.com</a></span><span>Minted Mojito LLC © 2026</span></footer>
+</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 14px 20px 26px; background: #EFEEED; border-top: 1px solid rgba(49,4,22,0.16); box-shadow: 0 -8px 24px rgba(49,4,22,0.10)"><button type="button" class="pbtn" style="width: 100%; min-height: 56px; border: none; border-radius: 999px; background: #310416; color: #EFEEED; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 15px">Book a session · {{total}}</button></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { promo: 0 }; }
+  renderVals() {
+    var s = this.state, self = this;
+    return { promoIdle: s.promo === 0, promoOpen: s.promo === 1, promoApplied: s.promo === 2,
+      total: s.promo === 2 ? '$93.50' : '$110.00',
+      openPromo: function () { self.setState({ promo: 1 }); },
+      applyPromo: function () { self.setState({ promo: 2 }); },
+      removePromo: function () { self.setState({ promo: 0 }); } };
+  }
+}
+</script>
+</body>
+</html>

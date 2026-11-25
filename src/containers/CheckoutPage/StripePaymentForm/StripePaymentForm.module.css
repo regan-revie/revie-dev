@@ -1,159 +1,281 @@
 @import '../../../styles/customMediaQueries.css';
 
+/*
+ * The checkout form: the note to the coach, the card, the Book button and the terms. Values are the
+ * approved design's (docs/design/checkout/ Main, Phone and States). Colours, radii and fonts are
+ * the Revie tokens.
+ */
+
 .root {
   display: flex;
   flex-direction: column;
+  gap: 40px;
+  color: var(--revieMaroon);
 }
 
-.locationWrapper {
-  margin-bottom: 40px;
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.heading {
-  composes: p from global;
-  font-weight: var(--fontWeightBold);
-  padding: 0;
-  margin-bottom: 16px;
-}
-
-.locationDetails {
-  padding: 0;
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.3;
+  letter-spacing: normal;
+  color: var(--revieMaroon);
 }
 
-.card {
-  composes: marketplaceInputStyles from global;
-
-  @media (--viewportMedium) {
-    padding: 11px 0 11px 16px;
-  }
+.stepNumber {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--revieMaroon);
+  color: var(--revieCream);
+  font-size: 15px;
 }
 
-.cardError {
-  border: var(--borderErrorField);
-}
-
-.error {
-  color: var(--colorFail);
-  font-size: 13px;
-}
-
-.errorMessage {
-  margin-top: 24px;
-  color: var(--colorFail);
-}
-
-.transactionFieldsContainer,
-.paymentMethodSelector {
-  margin-bottom: 36px;
-
-  @media (--viewportMedium) {
-    margin-bottom: 40px;
-  }
-}
-
-.saveForLaterUse {
-  padding-top: 6px;
-  margin-bottom: 36px;
-
-  @media (--viewportMedium) {
-    padding-top: 8px;
-    margin-top: 0px;
-    margin-bottom: 48px;
-  }
-}
-
-.saveForLaterUseCheckbox {
-  display: inline-block;
-  padding: 2px 0 3px 0;
-
-  @media (--viewportMedium) {
-    padding: 1px 0 0px 0;
-  }
-}
-
-.saveForLaterUseLabel {
-  composes: h5 from global;
-
-  color: var(--colorGrey700);
-  margin-top: 3px;
-  margin-bottom: 0px;
-  cursor: pointer;
-}
-
-.saveForLaterUseLegalInfo {
-  composes: h5 from global;
-
-  color: var(--colorGrey600);
-  display: inline-block;
-  padding: 0px 0 0px 26px;
-  margin-top: -2px;
-  margin-bottom: 2px;
-
-  @media (--viewportMedium) {
-    margin-top: -1px;
-    margin-bottom: 1px;
-  }
-}
-
-.billingDetails {
-  margin-bottom: 48px;
-}
-
-.sameAddressCheckbox {
-  display: block;
-  margin: 24px 0;
-}
-
-.messageLabel {
-  margin: 0 0 5px 0;
-
-  @media (--viewportMedium) {
-    margin: 0 0 6px 0;
-  }
-}
-
-.messageOptional {
+.optional {
+  font-family: var(--fontFamily);
+  font-weight: 400;
+  font-size: 15px;
   color: var(--colorTextMuted);
 }
 
-.message {
-  border-bottom-color: var(--colorGrey300);
+/* Kept for screen readers: the heading above the box is the visible label. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
-.submitContainer {
-  margin-top: auto;
+.textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1.5px solid rgba(49, 4, 22, 0.3);
+  border-radius: 8px;
+  background-color: var(--revieCream);
+  color: var(--revieMaroon);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  resize: vertical;
 
-  @media (--viewportLarge) {
-    margin-top: 72px;
+  &:focus {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+    border-color: var(--revieMaroon);
   }
 }
 
-.paymentInfo {
-  composes: h5 from global;
+.help {
+  font-size: 14px;
+  color: var(--colorTextMuted);
+}
 
-  color: var(--colorGrey600);
-  text-align: center;
-  margin: 28px 0 0 0;
+.transactionFieldsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
-  @media (--viewportLarge) {
-    font-size: 14px;
-    padding: 2px 0 6px 0;
-    margin: 24px 0 0 0;
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 14px;
+  font-weight: var(--fontWeightBold);
+}
+
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 52px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1.5px solid rgba(49, 4, 22, 0.3);
+  border-radius: 8px;
+  background-color: var(--revieCream);
+  color: var(--revieMaroon);
+  font: inherit;
+  font-size: 16px;
+
+  &:focus {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+    border-color: var(--revieMaroon);
+  }
+}
+
+/* The Stripe card field: the same box as the inputs, with Stripe's iframe inside. */
+.card {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 16px;
+  border: 1.5px solid rgba(49, 4, 22, 0.3);
+  border-radius: 8px;
+  background-color: var(--revieCream);
+  transition: border-color 150ms ease;
+}
+
+.cardSuccess {
+  border-color: var(--revieMaroon);
+}
+
+.cardError {
+  border: 2px solid var(--revieError);
+}
+
+.paymentMethodSelector {
+  margin: 0;
+}
+
+.sameAddress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.spinner {
+  margin: 0;
+  stroke: var(--revieMaroon);
+}
+
+.stripeNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--colorTextMuted);
+}
+
+/* The action area: errors, the Book button, the terms. */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Desktop: the button sits under the form. Phone: a bar fixed to the bottom of the screen. */
+.bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  padding: 14px 20px 26px;
+  border-top: 1px solid rgba(49, 4, 22, 0.16);
+  background-color: var(--revieCream);
+  box-shadow: 0 -8px 24px rgba(49, 4, 22, 0.1);
+
+  @media (min-width: 861px) {
+    position: static;
+    padding: 0;
+    border-top: none;
+    background-color: transparent;
+    box-shadow: none;
   }
 }
 
 .submitButton {
-  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--revieMaroon);
+  color: var(--revieCream);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
 
-  @media (--viewportMedium) {
-    margin-top: 26px;
+  @media (min-width: 861px) {
+    min-height: 58px;
   }
-  @media (--viewportLarge) {
-    margin-top: 16px;
+
+  &:hover:not(:disabled) {
+    background-color: var(--reviePink);
+    color: var(--revieMaroon);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+.submitSpinner {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+.terms {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--colorTextMuted);
+
+  & a {
+    color: var(--revieMaroon);
   }
 }
 
 .missingStripeKey {
-  color: var(--colorFail);
+  margin: 0;
+  padding: 16px;
+  border: 2px solid var(--revieError);
+  border-radius: var(--borderRadiusMedium);
+  color: var(--revieError);
+  font-weight: var(--fontWeightBold);
+}
+
+/* Shipping and pickup (not used for sessions, kept for the template's other processes). */
+.heading {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-size: 18px;
+}
+
+.locationWrapper {
+  margin: 0;
+}
+
+.locationDetails {
+  margin: 8px 0 0;
 }

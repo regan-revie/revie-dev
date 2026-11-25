@@ -37,6 +37,8 @@ const STRIP_DAYS = 5;
  * @param {(slot) => void} props.onSelectSlot
  * @param {() => void} [props.onDayChange] called when another day is chosen, so a held pick can clear
  * @param {number} props.dayStepNumber the number on the "Pick a day" title
+ * @param {string} [props.initialDayKey] a day (YYYY-MM-DD) to open on, if it has times: "Find a new
+ *   time" on the checkout sends the client back to the day they had chosen
  */
 const NylasSlotSteps = ({
   slots,
@@ -45,6 +47,7 @@ const NylasSlotSteps = ({
   onSelectSlot,
   onDayChange,
   dayStepNumber,
+  initialDayKey,
 }) => {
   const intl = useIntl();
   const locale = intl.locale;
@@ -54,9 +57,10 @@ const NylasSlotSteps = ({
   const firstDayKey = days[0]?.dayKey;
   const lastDayKey = days[days.length - 1]?.dayKey;
 
-  const [selectedDayKey, setSelectedDayKey] = useState(null);
+  const hasInitialDay = !!initialDayKey && slotsByDay.has(initialDayKey);
+  const [selectedDayKey, setSelectedDayKey] = useState(hasInitialDay ? initialDayKey : null);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [stripStartKey, setStripStartKey] = useState(null);
+  const [stripStartKey, setStripStartKey] = useState(hasInitialDay ? initialDayKey : null);
   const [monthKey, setMonthKey] = useState(null);
 
   const activeDayKey = slotsByDay.has(selectedDayKey) ? selectedDayKey : firstDayKey;

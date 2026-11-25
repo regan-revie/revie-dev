@@ -106,7 +106,11 @@ describe('coachTraits', () => {
 
   describe("coach_title (the one-line title under a coach's name)", () => {
     it('is required of coaches with the four traits, but is not a trait copied to listings', () => {
-      expect(COACH_REQUIRED_PROFILE_KEYS).toEqual([...COACH_TRAIT_USER_KEYS, 'coach_title']);
+      expect(COACH_REQUIRED_PROFILE_KEYS).toEqual([
+        ...COACH_TRAIT_USER_KEYS,
+        'coach_title',
+        'clients_love',
+      ]);
       expect(COACH_TRAIT_USER_KEYS).not.toContain('coach_title');
       expect(COACH_TRAIT_LISTING_KEYS).toHaveLength(4);
     });
@@ -137,6 +141,45 @@ describe('coachTraits', () => {
     it('does not count while the field has not been created in Console', () => {
       const userFields = COACH_TRAIT_USER_KEYS.map(key => field(key, coachOnly));
       expect(requiredCoachTraitKeys(userFields)).not.toContain('coach_title');
+    });
+  });
+
+  describe('clients_love ("Clients love working with me because...")', () => {
+    it('is made required for a coach, and left as it is for a client', () => {
+      const love = field('clients_love');
+      expect(withCoachTraitsRequired(love, 'coach').saveConfig.isRequired).toBe(true);
+      expect(withCoachTraitsRequired(love, 'client')).toBe(love);
+    });
+
+    it('counts toward "Finish your profile" once the field exists for coaches', () => {
+      const userFields = [...COACH_TRAIT_USER_KEYS, 'coach_title', 'clients_love'].map(key =>
+        field(key, coachOnly)
+      );
+      const answered = {
+        personality_identifier: ['x'],
+        languages: ['x'],
+        location: 'x',
+        communication_style: ['x'],
+        coach_title: 'Career coach',
+      };
+      expect(requiredCoachTraitKeys(userFields)).toContain('clients_love');
+      expect(missingCoachTraits(userWith(answered), userFields)).toEqual(['clients_love']);
+      expect(
+        missingCoachTraits(userWith({ ...answered, clients_love: 'I listen.' }), userFields)
+      ).toEqual([]);
+    });
+
+    it('does not count while the field has not been created in Console', () => {
+      const userFields = [...COACH_TRAIT_USER_KEYS, 'coach_title'].map(key =>
+        field(key, coachOnly)
+      );
+      expect(requiredCoachTraitKeys(userFields)).not.toContain('clients_love');
+    });
+
+    it('is not asked of a field that exists for clients only, and is not copied to listings', () => {
+      const userFields = [field('clients_love', clientOnly)];
+      expect(requiredCoachTraitKeys(userFields)).toEqual([]);
+      expect(COACH_TRAIT_LISTING_KEYS).toHaveLength(4);
     });
   });
 

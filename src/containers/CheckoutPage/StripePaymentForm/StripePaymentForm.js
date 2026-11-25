@@ -2,9 +2,13 @@
  * Note: This form is using card from Stripe Elements https://stripe.com/docs/stripe-js#elements
  * Card is not a Final Form field so it's not available trough Final Form.
  * It's also handled separately in handleSubmit function.
+ *
+ * Revie: laid out as the approved checkout design (docs/design/checkout/): 1 "Anything {name} should
+ * know?" (the note to the coach), 2 "Payment" (the card and the name on it), then the Book button
+ * and the terms. All the payment logic below is the template's; only what is drawn changed.
  */
 import React, { Component } from 'react';
-import { Form as FinalForm } from 'react-final-form';
+import { Form as FinalForm, Field } from 'react-final-form';
 import arrayMutators from 'final-form-arrays';
 import classNames from 'classnames';
 
@@ -18,15 +22,13 @@ import { isDownloadProcess, isBookingProcess } from '../../../transactions/trans
 import {
   Heading,
   Form,
-  PrimaryButton,
-  FieldCheckbox,
-  FieldTextInput,
   IconSpinner,
   SavedCardDetails,
-  StripePaymentAddress,
   CustomExtendedDataField,
 } from '../../../components';
 
+import ErrorNote from '../RevieCheckout/ErrorNote';
+import { IconCancelling } from '../../ListingPage/SessionPage/SessionIcons';
 import ShippingDetails from '../ShippingDetails/ShippingDetails';
 
 import css from './StripePaymentForm.module.css';
@@ -76,60 +78,83 @@ const stripeElementsOptions = {
   ],
 };
 
-// card (being a Stripe Elements component), can have own styling passed to it.
-// However, its internal width-calculation seems to break if font-size is too big
-// compared to component's own width.
-const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+// The card field's own text, drawn by Stripe inside its iframe (so the page's fonts do not reach it).
+// 16px, because a smaller size makes iOS Safari zoom the page in when the field is focused.
 const cardStyles = {
   base: {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", Helvetica, Arial, sans-serif',
-    fontSize: isMobile ? '14px' : '16px',
+    fontSize: '16px',
     fontSmoothing: 'antialiased',
     lineHeight: '24px',
     letterSpacing: '-0.1px',
-    color: '#4A4A4A',
+    color: '#310416', // --revieMaroon
     '::placeholder': {
-      color: '#B2B2B2',
+      color: 'rgba(49, 4, 22, 0.6)',
     },
+  },
+  invalid: {
+    color: '#B8000A', // --revieError
   },
 };
 
+// The Stripe error codes the checkout has its own words for.
+const PI_AUTHENTICATION_FAILURE = 'payment_intent_authentication_failure';
+
+/**
+ * What the client reads when paying fails. Errors say what happened and whether money moved: a
+ * declined card, or any other card problem, and a failed authentication, all happen before anything
+ * is charged, and the message says so. "A payment has been made but..." is the other way round.
+ *
+ * @returns {React.ReactNode}
+ */
+export const getPaymentErrorContent = (confirmCardPaymentError, confirmPaymentError) => {
+  if (confirmCardPaymentError) {
+    const { code, type, message, decline_code: declineCode } = confirmCardPaymentError;
+    if (code === 'card_declined' || declineCode) {
+      return <FormattedMessage id="StripePaymentForm.cardDeclined" />;
+    }
+    if (code === PI_AUTHENTICATION_FAILURE) {
+      return (
+        <>
+          <FormattedMessage id="StripePaymentForm.confirmCardPaymentError" />{' '}
+          <FormattedMessage id="StripePaymentForm.notCharged" />
+        </>
+      );
+    }
+    if (type === 'api_connection_error') {
+      return <FormattedMessage id="StripePaymentForm.connectionError" />;
+    }
+    if (type === 'card_error' && message) {
+      return (
+        <>
+          {message} <FormattedMessage id="StripePaymentForm.notCharged" />
+        </>
+      );
+    }
+    return message || <FormattedMessage id="StripePaymentForm.genericError" />;
+  }
+  if (confirmPaymentError) {
+    return <FormattedMessage id="StripePaymentForm.confirmPaymentError" />;
+  }
+  return <FormattedMessage id="StripePaymentForm.genericError" />;
+};
+
 const OneTimePaymentWithCardElement = props => {
-  const {
-    cardClasses,
-    formId,
-    handleStripeElementRef,
-    hasCardError,
-    error,
-    label,
-    intl,
-    marketplaceName,
-  } = props;
-  const labelText =
-    label || intl.formatMessage({ id: 'StripePaymentForm.saveAfterOnetimePayment' });
+  const { cardClasses, formId, handleStripeElementRef, hasCardError, error } = props;
   return (
     <React.Fragment>
-      <label className={css.paymentLabel} htmlFor={`${formId}-card`}>
-        <FormattedMessage id="StripePaymentForm.paymentCardDetails" />
-      </label>
-      <div className={cardClasses} id={`${formId}-card`} ref={handleStripeElementRef} />
-      {hasCardError ? <span className={css.error}>{error}</span> : null}
-      <div className={css.saveForLaterUse}>
-        <FieldCheckbox
-          className={css.saveForLaterUseCheckbox}
-          textClassName={css.saveForLaterUseLabel}
-          id="saveAfterOnetimePayment"
-          name="saveAfterOnetimePayment"
-          label={labelText}
-          value="saveAfterOnetimePayment"
-          useSuccessColor
-        />
-        <span className={css.saveForLaterUseLegalInfo}>
-          <FormattedMessage
-            id="StripePaymentForm.saveforLaterUseLegalInfo"
-            values={{ marketplaceName }}
-          />
+      <div className={css.field}>
+        <span className={css.fieldLabel} id={`${formId}-card-label`}>
+          <FormattedMessage id="StripePaymentForm.cardLabel" />
         </span>
+        <div
+          className={cardClasses}
+          id={`${formId}-card`}
+          role="group"
+          aria-labelledby={`${formId}-card-label`}
+          ref={handleStripeElementRef}
+        />
+        {hasCardError ? <ErrorNote>{error}</ErrorNote> : null}
       </div>
     </React.Fragment>
   );
@@ -145,20 +170,10 @@ const PaymentMethodSelector = props => {
     hasCardError,
     error,
     paymentMethod,
-    intl,
-    marketplaceName,
   } = props;
-  const last4Digits = defaultPaymentMethod.attributes.card.last4Digits;
-  const labelText = intl.formatMessage(
-    { id: 'StripePaymentForm.replaceAfterOnetimePayment' },
-    { last4Digits }
-  );
 
   return (
     <React.Fragment>
-      <Heading as="h3" rootClassName={css.heading}>
-        <FormattedMessage id="StripePaymentForm.payWithHeading" />
-      </Heading>
       <SavedCardDetails
         className={css.paymentMethodSelector}
         card={defaultPaymentMethod.attributes.card}
@@ -171,9 +186,6 @@ const PaymentMethodSelector = props => {
           handleStripeElementRef={handleStripeElementRef}
           hasCardError={hasCardError}
           error={error}
-          label={labelText}
-          intl={intl}
-          marketplaceName={marketplaceName}
         />
       ) : null}
     </React.Fragment>
@@ -365,16 +377,6 @@ class StripePaymentForm extends Component {
       this.card = elements.create('card', { style: cardStyles });
       this.card.mount(element || this.cardContainer);
       this.card.addEventListener('change', this.handleCardValueChange);
-      // EventListener is the only way to simulate breakpoints with Stripe.
-      window.addEventListener('resize', () => {
-        if (this.card) {
-          if (window.innerWidth < 768) {
-            this.card.update({ style: { base: { fontSize: '14px', lineHeight: '24px' } } });
-          } else {
-            this.card.update({ style: { base: { fontSize: '18px', lineHeight: '24px' } } });
-          }
-        }
-      });
     }
   }
 
@@ -476,9 +478,11 @@ class StripePaymentForm extends Component {
       loadingData,
       formId,
       providerDisplayName,
+      coachFirstName,
+      coachWillWord,
+      termsHref,
       showInitialMessageInput,
       intl,
-      initiateOrderError,
       confirmCardPaymentError,
       confirmPaymentError,
       invalid,
@@ -493,12 +497,10 @@ class StripePaymentForm extends Component {
       totalPrice,
       locale,
       stripePublishableKey,
-      marketplaceName,
       processName,
       isFuzzyLocation,
       transactionFieldConfigs = [],
       showTransactionFields,
-      values,
     } = formRenderProps;
 
     this.finalFormAPI = formApi;
@@ -534,53 +536,6 @@ class StripePaymentForm extends Component {
     // when speculateTransaction call is in progress.
     const totalPriceMaybe = totalPrice || '';
 
-    // TODO: confirmCardPayment can create all kinds of errors.
-    // Currently, we provide translation support for one:
-    // https://stripe.com/docs/error-codes
-    const piAuthenticationFailure = 'payment_intent_authentication_failure';
-    const paymentErrorMessage =
-      confirmCardPaymentError && confirmCardPaymentError.code === piAuthenticationFailure
-        ? intl.formatMessage({ id: 'StripePaymentForm.confirmCardPaymentError' })
-        : confirmCardPaymentError
-        ? confirmCardPaymentError.message
-        : confirmPaymentError
-        ? intl.formatMessage({ id: 'StripePaymentForm.confirmPaymentError' })
-        : intl.formatMessage({ id: 'StripePaymentForm.genericError' });
-
-    const billingDetailsNameLabel = intl.formatMessage({
-      id: 'StripePaymentForm.billingDetailsNameLabel',
-    });
-
-    const billingDetailsNamePlaceholder = intl.formatMessage({
-      id: 'StripePaymentForm.billingDetailsNamePlaceholder',
-    });
-
-    const messagePlaceholder = intl.formatMessage(
-      { id: 'StripePaymentForm.messagePlaceholder' },
-      { name: providerDisplayName }
-    );
-
-    const messageOptionalText = intl.formatMessage({
-      id: 'StripePaymentForm.messageOptionalText',
-    });
-
-    const initialMessageLabel = intl.formatMessage(
-      { id: 'StripePaymentForm.messageLabel' },
-      { messageOptionalText: messageOptionalText }
-    );
-
-    // Asking billing address is recommended in PaymentIntent flow.
-    // In CheckoutPage, we send name and email as billing details, but address only if it exists.
-    const billingAddress = (
-      <StripePaymentAddress
-        intl={intl}
-        form={formApi}
-        fieldId={formId}
-        card={this.card}
-        locale={locale}
-      />
-    );
-
     const hasStripeKey = stripePublishableKey;
 
     const handleSameAddressCheckbox = event => {
@@ -590,155 +545,186 @@ class StripePaymentForm extends Component {
 
     const isBooking = isBookingProcess(processName);
     const isDownload = isDownloadProcess(processName);
-    const isBookingYesNo = isBooking ? 'yes' : 'no';
+    const coachName = coachFirstName || providerDisplayName || '';
 
-    const showAdditionalInfoHeading =
-      showInitialMessageInput || (hasTransactionFieldConfigs && showTransactionFields);
+    const showTransactionFieldsBlock = hasTransactionFieldConfigs && showTransactionFields;
+    const paymentStepNumber = showInitialMessageInput ? 2 : 1;
+
+    const termsLink = chunks => (
+      <a href={termsHref || '/terms-of-service'} target="_blank" rel="noopener noreferrer">
+        {chunks}
+      </a>
+    );
 
     return hasStripeKey ? (
-      <Form className={classes} onSubmit={handleSubmit} enforcePagePreloadFor="OrderDetailsPage">
-        <LocationOrShippingDetails
-          askShippingDetails={askShippingDetails}
-          showPickUpLocation={showPickUpLocation}
-          showLocation={showLocation}
-          listingLocation={listingLocation}
-          isFuzzyLocation={isFuzzyLocation}
-          formApi={formApi}
-          locale={locale}
-          intl={intl}
-        />
-
-        {billingDetailsNeeded && !loadingData ? (
-          <React.Fragment>
-            {hasDefaultPaymentMethod ? (
-              <PaymentMethodSelector
-                cardClasses={cardClasses}
-                formId={formId}
-                defaultPaymentMethod={ensuredDefaultPaymentMethod}
-                changePaymentMethod={this.changePaymentMethod}
-                handleStripeElementRef={this.handleStripeElementRef}
-                hasCardError={hasCardError}
-                error={this.state.error}
-                paymentMethod={selectedPaymentMethod}
-                intl={intl}
-                marketplaceName={marketplaceName}
+      <Form
+        id={formId}
+        className={classes}
+        onSubmit={handleSubmit}
+        enforcePagePreloadFor="OrderDetailsPage"
+      >
+        {showInitialMessageInput ? (
+          <section className={css.section} aria-labelledby={`${formId}-note-title`}>
+            <h2 className={css.sectionTitle}>
+              <span aria-hidden="true" className={css.stepNumber}>
+                1
+              </span>
+              <span id={`${formId}-note-title`}>
+                <FormattedMessage id="CheckoutPage.noteHeading" values={{ name: coachName }} />{' '}
+                <span className={css.optional}>
+                  <FormattedMessage id="CheckoutPage.noteOptional" />
+                </span>
+              </span>
+            </h2>
+            {/* The heading above is the label people see; this one is for screen readers. */}
+            <label className={css.srOnly} htmlFor={`${formId}-message`}>
+              <FormattedMessage id="CheckoutPage.noteLabel" values={{ name: coachName }} />
+            </label>
+            <Field
+              name="initialMessage"
+              id={`${formId}-message`}
+              component="textarea"
+              rows={4}
+              className={css.textarea}
+              placeholder={intl.formatMessage({ id: 'CheckoutPage.notePlaceholder' })}
+            />
+            <span className={css.help}>
+              <FormattedMessage
+                id="CheckoutPage.noteHelp"
+                values={{ will: coachWillWord || "They'll" }}
               />
-            ) : (
-              <React.Fragment>
-                <Heading as="h3" rootClassName={css.heading}>
-                  <FormattedMessage id="StripePaymentForm.paymentHeading" />
-                </Heading>
-                <OneTimePaymentWithCardElement
-                  cardClasses={cardClasses}
-                  formId={formId}
-                  handleStripeElementRef={this.handleStripeElementRef}
-                  hasCardError={hasCardError}
-                  error={this.state.error}
-                  intl={intl}
-                  marketplaceName={marketplaceName}
-                />
-              </React.Fragment>
-            )}
-
-            {showOnetimePaymentFields ? (
-              <div className={css.billingDetails}>
-                <Heading as="h3" rootClassName={css.heading}>
-                  <FormattedMessage id="StripePaymentForm.billingDetails" />
-                </Heading>
-
-                {askShippingDetails ? (
-                  <FieldCheckbox
-                    className={css.sameAddressCheckbox}
-                    textClassName={css.sameAddressLabel}
-                    id="sameAddressCheckbox"
-                    name="sameAddressCheckbox"
-                    label={intl.formatMessage({
-                      id: 'StripePaymentForm.sameBillingAndShippingAddress',
-                    })}
-                    value="sameAddress"
-                    useSuccessColor
-                    onChange={handleSameAddressCheckbox}
-                  />
-                ) : null}
-
-                <FieldTextInput
-                  className={css.field}
-                  type="text"
-                  id="name"
-                  name="name"
-                  autoComplete="cc-name"
-                  label={billingDetailsNameLabel}
-                  placeholder={billingDetailsNamePlaceholder}
-                />
-
-                {billingAddress}
-              </div>
-            ) : null}
-          </React.Fragment>
-        ) : loadingData ? (
-          <p className={css.spinner}>
-            <IconSpinner />
-          </p>
+            </span>
+          </section>
         ) : null}
 
-        {initiateOrderError ? (
-          <span className={css.errorMessage}>{initiateOrderError.message}</span>
-        ) : null}
-
-        {showAdditionalInfoHeading ? (
-          <Heading as="h3" rootClassName={css.heading}>
-            <FormattedMessage id="StripePaymentForm.messageHeading" />
-          </Heading>
-        ) : null}
-        {hasTransactionFieldConfigs && showTransactionFields ? (
+        {showTransactionFieldsBlock ? (
           <div className={css.transactionFieldsContainer}>
             {transactionFieldsProps.map(({ key, ...fieldProps }) => (
               <CustomExtendedDataField key={key} {...fieldProps} formId={formId} />
             ))}
           </div>
         ) : null}
-        {showInitialMessageInput ? (
-          <div>
-            <FieldTextInput
-              type="textarea"
-              id={`${formId}-message`}
-              name="initialMessage"
-              label={initialMessageLabel}
-              placeholder={messagePlaceholder}
-              className={css.message}
-            />
-          </div>
-        ) : null}
-        <div className={css.submitContainer}>
-          {hasPaymentErrors ? (
-            <span className={css.errorMessage}>{paymentErrorMessage}</span>
+
+        <section className={css.section} aria-labelledby={`${formId}-payment-title`}>
+          <h2 className={css.sectionTitle}>
+            <span aria-hidden="true" className={css.stepNumber}>
+              {paymentStepNumber}
+            </span>
+            <span id={`${formId}-payment-title`}>
+              <FormattedMessage id="StripePaymentForm.paymentHeading" />
+            </span>
+          </h2>
+
+          <LocationOrShippingDetails
+            askShippingDetails={askShippingDetails}
+            showPickUpLocation={showPickUpLocation}
+            showLocation={showLocation}
+            listingLocation={listingLocation}
+            isFuzzyLocation={isFuzzyLocation}
+            formApi={formApi}
+            locale={locale}
+            intl={intl}
+          />
+
+          {billingDetailsNeeded && !loadingData ? (
+            <React.Fragment>
+              {hasDefaultPaymentMethod ? (
+                <PaymentMethodSelector
+                  cardClasses={cardClasses}
+                  formId={formId}
+                  defaultPaymentMethod={ensuredDefaultPaymentMethod}
+                  changePaymentMethod={this.changePaymentMethod}
+                  handleStripeElementRef={this.handleStripeElementRef}
+                  hasCardError={hasCardError}
+                  error={this.state.error}
+                  paymentMethod={selectedPaymentMethod}
+                />
+              ) : (
+                <OneTimePaymentWithCardElement
+                  cardClasses={cardClasses}
+                  formId={formId}
+                  handleStripeElementRef={this.handleStripeElementRef}
+                  hasCardError={hasCardError}
+                  error={this.state.error}
+                />
+              )}
+
+              {showOnetimePaymentFields ? (
+                <React.Fragment>
+                  {askShippingDetails ? (
+                    <label className={css.sameAddress}>
+                      <input
+                        type="checkbox"
+                        id="sameAddressCheckbox"
+                        name="sameAddressCheckbox"
+                        onChange={handleSameAddressCheckbox}
+                      />
+                      <FormattedMessage id="StripePaymentForm.sameBillingAndShippingAddress" />
+                    </label>
+                  ) : null}
+
+                  <div className={css.field}>
+                    <label className={css.fieldLabel} htmlFor={`${formId}-name`}>
+                      <FormattedMessage id="StripePaymentForm.billingDetailsNameLabel" />
+                    </label>
+                    <Field
+                      name="name"
+                      id={`${formId}-name`}
+                      component="input"
+                      type="text"
+                      autoComplete="cc-name"
+                      className={css.input}
+                    />
+                  </div>
+                </React.Fragment>
+              ) : null}
+            </React.Fragment>
+          ) : loadingData ? (
+            <p className={css.spinner}>
+              <IconSpinner />
+            </p>
           ) : null}
-          <PrimaryButton
-            className={css.submitButton}
-            type="submit"
-            inProgress={submitInProgress}
-            disabled={submitDisabled}
-          >
-            {billingDetailsNeeded ? (
+
+          <span className={css.stripeNote}>
+            <IconCancelling size={18} />
+            <FormattedMessage id="StripePaymentForm.stripeNote" />
+          </span>
+        </section>
+
+        <div className={css.actions}>
+          {hasPaymentErrors ? (
+            <ErrorNote boxed>
+              {getPaymentErrorContent(confirmCardPaymentError, confirmPaymentError)}
+            </ErrorNote>
+          ) : null}
+          {/* On a phone this is the sticky bar along the bottom of the screen; on a desktop it sits
+              under the form. */}
+          <div className={css.bar}>
+            <button
+              type="submit"
+              className={css.submitButton}
+              disabled={submitDisabled}
+              data-testid="checkout-submit"
+            >
+              {submitInProgress ? <IconSpinner className={css.submitSpinner} /> : null}
+              {billingDetailsNeeded ? (
+                <FormattedMessage
+                  id="StripePaymentForm.submitBook"
+                  values={{ totalPrice: totalPriceMaybe }}
+                />
+              ) : (
+                <FormattedMessage id="StripePaymentForm.submitConfirmPaymentInfo" />
+              )}
+            </button>
+          </div>
+          {!isDownload ? (
+            <p className={css.terms}>
               <FormattedMessage
-                id="StripePaymentForm.submitPaymentInfo"
-                values={{ totalPrice: totalPriceMaybe, isBooking: isBookingYesNo }}
-              />
-            ) : (
-              <FormattedMessage
-                id="StripePaymentForm.submitConfirmPaymentInfo"
-                values={{ totalPrice: totalPriceMaybe, isBooking: isBookingYesNo }}
-              />
-            )}
-          </PrimaryButton>
-          {!isDownload && (
-            <p className={css.paymentInfo}>
-              <FormattedMessage
-                id="StripePaymentForm.submitConfirmPaymentFinePrint"
-                values={{ isBooking: isBookingYesNo, name: providerDisplayName }}
+                id={isBooking ? 'StripePaymentForm.termsBooking' : 'StripePaymentForm.terms'}
+                values={{ terms: termsLink }}
               />
             </p>
-          )}
+          ) : null}
         </div>
       </Form>
     ) : (

@@ -1,0 +1,121 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-11-24T20:15:00Z"
+ },
+ "title": "Revie checkout — desktop & phone",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1300,
+   "title": "Desktop — checkout",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "Phone.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Phone — checkout (scroll inside)",
+   "is_interactive": true,
+   "radius": 28
+  },
+  "States.dc.html": {
+   "x": 0,
+   "y": 1420,
+   "w": 1200,
+   "h": 700,
+   "title": "Checkout — when something goes wrong"
+  },
+  "SignUp.dc.html": {
+   "x": 0,
+   "y": 2260,
+   "w": 1440,
+   "h": 1300,
+   "title": "Before checkout — sign up (desktop, from a booking)",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "LogIn.dc.html": {
+   "x": 1520,
+   "y": 2260,
+   "w": 1440,
+   "h": 900,
+   "title": "Log in (desktop)",
+   "is_interactive": true
+  },
+  "SignUpPhone.dc.html": {
+   "x": 3040,
+   "y": 2260,
+   "w": 390,
+   "h": 844,
+   "title": "Phone — sign up from \"Get started\" (scroll inside)",
+   "is_interactive": true,
+   "radius": 28
+  },
+  "SignUpStates.dc.html": {
+   "x": 0,
+   "y": 3680,
+   "w": 1320,
+   "h": 900,
+   "title": "Sign up — Google step, check your inbox, errors"
+  },
+  "BannerPage.dc.html": {
+   "x": 1520,
+   "y": 3680,
+   "w": 1440,
+   "h": 760,
+   "title": "After sign-up (not from a booking): Find a coach with the confirm-email strip"
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Phone.dc.html",
+  "States.dc.html",
+  "SignUp.dc.html",
+  "LogIn.dc.html",
+  "SignUpPhone.dc.html",
+  "SignUpStates.dc.html",
+  "BannerPage.dc.html"
+ ],
+ "notes": {
+  "n1": {
+   "x": 1990,
+   "y": 0,
+   "w": 360,
+   "fill": "orange",
+   "text": "Try 'Have a promo code?' in Play: Apply shows the 'Promo discount (NEWYEAR15)' line and the new total. Sample coach, times and prices; currency $."
+  },
+  "n2": {
+   "x": 1990,
+   "y": 360,
+   "w": 360,
+   "fill": "blue",
+   "text": "Checked against what's built: promo check endpoint and its messages, 'Promo discount (CODE)' line, checkout network-error copy, title 'Complete your booking'. Still to confirm in Claude Code: the note-to-coach field and 'No booking fees'."
+  },
+  "n3": {
+   "x": 3040,
+   "y": 3200,
+   "w": 390,
+   "fill": "blue",
+   "text": "Sign up and log in, proposal for review. Same fields as today (Nov 18 decision): account type, first and last name, email, password, over 18, terms. From a booking the client is already 'Find a coach', so that choice is hidden and a periwinkle line says what she's booking."
+  }
+ },
+ "designSystems": [
+  {
+   "title": "Revie",
+   "namespace": "revie",
+   "artifact": "https://claude.ai/artifact/6fdEvFtcDe6SSj1sPsbnZD",
+   "version": null,
+   "copiedAt": "2026-11-24T20:15:00Z"
+  }
+ ]
+}

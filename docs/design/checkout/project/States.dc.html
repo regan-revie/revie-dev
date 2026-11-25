@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Checkout — what goes wrong</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/777a3592ed78484b92a77984f394a4cb) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/c459a03d649b6d6a09f1584457a7b466) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/c36d98ccd1c3a28c0b417ecd8185ceda) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/b71f9418de94b71d0e352029e4f2616b) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Schibsted Grotesk';src:url(/_blob/5b12d3152062fa945c237bf31b084af5) format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+</style>
+<style>
+body{margin:0;background:#EFEEED}
+a{color:#310416}a:hover{color:#310416;text-decoration-thickness:2px}
+button{font:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #DBABF5;outline-offset:2px}
+.card{transition:transform 200ms, box-shadow 200ms}
+.card:hover,.card:focus-visible{transform:rotate(var(--tilt)) translateY(-4px);box-shadow:0 16px 40px rgba(49,4,22,0.14)}
+.card .go{transition:background-color 150ms}
+.card:hover .go{background:#FF90C2 !important}
+.pbtn:hover{background:#FF90C2 !important}
+@media (max-width: 1100px){.fgrid{grid-template-columns:repeat(2, minmax(0, 1fr)) !important}}
+@media (max-width: 640px){.fgrid{grid-template-columns:minmax(0, 1fr) !important}}
+.sgrid > :last-child:nth-child(odd){grid-column:1/-1;min-height:280px !important}
+@media (max-width: 760px){.sgrid{grid-template-columns:minmax(0,1fr) !important}}
+</style>
+</helmet>
+<div style="width: 1200px; box-sizing: border-box; padding: 48px; background: #EFEEED; color: #310416; font-family: 'Bio Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.5; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; align-items: center; gap: 14px; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #310416"><span>Checkout · when something goes wrong</span><span aria-hidden="true" style="flex: 1; height: 1px; background: currentColor; opacity: 0.3"></span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 20px; border: 1px solid rgba(49,4,22,0.16)"><div style="font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 12px">Promo: unknown code</div><div style="display: flex; flex-direction: column; gap: 6px"><label style="font-size: 14px; font-weight: 700">Promo code</label><div style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416; height: 46px; display: flex; align-items: center; border-color: #B8000A; border-width: 2px; text-transform: uppercase">SPRING20</div><span role="alert" style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #B8000A"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B8000A" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg><span>Oops! That code isn't valid.</span></span></div></div>
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 20px; border: 1px solid rgba(49,4,22,0.16)"><div style="font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 12px">Promo: not a first session</div><div style="display: flex; flex-direction: column; gap: 6px"><label style="font-size: 14px; font-weight: 700">Promo code</label><div style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416; height: 46px; display: flex; align-items: center; border-color: #B8000A; border-width: 2px; text-transform: uppercase">WELCOME10</div><span role="alert" style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #B8000A"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B8000A" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg><span>This code is for your first session with Revie.</span></span></div></div>
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 20px; border: 1px solid rgba(49,4,22,0.16)"><div style="font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 12px">Promo: too many tries</div><div style="display: flex; flex-direction: column; gap: 6px"><label style="font-size: 14px; font-weight: 700">Promo code</label><div style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416; height: 46px; display: flex; align-items: center; border-color: #B8000A; border-width: 2px; text-transform: uppercase">NEWYEAR16</div><span role="alert" style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #B8000A"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B8000A" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg>Too many tries. Wait a few minutes and try again.</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 20px; border: 1px solid rgba(49,4,22,0.16)"><div style="font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 12px">Card declined</div><div role="alert" style="display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px; border-radius: 12px; border: 2px solid #B8000A; background: #EFEEED; font-size: 15px; line-height: 1.5"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B8000A" stroke-width="2.2" stroke-linecap="round" style="flex: none"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg><span>Your card was declined. You haven't been charged. Try another card.</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 20px; border: 1px solid rgba(49,4,22,0.16)"><div style="font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 12px">No connection</div><div role="alert" style="display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px; border-radius: 12px; border: 2px solid #B8000A; background: #EFEEED; font-size: 15px; line-height: 1.5"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B8000A" stroke-width="2.2" stroke-linecap="round" style="flex: none"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg><span>We couldn't reach our servers. You haven't been charged. Check your connection and try again.</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 20px; border: 1px solid rgba(49,4,22,0.16)"><div style="font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 12px">Promo: database down</div><div role="alert" style="display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px; border-radius: 12px; border: 2px solid #B8000A; background: #EFEEED; font-size: 15px; line-height: 1.5"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B8000A" stroke-width="2.2" stroke-linecap="round" style="flex: none"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg><span>Uh-oh! Something went wrong. Try again in a minute to use the promo code.</span></div></div>
+</div>
+<p style="margin: 0; font-size: 14px; max-width: 760px">Errors use the error red with bold text and an icon, so they don't rely on colour alone. "That time was just taken" happens after paying, on the booking page ("That one didn't go through. You haven't been charged."), so it belongs with the confirmation design.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":700}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
