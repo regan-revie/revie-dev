@@ -61,6 +61,8 @@ const NylasBookingForm = props => {
     // eslint-disable-next-line no-unused-vars
     priceVariantFieldComponent,
     preselectedPriceVariant,
+    // The day to open on (`?day=`), from the checkout's "Find a new time".
+    preselectedDayKey,
     marketplaceName, // eslint-disable-line no-unused-vars
     payoutDetailsWarning,
     authorFirstName,
@@ -276,6 +278,7 @@ const NylasBookingForm = props => {
                   timeZone={timeZone}
                   selectedSlot={selectedSlot}
                   dayStepNumber={dayStepNumber}
+                  initialDayKey={preselectedDayKey}
                   onSelectSlot={slot => handleSlotSelect(slot, values.priceVariantName, form)}
                   onDayChange={() => clearSelection(form)}
                 />

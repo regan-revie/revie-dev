@@ -19,6 +19,52 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-25 (checkout redesign, and `clients_love` required for coaches)
+
+**Branch / PR:** `checkout-redesign`, one PR against `main`. Design: `docs/design/checkout/` (the canvas "Revie checkout — desktop & phone", copied as given; the sign-up, log-in and banner boards on the same canvas are a separate proposal and were **not built**).
+
+**Checked before building (your two questions)**
+- **(a) The note to the coach: true.** The box existed (the template's initial message). It is saved on the booking as `protectedData.customerDefaultMessage` and shown to the coach on her booking page under "Additional information" (`TransactionFields`, rendered for both people). **Two things to know:** it is not emailed to the coach and it is not a chat message, so "She'll see it before your session" is true once she opens the booking; and "keep chatting in your inbox" is true (the booking page has the message form). If you want her emailed the note, that is a Sharetribe email template change, not built.
+- **(b) The client pays exactly the listed price: true on Dev.** `transactions/commission.json` on Dev holds only a 20% provider commission and no customer commission (read from the Asset Delivery API, nothing printed), so the client's total is the session price (less a promo, which is customer-only). **Not checked: Live.** Live's commission asset lives in Console and is out of reach of Claude's read-only Dev token; look at Console > Build > Transactions > Commission on Live before cutover. The page also only says "No booking fees" when the transaction has no customer-commission line, so it cannot say it falsely.
+
+**What was built**
+1. **The page** (`CheckoutPageWithPayment.js`, `RevieCheckout/`): slim maroon bar with the Revie avatar and "Secure checkout" with a lock (no navigation), one-line footer with hello@heyrevie.com (and the canvas's "Minted Mojito LLC © year" line), "Back to the session", "Complete your **booking.**". Left: 1 "Anything Maya should know? Optional" with the box directly under it (hidden label for screen readers) and "She'll/He'll/They'll see it...", 2 "Payment" (Stripe card, name on card, the Stripe note), the maroon Book button, the terms (link to `/terms-of-service`, new tab). Right: the sticky maroon summary (coach sticker photo via `CoachPhoto`, title bold after the last comma, "with Maya R." linking to her profile, date and time, "Find a new time", "In your timezone (London)", length and Google Meet, price, promo, Total, "No booking fees", the periwinkle cancellation box). Phone: stacked, summary first, a fixed "Book a session · total" bar.
+2. **Real data in the summary:** the transaction's own line items (session, promo discount, total), the booking's start and end, the coach's name, photo and pronouns, the chosen length.
+3. **Promo code moved into the summary** with all its logic and messages unchanged; "Promo discount (CODE) · Remove  −$16.50" once applied, and the total and the Book button update.
+4. **"Find a new time"** returns to the session page keeping the length and the day (`?bookableOption=...&day=...&orderOpen=true`). The session page did not read a day before: `OrderPanel` now reads `day` and `NylasBookingForm`/`NylasSlotSteps` open on it (tested, including a day with no times).
+5. **Errors** (`ErrorNote`): error red, bold, with an icon. A declined card, any other card problem and no connection at the first step all say "You haven't been charged". Reworded about twenty messages so no "order", "request" or "listing" shows on the page; a test fails if one comes back.
+6. **`clients_love` is required for coaches**, like `coach_title`, and counts toward "Finish your profile" (`COACH_REQUIRED_PROFILE_KEYS`), for coaches only. Console's `required` stays off, as with `coach_title`; docs updated (`onboarding-fields.md`, `go-live-plan.md`, `tech-constraints.md`).
+7. **Styleguide examples** to look at it without an account or a card: `/styleguide/c/CheckoutPage/Checkout`, `CheckoutWithPromo`, `CheckoutCardDeclined`, `CheckoutNoConnection` (`?bare=1` hides the styleguide frame).
+
+**Billing address: dropped.** Stripe's card field collects the postal code itself and `getBillingDetails` already sent an address only when a street and a postal code were both there, so nothing downstream needed it. Name on card stays. Not something I could check from here: any Radar rule in your Stripe Dashboard that requires an address match.
+
+**Judgement calls and things I couldn't match (please look at these)**
+- **"Save this card for next time" is gone** (the canvas has none). Someone with a card already saved still sees it; no new card can be saved from this page. Say if you want the checkbox back.
+- **Red on maroon is unreadable** (1.7 : 1), and the canvas only shows promo errors on cream. Inside the summary a promo error or a price error sits on a cream chip.
+- **Boxed errors are bold red text**; the canvas markup has maroon, non-bold text in the box but its caption says bold red, so I followed the caption.
+- **Promo wording:** kept the existing messages as asked. The canvas words some differently ("Oops! That code isn't valid.", "This code is for your first session with Revie.", "Too many tries. Wait a few minutes...", "Uh-oh! Something went wrong...").
+- **A connection drop during Stripe's own call** says "We couldn't reach our payment provider... You won't be charged twice" and not "You haven't been charged", because that is the one case where the outcome is not certain. If the first step fails (no connection), the template hides the form and the way to try again is to refresh: I left that, because showing the form again could create a second booking if the first was made and only the answer was lost.
+- **Timezone:** checkout shows the browser's timezone. A different zone picked in the booking panel is not passed on (it was never part of the booking values).
+- **The canvas's "Find a new time" colour** is an unresolved placeholder (`color: {C}`); built cream like the other links.
+- **The template's purchase checkout** (shipping, price breakdown) no longer exists on this page; its tests were replaced by `CheckoutPage.revie.test.js`. Revie only sells sessions.
+- **Not verified:** a real booking on Dev (needs a signed-in client and Stripe), the real Stripe card field's look inside the new box (the styleguide examples do load Stripe's own field, and it looked right), Safari.
+
+**Tests:** `yarn format-ci` clean, 1549 tests pass (new: `CheckoutPage.revie.test.js`, `checkoutFormat.test.js`, additions to `CheckoutPage.promo.test.js`, `NylasBookingForm.test.js`, `coachTraits.test.js`; the template's purchase and booking checkout tests replaced). Server tests not run: nothing in `server/` changed.
+
+**Console / Render steps:** none. No process, field or environment variable changed. (`clients_love` already exists in Dev Console; at cutover it is created in Test and Live like `coach_title`, see `docs/go-live-plan.md`.)
+
+**Dev test steps** (signed-in client, a coach with a connected calendar and Stripe payouts, a Stripe test card such as 4242 4242 4242 4242)
+1. Open a session, pick a length, a day and a time, press Book. Checkout opens: slim maroon bar, "Complete your booking.", the summary shows the real title, coach, day, time and length, the price and "No booking fees". Check the time is in your own timezone.
+2. Press "Find a new time": you land on the session page on the same length and the same day (on a phone, with the sheet open).
+3. **Without a code:** type a note, enter the card and name, press "Book a session · $X". You land on the booking page; the booking is confirmed by the Nylas webhook as before. Open the booking as the coach: your note is under "Additional information".
+4. **With a code:** "Have a code?", enter a valid code, Apply: the line "Promo discount (CODE)" appears with the amount, the Total and the Book button drop. Remove it: they go back. Apply again and book: you are charged the discounted total (check in Stripe) and the coach is still paid 80% of the full price.
+5. Try a bad code (message under the field, on a cream chip), then the card `4000 0000 0000 0002` (declined): the box says your card was declined and you haven't been charged.
+6. Switch off your connection and press Book: "We couldn't reach our servers. You haven't been charged." Refresh to try again.
+7. On a phone (or 390px wide): the summary comes first, the Book bar stays at the bottom, nothing is hidden behind it at the end of the page.
+8. As a coach on Dev: the profile form requires "Clients love working with me because...", and "Finish your profile" lists it until it is filled. A client's profile does not ask for it.
+
+---
+
 ## HANDOFF — 2026-11-25 (session page updates after jobs A and B: canvas changes of Nov 24 to 25)
 
 **Branch / PR:** `session-page-updates`, one PR against `main`. Job B (PR #52) was merged first, so this sits on `main`, not on top of another PR.

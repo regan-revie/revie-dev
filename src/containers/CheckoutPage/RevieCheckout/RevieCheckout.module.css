@@ -1,0 +1,102 @@
+@import '../../../styles/customMediaQueries.css';
+
+/*
+ * The checkout page's layout. Values are the approved design's (docs/design/checkout/ Main and
+ * Phone). The columns stack under 861px, with the summary first, as the canvas does.
+ */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 8px 20px 32px;
+  color: var(--revieMaroon);
+
+  @media (min-width: 861px) {
+    gap: 20px;
+    padding: 24px 32px 96px;
+  }
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 16px;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--revieMaroon);
+    text-decoration: underline;
+  }
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 400;
+  font-size: 36px;
+  line-height: 1.05;
+  letter-spacing: normal;
+  color: var(--revieMaroon);
+
+  @media (min-width: 861px) {
+    font-size: clamp(38px, 4vw, 52px);
+    letter-spacing: -0.5px;
+  }
+
+  & b {
+    font-weight: 700;
+  }
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+
+  @media (min-width: 861px) {
+    grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr);
+    gap: 56px;
+    margin-top: 16px;
+  }
+}
+
+/* First on a phone; on a desktop the right-hand column, stuck to the top while the form scrolls. */
+.summaryColumn {
+  @media (min-width: 861px) {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    top: 24px;
+  }
+}
+
+.formColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+
+  @media (min-width: 861px) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
+
+/* What went wrong with the whole booking (the time was taken, the coach cannot be paid, ...). */
+.errors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

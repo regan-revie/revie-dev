@@ -411,6 +411,11 @@ const OrderPanel = props => {
   const searchParams = parse(location.search);
   const isOrderOpen = !!searchParams.orderOpen;
   const preselectedPriceVariantSlug = searchParams.bookableOption;
+  // Revie: the checkout's "Find a new time" sends the client back with the length and the day they
+  // had chosen (`?bookableOption=...&day=2026-12-03&orderOpen=true`). The day is the viewer's own.
+  const preselectedDayKey = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.day || '')
+    ? searchParams.day
+    : undefined;
 
   const seatsEnabled = [AVAILABILITY_MULTIPLE_SEATS].includes(listingTypeConfig?.availabilityType);
 
@@ -492,6 +497,7 @@ const OrderPanel = props => {
         bookingFormProps={{
           formId: 'OrderPanelNylasBookingForm',
           timeZone,
+          preselectedDayKey,
           finePrintComponent: SubmitFinePrint,
           ...priceVariantsMaybe,
           ...sharedProps,

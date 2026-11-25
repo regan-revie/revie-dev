@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign up — desktop, from a booking</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/777a3592ed78484b92a77984f394a4cb) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/c459a03d649b6d6a09f1584457a7b466) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/c36d98ccd1c3a28c0b417ecd8185ceda) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/b71f9418de94b71d0e352029e4f2616b) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Schibsted Grotesk';src:url(/_blob/5b12d3152062fa945c237bf31b084af5) format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+</style>
+<style>
+body{margin:0;background:#EFEEED}
+a{color:#310416}a:hover{color:#310416;text-decoration-thickness:2px}
+button{font:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #DBABF5;outline-offset:2px}
+.card{transition:transform 200ms, box-shadow 200ms}
+.card:hover,.card:focus-visible{transform:rotate(var(--tilt)) translateY(-4px);box-shadow:0 16px 40px rgba(49,4,22,0.14)}
+.card .go{transition:background-color 150ms}
+.card:hover .go{background:#FF90C2 !important}
+.pbtn:hover{background:#FF90C2 !important}
+@media (max-width: 1100px){.fgrid{grid-template-columns:repeat(2, minmax(0, 1fr)) !important}}
+@media (max-width: 640px){.fgrid{grid-template-columns:minmax(0, 1fr) !important}}
+.sgrid > :last-child:nth-child(odd){grid-column:1/-1;min-height:280px !important}
+@media (max-width: 760px){.sgrid{grid-template-columns:minmax(0,1fr) !important}}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #EFEEED; color: #310416; font-family: 'Bio Sans', system-ui, sans-serif; font-size: 17px; line-height: 1.55">
+<header style="background: #310416; padding: 22px 36px; display: flex; align-items: center"><a href="#" aria-label="Revie home" style="display: block; line-height: 0"><img src="/_blob/733d757c7635337ebf695f3dd4f352b2" alt="Revie" style="display: block; width: 56px; height: 56px"></a></header>
+<main style="box-sizing: border-box; max-width: 480px; margin: 0 auto; padding: 48px 24px 80px; display: flex; flex-direction: column; gap: 22px">
+<div style="display: flex; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 14px; background: #D8E6FF; color: #032723; font-size: 15px; line-height: 1.45"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 400 400" fill="#032723" style="flex: none"><path d="M138.23,97.16h125.81v-26.8c0-3.33,10.94-4.33,10.94,1.09v25.71h34.46c12.61,0,28.6,17.49,28.87,30.2-3.09,55.69,4.52,116.59.16,171.68-1.26,15.89-10.97,28.58-26.68,32.4l-220.06.94c-17.92-2.87-28.73-16.74-30.12-34.43,3.64-54.37-4.74-114.85.06-168.5,1.22-13.69,14.15-32.29,28.97-32.29h36.65v-26.8c0-3.57,10.94-3.57,10.94,0v26.8ZM127.29,108.1h-34.46c-6.6,0-19.14,11.64-19.14,18.05v25.71h253.81v-22.43c0-8.01-12.05-21.33-20.24-21.33h-32.27v21.33c0,3.8-10.94,5.53-10.94,0v-21.33h-125.81v21.33c0,.98-4.06,4.07-5.96,3.89-1.38-.13-4.98-3.32-4.98-3.89v-21.33ZM327.49,162.8H73.69v139.48c0,7,10.66,17.78,18.02,18.08l219.4-.54c7.63-1.94,16.38-13.08,16.38-20.82v-136.2Z"></path><path d="M204.05,183.91c3.95,3.29,13.49,33.09,15.8,34.5,7.67,2.31,36.73,1.18,41.35,5.14,2.08,1.79,2.58,4.75,2.04,7.36-1.28,6.22-25.25,20.49-29.84,27-1.14,3.05,6.36,27.73,6.94,33.54.56,5.65-.8,11.31-7.81,10.1-7.21-1.25-28.13-18.01-33.1-18.01l-31.5,17.35c-2.57,1.85-7.77.09-8.98-2.44-3.28-6.85,7.42-31.93,6.97-40.81-.99-3.56-25.19-18.75-28.36-24.23-2-3.45-1.05-10.11,3.01-11.33,8.45-2.54,33.03-.58,38.6-4.06l15.6-34.17c2.57-1.76,6.82-1.99,9.27.04ZM245.93,231.73c-7.6-1.69-26.23-.1-32.15-3.42-4.55-2.55-12.75-28.33-14.35-28.33-3.47,5.12-10.04,26.86-14.78,28.99l-31.72,3.3,24.73,21.3-6.11,32.85,27.89-15.24,27.89,15.24-5.24-33.14,23.85-21.55Z"></path></svg><span>You're booking <b>Thu, Dec 3 · 10:00–11:00 AM PT</b> with Maya R. Sign up and you'll go straight to checkout.</span></div>
+<h1 style="margin: 0; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 48px; line-height: 1.05; letter-spacing: -0.5px">Create your <b>account.</b></h1>
+<div role="tablist" style="display: flex; padding: 4px; border-radius: 999px; border: 1.5px solid rgba(49,4,22,0.2)"><a role="tab" href="#" style="flex: 1; text-align: center; padding: 10px 0; border-radius: 999px; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 13px; background: #310416; color: #EFEEED;">Sign up</a><a role="tab" href="#" style="flex: 1; text-align: center; padding: 10px 0; border-radius: 999px; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 13px; background: transparent; color: #310416;">Log in</a></div>
+<button type="button" style="display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 54px; border: 1.5px solid #310416; border-radius: 999px; background: #EFEEED; color: #310416; font-family: 'Bio Sans', sans-serif; font-weight: 700; font-size: 16px"><span aria-hidden="true" style="display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 999px; border: 1px dashed rgba(49,4,22,0.45); font-size: 10px; font-weight: 400">G</span>Continue with Google</button>
+<div style="display: flex; align-items: center; gap: 14px; font-size: 14px; color: rgba(49,4,22,0.74)"><span style="flex: 1; height: 1px; background: rgba(49,4,22,0.2)"></span>or with your email<span style="flex: 1; height: 1px; background: rgba(49,4,22,0.2)"></span></div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px"><div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><label style="font-size: 14px; font-weight: 700">First name</label><input type="text" autocomplete="given-name" style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416"></div><div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><label style="font-size: 14px; font-weight: 700">Last name</label><input type="text" autocomplete="family-name" style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416"></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><label style="font-size: 14px; font-weight: 700">Email</label><input type="email" autocomplete="email" style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label style="font-size: 14px; font-weight: 700">Password</label><div style="position: relative"><input type="password" autocomplete="new-password" style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 1.5px solid rgba(49,4,22,0.3); border-radius: 8px; background: #EFEEED; font: inherit; font-size: 16px; color: #310416; padding-right: 72px"><button type="button" style="position: absolute; right: 8px; top: 8px; height: 36px; padding: 0 12px; border: none; border-radius: 999px; background: none; color: #310416; font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px">Show</button></div><span style="font-size: 14px; color: rgba(49,4,22,0.74)">At least 8 characters.</span></div>
+<div style="display: flex; flex-direction: column; gap: 12px"><label style="display: flex; gap: 12px; align-items: flex-start; font-size: 15px; line-height: 1.45; cursor: pointer"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-top: 1px; border: 2px solid; border-radius: 6px; box-sizing: border-box; background: #EFEEED; border-color: rgba(49,4,22,0.45);"></span><span>I'm 18 or over.</span></label><label style="display: flex; gap: 12px; align-items: flex-start; font-size: 15px; line-height: 1.45; cursor: pointer"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-top: 1px; border: 2px solid; border-radius: 6px; box-sizing: border-box; background: #EFEEED; border-color: rgba(49,4,22,0.45);"></span><span>I accept Revie's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</span></label></div>
+<button type="button" class="pbtn" style="width: 100%; min-height: 56px; border: none; border-radius: 999px; background: #310416; color: #EFEEED; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 15px">Create account</button>
+<p style="margin: 0; text-align: center; font-size: 15px">Already have an account? <a href="#"><b>Log in</b></a></p>
+</main>
+<footer style="padding: 24px 36px; border-top: 1px solid rgba(49,4,22,0.14); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px"><span>Questions? <a href="mailto:hello@heyrevie.com">hello@heyrevie.com</a></span><span>Minted Mojito LLC © 2026</span></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { promo: 0 }; }
+  renderVals() {
+    var s = this.state, self = this;
+    return { promoIdle: s.promo === 0, promoOpen: s.promo === 1, promoApplied: s.promo === 2,
+      total: s.promo === 2 ? '$93.50' : '$110.00',
+      openPromo: function () { self.setState({ promo: 1 }); },
+      applyPromo: function () { self.setState({ promo: 2 }); },
+      removePromo: function () { self.setState({ promo: 0 }); } };
+  }
+}
+</script>
+</body>
+</html>

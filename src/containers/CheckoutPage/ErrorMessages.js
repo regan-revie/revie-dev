@@ -16,7 +16,7 @@ import {
   isCalendarNotBookableError,
 } from '../../util/errors';
 
-import css from './CheckoutPage.module.css';
+import ErrorNote from './RevieCheckout/ErrorNote';
 
 // Collect error message checks to a single function.
 /**
@@ -144,14 +144,15 @@ export const getErrorMessages = (
   }
 
   // Add paragraph-container for the error message, if it exists
+  // Revie: every error on the page is the same note: error red, bold, with an icon (ErrorNote).
   const listingNotFoundErrorMessageParagraph = listingNotFoundErrorMessage ? (
-    <p className={css.notFoundError}>{listingNotFoundErrorMessage}</p>
+    <ErrorNote boxed>{listingNotFoundErrorMessage}</ErrorNote>
   ) : null;
   const initiateOrderErrorMessageParagraph = initiateOrderErrorMessage ? (
-    <p className={css.orderError}>{initiateOrderErrorMessage}</p>
+    <ErrorNote boxed>{initiateOrderErrorMessage}</ErrorNote>
   ) : null;
   const speculateErrorMessageParagraph = speculateErrorMessage ? (
-    <p className={css.orderError}>{speculateErrorMessage}</p>
+    <ErrorNote boxed>{speculateErrorMessage}</ErrorNote>
   ) : null;
   const speculateTransactionErrorMessageParagraph =
     speculateTransactionError &&
@@ -159,26 +160,26 @@ export const getErrorMessages = (
     // The slot message above already says what is wrong; "Failed to fetch breakdown information"
     // beside it only adds noise.
     !isSlotTakenError(speculateTransactionError) ? (
-      <p className={css.speculateError}>
+      <ErrorNote>
         <FormattedMessage id="CheckoutPage.speculateTransactionError" />
-      </p>
+      </ErrorNote>
     ) : null;
 
   // Stripe might throw error when retrieving payment intent
   const retrievePaymentIntentErrorMessageParagraph = retrievePaymentIntentError ? (
-    <p className={css.orderError}>
+    <ErrorNote boxed>
       <FormattedMessage
         id="CheckoutPage.retrievingStripePaymentIntentFailed"
         values={{ listingLink }}
       />
-    </p>
+    </ErrorNote>
   ) : null;
 
   // Stripe related processes expire unpaid checkouts via the transaction process
   const paymentExpiredMessageParagraph = isPaymentExpired ? (
-    <p className={css.orderError}>
+    <ErrorNote boxed>
       <FormattedMessage id="CheckoutPage.paymentExpiredMessage" values={{ listingLink }} />
-    </p>
+    </ErrorNote>
   ) : null;
 
   return {

@@ -1,0 +1,63 @@
+@import '../../../styles/customMediaQueries.css';
+
+/* Values: docs/design/checkout/ Main (desktop) and Phone. */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  background-color: var(--revieMaroon);
+
+  @media (min-width: 861px) {
+    padding: 22px 36px;
+  }
+}
+
+.logo {
+  display: block;
+  line-height: 0;
+}
+
+.logoImage {
+  display: block;
+  width: 44px;
+  height: 44px;
+
+  @media (min-width: 861px) {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+.secure {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--revieCream);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  /* On a phone the fixed Book bar covers the bottom of the screen: leave room beneath the footer. */
+  padding: 20px 20px 120px;
+  border-top: 1px solid rgba(49, 4, 22, 0.14);
+  font-size: 14px;
+
+  @media (min-width: 861px) {
+    padding: 24px 36px;
+  }
+
+  & a {
+    color: var(--revieMaroon);
+  }
+}

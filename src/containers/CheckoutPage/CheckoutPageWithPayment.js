@@ -7,8 +7,15 @@ import {
   isValidCurrencyForTransactionProcess,
   pickTransactionFieldsData,
 } from '../../util/fieldHelpers.js';
-import { propTypes } from '../../util/types';
+import {
+  propTypes,
+  LINE_ITEM_CUSTOMER_COMMISSION,
+  LINE_ITEM_PROMO_DISCOUNT,
+  LINE_ITEM_PROVIDER_COMMISSION,
+} from '../../util/types';
 import { ensureTransaction } from '../../util/data';
+import { formatMoney } from '../../util/currency';
+import { getDefaultTimeZoneOnBrowser } from '../../util/dates';
 import { createSlug } from '../../util/urlHelpers';
 import { nylasCreateBooking, promoCheck } from '../../util/api';
 import {
@@ -25,7 +32,9 @@ import {
 } from '../../transactions/transaction';
 
 // Import shared components
-import { H3, H4, NamedLink, OrderBreakdown, Page, TopbarSimplified } from '../../components';
+import { H4, NamedLink, Page, TopbarSimplified } from '../../components';
+import { timeZoneCity } from '../../components/OrderPanel/NylasBookingForm/nylasSlots';
+import { firstNameOf } from '../ListingPage/SessionPage/sessionPageHelpers';
 
 // Session helpers file needs to be imported before other CheckoutPage modules that use it
 import { clearData, storeData } from './CheckoutPageSessionHelpers';
@@ -46,12 +55,13 @@ import {
 import { getErrorMessages } from './ErrorMessages';
 
 import StripePaymentForm from './StripePaymentForm/StripePaymentForm';
-import DetailsSideCard from './DetailsSideCard';
-import MobileListingImage from './MobileListingImage';
-import MobileOrderBreakdown from './MobileOrderBreakdown';
 import PromoCodeSection from './PromoCodeSection/PromoCodeSection';
+import { CheckoutFooter, CheckoutTopbar } from './RevieCheckout/CheckoutChrome';
+import CheckoutSummary from './RevieCheckout/CheckoutSummary';
+import { formatDiscount, subjectWillOf } from './RevieCheckout/checkoutFormat';
 
 import css from './CheckoutPage.module.css';
+import revieCss from './RevieCheckout/RevieCheckout.module.css';
 
 // Stripe PaymentIntent statuses, where user actions are already completed
 // https://stripe.com/docs/payments/payment-intents/status
@@ -70,6 +80,15 @@ const paymentFlow = (selectedPaymentMethod, saveAfterOnetimePayment) => {
     : saveAfterOnetimePayment
     ? PAY_AND_SAVE_FOR_LATER_USE
     : ONETIME_PAYMENT;
+};
+
+// The terms page, which opens in a new tab so the booking in progress is not lost.
+const termsPath = routeConfiguration => {
+  try {
+    return pathByRouteName('TermsOfServicePage', routeConfiguration);
+  } catch (e) {
+    return '/terms-of-service';
+  }
 };
 
 const capitalizeString = s => `${s.charAt(0).toUpperCase()}${s.substr(1)}`;
@@ -552,28 +571,30 @@ export const CheckoutPageWithPayment = props => {
     existingTransaction?.attributes?.lineItems?.length > 0
       ? existingTransaction
       : speculatedTransaction;
-  const timeZone = listing?.attributes?.availabilityPlan?.timezone;
   const transactionProcessAlias = listing?.attributes?.publicData?.transactionProcessAlias;
-  const priceVariantName = tx.attributes.protectedData?.priceVariantName;
+  const priceVariantName =
+    tx.attributes.protectedData?.priceVariantName || orderData?.priceVariantName;
 
-  const txBookingMaybe = tx?.booking?.id ? { booking: tx.booking, timeZone } : {};
+  // Revie: the summary shows the transaction's own line items, so the numbers on the page are the
+  // ones the server will charge: the session, the promo discount if a code is on, and the total.
+  // Shown only once the (speculated) transaction is loaded, i.e. it has an id and line items.
+  const hasLineItems = !!tx.id && tx.attributes.lineItems?.length > 0;
+  const customerLineItems = hasLineItems
+    ? tx.attributes.lineItems.filter(li => !li.reversal && li.includeFor?.includes('customer'))
+    : [];
+  const promoLineItem = customerLineItems.find(li => li.code === LINE_ITEM_PROMO_DISCOUNT);
+  const sessionLineItem = customerLineItems.find(
+    li =>
+      ![
+        LINE_ITEM_PROMO_DISCOUNT,
+        LINE_ITEM_PROVIDER_COMMISSION,
+        LINE_ITEM_CUSTOMER_COMMISSION,
+      ].includes(li.code)
+  );
+  // "No booking fees" is only said when it is true: there is no fee line for the client.
+  const hasCustomerFee = customerLineItems.some(li => li.code === LINE_ITEM_CUSTOMER_COMMISSION);
 
-  // Show breakdown only when (speculated?) transaction is loaded
-  // (i.e. it has an id and lineItems)
-  const breakdown =
-    tx.id && tx.attributes.lineItems?.length > 0 ? (
-      <OrderBreakdown
-        className={css.orderBreakdown}
-        userRole="customer"
-        transaction={tx}
-        {...txBookingMaybe}
-        currency={config.currency}
-        marketplaceName={config.marketplaceName}
-      />
-    ) : null;
-
-  const totalPrice =
-    tx?.attributes?.lineItems?.length > 0 ? getFormattedTotalPrice(tx, intl) : null;
+  const totalPrice = hasLineItems ? getFormattedTotalPrice(tx, intl) : null;
 
   const process = processName ? getProcess(processName) : null;
   const transitions = process.transitions;
@@ -589,8 +610,6 @@ export const CheckoutPageWithPayment = props => {
     !retrievePaymentIntentError &&
     !isPaymentExpired
   );
-
-  const firstImage = listing?.images?.length > 0 ? listing.images[0] : null;
 
   const listingLink = (
     <NamedLink
@@ -689,47 +708,111 @@ export const CheckoutPageWithPayment = props => {
     );
   }
 
+  // ---- The summary (Revie checkout design, docs/design/checkout/) ----
+  const author = listing?.author;
+  const coachName = author?.attributes?.profile?.displayName || '';
+  const coachFirstName = firstNameOf(coachName);
+  const pronounsKey = author?.attributes?.profile?.publicData?.pronouns;
+
+  const bookingStart = orderData?.bookingDates?.bookingStart || tx?.booking?.attributes?.start;
+  const bookingEnd = orderData?.bookingDates?.bookingEnd || tx?.booking?.attributes?.end;
+  const startMs = bookingStart ? new Date(bookingStart).getTime() : NaN;
+  const endMs = bookingEnd ? new Date(bookingEnd).getTime() : NaN;
+  // Times are the viewer's, as on the booking panel.
+  const viewerTimeZone = getDefaultTimeZoneOnBrowser();
+
+  const sessionPriceText = sessionLineItem ? formatMoney(intl, sessionLineItem.lineTotal) : null;
+  const discountText = promoLineItem
+    ? formatDiscount(formatMoney(intl, promoLineItem.lineTotal))
+    : null;
+
+  // The code control sits in the summary. Before the booking is started a code can be added or
+  // taken off; once it exists the price is fixed, and an applied code is only shown.
+  const promoSection = showPromoCode ? (
+    <PromoCodeSection
+      appliedCode={orderData?.promoCode}
+      appliedPercent={orderData?.promoPercent}
+      discountText={discountText}
+      refusedReason={promoRefusedReason}
+      onApply={applyPromo}
+      onRemove={removePromo}
+    />
+  ) : orderData?.promoCode ? (
+    <PromoCodeSection
+      appliedCode={orderData.promoCode}
+      appliedPercent={orderData.promoPercent}
+      discountText={discountText}
+    />
+  ) : null;
+
+  const termsHref = termsPath(props.routeConfiguration);
+
+  const pageErrors = [
+    errorMessages.initiateOrderErrorMessage,
+    errorMessages.listingNotFoundErrorMessage,
+    errorMessages.speculateErrorMessage,
+    errorMessages.retrievePaymentIntentErrorMessage,
+    errorMessages.paymentExpiredMessage,
+  ].filter(Boolean);
+
   return (
     <Page title={title} scrollingDisabled={scrollingDisabled}>
-      <TopbarSimplified />
-      <div className={css.contentContainer}>
-        <MobileListingImage
-          listingTitle={listingTitle}
-          author={listing?.author}
-          firstImage={firstImage}
-          layoutListingImageConfig={config.layout.listingImage}
-          showListingImage={showListingImage}
-        />
-        <main className={css.orderFormContainer}>
-          <div className={css.headingContainer}>
-            <H3 as="h1" className={css.heading}>
-              {title}
-            </H3>
-            <H4 as="h2" className={css.detailsHeadingMobile}>
-              <FormattedMessage id="CheckoutPage.listingTitle" values={{ listingTitle }} />
-            </H4>
-          </div>
-          <MobileOrderBreakdown
-            speculateTransactionErrorMessage={errorMessages.speculateTransactionErrorMessage}
-            breakdown={breakdown}
-            priceVariantName={priceVariantName}
-          />
-          <section className={css.paymentContainer}>
-            {errorMessages.initiateOrderErrorMessage}
-            {errorMessages.listingNotFoundErrorMessage}
-            {errorMessages.speculateErrorMessage}
-            {errorMessages.retrievePaymentIntentErrorMessage}
-            {errorMessages.paymentExpiredMessage}
+      <CheckoutTopbar />
+      <main className={revieCss.main}>
+        <NamedLink
+          name="ListingPage"
+          params={{ id: listing?.id?.uuid, slug: createSlug(listingTitle) }}
+          className={revieCss.back}
+        >
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+          <FormattedMessage id="CheckoutPage.backToSession" />
+        </NamedLink>
 
-            {showPromoCode ? (
-              <PromoCodeSection
-                appliedCode={orderData?.promoCode}
-                appliedPercent={orderData?.promoPercent}
-                refusedReason={promoRefusedReason}
-                onApply={applyPromo}
-                onRemove={removePromo}
-              />
-            ) : null}
+        <h1 className={revieCss.heading}>
+          {isBooking ? (
+            <FormattedMessage id="CheckoutPage.heading" values={{ b: chunks => <b>{chunks}</b> }} />
+          ) : (
+            title
+          )}
+        </h1>
+
+        <div className={revieCss.columns}>
+          <div className={revieCss.summaryColumn}>
+            <CheckoutSummary
+              listingTitle={listingTitle}
+              listingId={listing?.id}
+              author={author}
+              coachName={coachName}
+              coachFirstName={coachFirstName}
+              startMs={startMs}
+              endMs={endMs}
+              timeZone={viewerTimeZone}
+              timeZoneCity={timeZoneCity(viewerTimeZone)}
+              priceVariantName={priceVariantName}
+              locale={intl.locale}
+              sessionPriceText={sessionPriceText}
+              promoSection={promoSection}
+              totalText={totalPrice}
+              showNoFees={hasLineItems && !hasCustomerFee}
+              errorMessage={errorMessages.speculateTransactionErrorMessage}
+            />
+          </div>
+
+          <div className={revieCss.formColumn}>
+            {pageErrors.length > 0 ? <div className={revieCss.errors}>{pageErrors}</div> : null}
 
             {showPaymentForm ? (
               <StripePaymentForm
@@ -740,6 +823,9 @@ export const CheckoutPageWithPayment = props => {
                 inProgress={submitting}
                 formId="CheckoutPagePaymentForm"
                 providerDisplayName={providerDisplayName}
+                coachFirstName={coachFirstName}
+                coachWillWord={subjectWillOf(pronounsKey)}
+                termsHref={termsHref}
                 showInitialMessageInput={showInitialMessageInput}
                 initialValues={initialValuesForStripePayment}
                 initiateOrderError={initiateOrderError}
@@ -771,24 +857,10 @@ export const CheckoutPageWithPayment = props => {
                 showTransactionFields={showTransactionFields}
               />
             ) : null}
-          </section>
-        </main>
-
-        <DetailsSideCard
-          listing={listing}
-          listingTitle={listingTitle}
-          priceVariantName={priceVariantName}
-          author={listing?.author}
-          firstImage={firstImage}
-          layoutListingImageConfig={config.layout.listingImage}
-          speculateTransactionErrorMessage={errorMessages.speculateTransactionErrorMessage}
-          isInquiryProcess={false}
-          processName={processName}
-          breakdown={breakdown}
-          showListingImage={showListingImage}
-          intl={intl}
-        />
-      </div>
+          </div>
+        </div>
+      </main>
+      <CheckoutFooter />
     </Page>
   );
 };

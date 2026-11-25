@@ -3,7 +3,7 @@
  * listings by the server (server/api/coachTraits/), because search can only filter on listing data.
  * `server/api/coachTraits/traits.js` is the authority on the mapping; this file only knows which
  * keys are involved, to hide them in the session editor and to tell whether a profile is finished
- * (the one-line title, `coach_title`, counts toward that too).
+ * (the one-line title, `coach_title`, and `clients_love` count toward that too).
  *
  *   profile (user public)   listing (public)
  *   personality_identifier  identity
@@ -22,9 +22,16 @@ export const COACH_TRAIT_USER_KEYS = [
 ];
 
 // What a coach has to answer on the profile: the four traits above, plus the one-line title the
-// session page shows under her name. The title is not a search trait and is not copied to listings.
+// session page shows under her name, plus "Clients love working with me because..." (the quote
+// card on the session page, and so the big photo beside it). Neither is a search trait and neither
+// is copied to listings.
 export const COACH_TITLE_KEY = 'coach_title';
-export const COACH_REQUIRED_PROFILE_KEYS = [...COACH_TRAIT_USER_KEYS, COACH_TITLE_KEY];
+export const CLIENTS_LOVE_KEY = 'clients_love';
+export const COACH_REQUIRED_PROFILE_KEYS = [
+  ...COACH_TRAIT_USER_KEYS,
+  COACH_TITLE_KEY,
+  CLIENTS_LOVE_KEY,
+];
 
 // Length limits Console cannot express for these two (short text is 70 characters at most, long text
 // has no limit), kept here so the profile form and its tests share them.
@@ -68,7 +75,7 @@ export const missingCoachTraits = (currentUser, userFields) => {
   return requiredCoachTraitKeys(userFields).filter(key => !hasValue(publicData[key]));
 };
 
-/** The same field configs, with the four traits and the title required when the user is a coach. */
+/** The same field configs, with the four traits, the title and clients_love required when the user is a coach. */
 export const withCoachTraitsRequired = (fieldConfig, userType) => {
   if (userType !== COACH_USER_TYPE || !COACH_REQUIRED_PROFILE_KEYS.includes(fieldConfig?.key)) {
     return fieldConfig;

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Find a coach with the confirm-email strip</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/777a3592ed78484b92a77984f394a4cb) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/c459a03d649b6d6a09f1584457a7b466) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/c36d98ccd1c3a28c0b417ecd8185ceda) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/b71f9418de94b71d0e352029e4f2616b) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Schibsted Grotesk';src:url(/_blob/5b12d3152062fa945c237bf31b084af5) format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+</style>
+<style>
+body{margin:0;background:#EFEEED}
+a{color:#310416}a:hover{color:#310416;text-decoration-thickness:2px}
+button{font:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #DBABF5;outline-offset:2px}
+.card{transition:transform 200ms, box-shadow 200ms}
+.card:hover,.card:focus-visible{transform:rotate(var(--tilt)) translateY(-4px);box-shadow:0 16px 40px rgba(49,4,22,0.14)}
+.card .go{transition:background-color 150ms}
+.card:hover .go{background:#FF90C2 !important}
+.pbtn:hover{background:#FF90C2 !important}
+@media (max-width: 1100px){.fgrid{grid-template-columns:repeat(2, minmax(0, 1fr)) !important}}
+@media (max-width: 640px){.fgrid{grid-template-columns:minmax(0, 1fr) !important}}
+.sgrid > :last-child:nth-child(odd){grid-column:1/-1;min-height:280px !important}
+@media (max-width: 760px){.sgrid{grid-template-columns:minmax(0,1fr) !important}}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #EFEEED; color: #310416; font-family: 'Bio Sans', system-ui, sans-serif; font-size: 17px; line-height: 1.55">
+<header style="background: #310416; padding: 22px 36px; display: flex; align-items: center; gap: 40px"><img src="/_blob/733d757c7635337ebf695f3dd4f352b2" alt="Revie" style="display: block; width: 56px; height: 56px"><nav style="display: flex; align-items: center; gap: 36px; margin-left: auto"><a href="#" style="color: #EFEEED; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 14px">Find a coach</a><a href="#" style="color: #EFEEED; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 14px">About</a><a href="#" style="color: #EFEEED; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 14px">Blog</a><a href="#" style="color: #EFEEED; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 14px">Inbox</a><span style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 999px; background: #EFEEED; color: #310416; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 17px">JL</span></nav></header>
+<div role="status" style="background: #D8E6FF; color: #032723"><div style="max-width: 1200px; margin: 0 auto; padding: 14px 48px; box-sizing: border-box; display: flex; gap: 12px; align-items: center; font-size: 15px"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#032723" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="M4 7l8 6 8-6"></path></svg><span><b>Confirm your email so your booking details reach you.</b> We sent a link to jess@example.com.</span><a href="#" style="margin-left: auto; color: #032723; font-weight: 700">Send it again</a></div></div>
+<main style="max-width: 1200px; margin: 0 auto; padding: 48px 48px 64px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px">
+<h1 style="margin: 0; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 48px; line-height: 1.05">Find a <b>coach.</b></h1>
+<p style="margin: 0; font-size: 15px; color: rgba(49,4,22,0.74)">The browse page isn't designed yet; the dashed boxes stand in for its filters and coach cards.</p>
+<div style="height: 56px; border-radius: 20px; border: 1.5px dashed rgba(49,4,22,0.25)"></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px"><div style="height: 260px; border-radius: 20px; border: 1.5px dashed rgba(49,4,22,0.25)"></div><div style="height: 260px; border-radius: 20px; border: 1.5px dashed rgba(49,4,22,0.25)"></div><div style="height: 260px; border-radius: 20px; border: 1.5px dashed rgba(49,4,22,0.25)"></div></div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":760}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { promo: 0 }; }
+  renderVals() {
+    var s = this.state, self = this;
+    return { promoIdle: s.promo === 0, promoOpen: s.promo === 1, promoApplied: s.promo === 2,
+      total: s.promo === 2 ? '$93.50' : '$110.00',
+      openPromo: function () { self.setState({ promo: 1 }); },
+      applyPromo: function () { self.setState({ promo: 2 }); },
+      removePromo: function () { self.setState({ promo: 0 }); } };
+  }
+}
+</script>
+</body>
+</html>

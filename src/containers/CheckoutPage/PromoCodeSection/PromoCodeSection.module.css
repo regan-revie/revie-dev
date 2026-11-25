@@ -1,20 +1,43 @@
 @import '../../../styles/customMediaQueries.css';
 
+/* Lives in the maroon checkout summary: cream text, and the field stays cream (docs/design/checkout/). */
+
 .root {
-  margin: 0 0 24px;
+  margin: 0;
+  color: var(--revieCream);
+  font-size: 15px;
 }
 
-.linkButton {
-  font-size: 14px;
-  line-height: 24px;
+.linkButton,
+.removeButton {
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
   text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.removeButton {
+  min-height: 0;
+  font-size: 14px;
+}
+
+.linkButton:focus-visible,
+.removeButton:focus-visible,
+.applyButton:focus-visible {
+  outline: 3px solid var(--revieLavender);
+  outline-offset: 2px;
 }
 
 .label {
   display: block;
   margin: 0 0 6px;
   font-size: 14px;
-  font-weight: var(--fontWeightMedium);
+  font-weight: var(--fontWeightBold);
 }
 
 .inputRow {
@@ -24,31 +47,65 @@
 }
 
 .input {
+  box-sizing: border-box;
   flex: 1;
   min-width: 0;
+  height: 46px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1.5px solid rgba(49, 4, 22, 0.3);
+  border-radius: 8px;
+  background-color: var(--revieCream);
+  color: var(--revieMaroon);
+  font: inherit;
+  font-size: 16px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
+.inputError {
+  border: 2px solid var(--revieError);
+}
+
 .applyButton {
-  flex: 0 0 auto;
-  width: auto;
-  min-height: 0;
+  flex: none;
+  height: 46px;
   padding: 0 20px;
+  border: none;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--revieLavender);
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: var(--reviePink);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 }
 
 .appliedRow {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
   gap: 12px;
 }
 
-.appliedText {
-  font-weight: var(--fontWeightMedium);
+.discount {
+  white-space: nowrap;
 }
 
+/* Red on maroon is unreadable (1.7 : 1), so the message sits on a cream chip inside the card. */
 .error {
-  margin: 6px 0 0;
-  font-size: 14px;
-  color: var(--colorFail);
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: var(--revieCream);
 }
