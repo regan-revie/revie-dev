@@ -456,7 +456,21 @@ describe('NylasBookingForm: the line under the Book button', () => {
 
   it('keeps "Times in your timezone (…) · Change" on one line, so "Change" is never alone', () => {
     const css = fs.readFileSync(path.join(__dirname, 'NylasBookingForm.module.css'), 'utf8');
-    const rule = css.match(/\.timeZoneLine\s*\{([^}]*)\}/)[1];
-    expect(rule).toMatch(/white-space:\s*nowrap/);
+    const rule = selector =>
+      css.match(new RegExp(`\\n${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`))[1];
+    expect(rule('.timeZoneLine')).toMatch(/white-space:\s*nowrap/);
+    expect(rule('.timeZoneLine')).toMatch(/max-width:\s*100%/);
+    // A very long zone name is shortened, never "Change", and never makes the panel scroll sideways.
+    expect(rule('.timeZoneText')).toMatch(/text-overflow:\s*ellipsis/);
+    expect(rule('.timeZoneChange')).toMatch(/flex:\s*none/);
+  });
+
+  it('puts the sentence and "· Change" in their own parts of the one line', async () => {
+    await pick(72);
+    const change = screen.getByRole('button', { name: 'BookingPanel.changeTimeZone' });
+    expect(change.closest('span').className).toMatch(/timeZoneChange/);
+    expect(
+      screen.getByText('BookingPanel.timeZoneLine').closest('[class*="timeZoneText"]')
+    ).not.toBeNull();
   });
 });

@@ -302,19 +302,23 @@ const NylasBookingForm = props => {
                   their home zone, not wherever the laptop currently is. */}
               <div className={css.timeZoneBlock}>
                 <div className={css.timeZoneLine}>
-                  <FormattedMessage
-                    id="BookingPanel.timeZoneLine"
-                    values={{ zone: timeZoneCity(timeZone) }}
-                  />
-                  {' · '}
-                  <button
-                    type="button"
-                    className={css.linkButton}
-                    aria-expanded={changingZone}
-                    onClick={() => setChangingZone(!changingZone)}
-                  >
-                    <FormattedMessage id="BookingPanel.changeTimeZone" />
-                  </button>
+                  <span className={css.timeZoneText}>
+                    <FormattedMessage
+                      id="BookingPanel.timeZoneLine"
+                      values={{ zone: timeZoneCity(timeZone) }}
+                    />
+                  </span>
+                  <span className={css.timeZoneChange}>
+                    {' · '}
+                    <button
+                      type="button"
+                      className={css.linkButton}
+                      aria-expanded={changingZone}
+                      onClick={() => setChangingZone(!changingZone)}
+                    >
+                      <FormattedMessage id="BookingPanel.changeTimeZone" />
+                    </button>
+                  </span>
                 </div>
                 {changingZone ? (
                   <select

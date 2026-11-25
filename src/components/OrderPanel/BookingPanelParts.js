@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../util/reactIntl';
@@ -40,12 +40,46 @@ export const PanelHeading = ({ name, className, as: Tag = 'h2' }) => (
   </Tag>
 );
 
-/** The card the panel and its states sit in. */
-export const BookingCard = ({ className, children, ...rest }) => (
-  <aside className={classNames(css.card, className)} {...rest}>
-    <div className={css.cardInner}>{children}</div>
-  </aside>
-);
+// Closer than this to the bottom counts as the bottom (a pixel or two of rounding).
+const BOTTOM_SLACK_PX = 4;
+
+/**
+ * The card the panel and its states sit in. On a desktop its inner wrapper scrolls when the content
+ * is taller than the window; the scrollbar is hidden altogether (it differs between browsers and,
+ * where scrollbars are always shown, takes room from the content), so a soft fade along the bottom
+ * edge says there is more below. The fade is there only while there is more below.
+ */
+export const BookingCard = ({ className, children, ...rest }) => {
+  const innerRef = useRef(null);
+  const [moreBelow, setMoreBelow] = useState(false);
+
+  useEffect(() => {
+    const inner = innerRef.current;
+    if (!inner) return undefined;
+    const update = () =>
+      setMoreBelow(inner.scrollHeight - inner.scrollTop - inner.clientHeight > BOTTOM_SLACK_PX);
+    update();
+    inner.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    // The content changes under it: "More dates" opens a calendar, a time is picked, a line appears.
+    const observer = typeof MutationObserver !== 'undefined' ? new MutationObserver(update) : null;
+    if (observer) observer.observe(inner, { childList: true, subtree: true, characterData: true });
+    return () => {
+      inner.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+      if (observer) observer.disconnect();
+    };
+  }, []);
+
+  return (
+    <aside className={classNames(css.card, className)} {...rest}>
+      <div ref={innerRef} className={css.cardInner}>
+        {children}
+      </div>
+      {moreBelow ? <div aria-hidden="true" className={css.fade} data-testid="card-fade" /> : null}
+    </aside>
+  );
+};
 
 /** A numbered step title: "1  Choose your session". */
 export const StepTitle = ({ number, id, children }) => (

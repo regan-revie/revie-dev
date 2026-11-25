@@ -17,8 +17,11 @@
 }
 
 .card {
+  position: relative;
   box-sizing: border-box;
-  padding: 28px;
+  /* No padding here: it is the inner wrapper's, so a scrolling wrapper clips at the card's edge and
+     nothing the content draws (a focus ring, a border) is cut off by a padding-less wrapper. */
+  padding: 0;
   border: 1px solid rgba(49, 4, 22, 0.16);
   border-radius: var(--borderRadiusLarge);
   background: var(--revieCream);
@@ -32,38 +35,60 @@
 }
 
 /*
- * What the card holds. On a desktop the card is sticky and, taller than the window (the calendar
- * opened by "More dates"), this inner wrapper scrolls so the Book button stays reachable. It is the
- * wrapper that scrolls, never the card: the card keeps its rounded corners, and nothing scrolls at
- * all while the content fits. The scrollbar is a thin overlay in the card's own colours, with no
- * track.
+ * What the card holds, with the card's padding. On a desktop the card is sticky and, taller than the
+ * window (the calendar opened by "More dates"), this wrapper scrolls so the Book button stays
+ * reachable. It is the wrapper that scrolls, never the card, and only while the content is taller.
+ *
+ * The scrollbar is hidden altogether, whatever the browser's "show scroll bars" setting: an
+ * always-visible one takes room from the content, and anything a little too wide then scrolls
+ * sideways. So nothing scrolls sideways (overflow-x hidden), everything inside is held to the
+ * wrapper's width, and a fade along the bottom edge (below) says there is more.
  */
 .cardInner {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--cardGap, 24px);
+  width: 100%;
+  padding: 28px;
+
+  & * {
+    box-sizing: border-box;
+  }
+
+  & > * {
+    min-width: 0;
+    max-width: 100%;
+  }
 
   @media (--viewportLarge) {
-    /* the window, less the 24px above and below the sticky card, its 2 x 28px padding and 2 x 1px border */
-    max-height: calc(100vh - 48px - 58px);
+    /* the window, less the 24px above and below the sticky card and its 2 x 1px border */
+    max-height: calc(100vh - 48px - 2px);
+    overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(49, 4, 22, 0.3) transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 
     &::-webkit-scrollbar {
-      width: 6px;
-      background: transparent;
+      display: none;
     }
+  }
+}
 
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
+/* The soft fade along the card's bottom edge, only while there is more below. */
+.fade {
+  display: none;
 
-    &::-webkit-scrollbar-thumb {
-      border-radius: 3px;
-      background: rgba(49, 4, 22, 0.3);
-    }
+  @media (--viewportLarge) {
+    display: block;
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 56px;
+    background: linear-gradient(to bottom, rgba(239, 238, 237, 0), var(--revieCream));
+    pointer-events: none;
   }
 }
 
