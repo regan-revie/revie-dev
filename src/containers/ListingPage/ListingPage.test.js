@@ -426,6 +426,13 @@ describe('Duck', () => {
               id,
               'imageVariant.listing-card': 'w:400;h:400;fit:crop',
               'imageVariant.listing-card-2x': 'w:800;h:800;fit:crop',
+              // The coach's photo in its original shape, cropped in the browser (components/CoachPhoto)
+              'imageVariant.scale-small': 'w:400;h:800;fit:scale',
+              'imageVariant.scale-large': 'w:800;h:1600;fit:scale',
+              'fields.image': expect.arrayContaining([
+                'variants.scale-small',
+                'variants.scale-large',
+              ]),
               include: ['author', 'author.profileImage', 'images', 'currentStock'],
             }),
           ],

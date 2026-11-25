@@ -461,7 +461,7 @@ describe('OrderPanel', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('OrderPanel.notTakingBookings')).toBeInTheDocument();
+      expect(getByText('BookingPanel.notTakingLead')).toBeInTheDocument();
     });
     expect(queryByText('BookingFixedDurationForm.bookingStartTitle')).not.toBeInTheDocument();
     expect(queryByText('BookingFixedDurationForm.requestToBook')).not.toBeInTheDocument();
@@ -472,7 +472,7 @@ describe('OrderPanel', () => {
     listing.attributes.availabilityPlan = null;
     const { getByText } = renderFixed({ listing, isOwnListing: false });
     await waitFor(() => {
-      expect(getByText('OrderPanel.notTakingBookings')).toBeInTheDocument();
+      expect(getByText('BookingPanel.notTakingLead')).toBeInTheDocument();
     });
   });
 
@@ -490,8 +490,13 @@ describe('OrderPanel', () => {
   });
 
   const stepButton = name => screen.queryByRole('button', { name });
-  const CALENDAR = 'OrderPanel.setupConnectCalendar';
-  const PAYOUTS = 'OrderPanel.setupAddPayoutDetails';
+  // The word shown in place of a button once a step is done ("Connected", "Added", "Done").
+  const doneTexts = () =>
+    ['BookingPanel.setupConnected', 'BookingPanel.setupAdded', 'BookingPanel.setupDone'].flatMap(
+      id => screen.queryAllByText(id)
+    );
+  const CALENDAR = 'BookingPanel.setupConnectCalendar';
+  const PAYOUTS = 'BookingPanel.setupPayout';
 
   it('Booking: fixed, own listing, neither step done: one card with two buttons', async () => {
     renderFixed(
@@ -500,15 +505,15 @@ describe('OrderPanel', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('OrderPanel.setupCardHeading')).toBeInTheDocument();
+      expect(screen.getByText('BookingPanel.setupHeadingLead')).toBeInTheDocument();
     });
-    expect(screen.getByText('OrderPanel.setupCardIntro')).toBeInTheDocument();
+    expect(screen.getByText('BookingPanel.stepsLeft')).toBeInTheDocument();
     expect(stepButton(CALENDAR)).toBeInTheDocument();
     expect(stepButton(PAYOUTS)).toBeInTheDocument();
     // No ticks, and none of the old red messages.
-    expect(screen.queryByText('OrderPanel.setupStepDone')).not.toBeInTheDocument();
-    expect(screen.queryByText('OrderPanel.notTakingBookings')).not.toBeInTheDocument();
-    expect(screen.queryByText('OrderPanel.ownListingSettingUp')).not.toBeInTheDocument();
+    expect(doneTexts()).toHaveLength(0);
+    expect(screen.queryByText('BookingPanel.notTakingLead')).not.toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.settingUp')).not.toBeInTheDocument();
   });
 
   it('Booking: fixed, own listing, calendar done: that step is ticked with no button, payouts still has one', async () => {
@@ -518,11 +523,11 @@ describe('OrderPanel', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('OrderPanel.setupCardHeading')).toBeInTheDocument();
+      expect(screen.getByText('BookingPanel.setupHeadingLead')).toBeInTheDocument();
     });
     expect(stepButton(CALENDAR)).not.toBeInTheDocument();
     expect(screen.getByText(CALENDAR)).toBeInTheDocument();
-    expect(screen.getAllByText('OrderPanel.setupStepDone')).toHaveLength(1);
+    expect(doneTexts()).toHaveLength(1);
     expect(stepButton(PAYOUTS)).toBeInTheDocument();
   });
 
@@ -533,7 +538,7 @@ describe('OrderPanel', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('OrderPanel.setupCardHeading')).toBeInTheDocument();
+      expect(screen.getByText('BookingPanel.setupHeadingLead')).toBeInTheDocument();
     });
     expect(stepButton(PAYOUTS)).not.toBeInTheDocument();
     expect(screen.getByText(PAYOUTS)).toBeInTheDocument();
@@ -547,9 +552,9 @@ describe('OrderPanel', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('OrderPanel.ownListingSettingUp')).toBeInTheDocument();
+      expect(screen.getByText('BookingPanel.settingUp')).toBeInTheDocument();
     });
-    expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.setupHeadingLead')).not.toBeInTheDocument();
     expect(stepButton(CALENDAR)).not.toBeInTheDocument();
     expect(stepButton(PAYOUTS)).not.toBeInTheDocument();
   });
@@ -560,11 +565,10 @@ describe('OrderPanel', () => {
       { initialState: coach({ calendar: true, payouts: true }) }
     );
 
-    await waitFor(() => {
-      expect(screen.getAllByText('title!').length).toBeGreaterThan(0);
-    });
-    expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
-    expect(screen.queryByText('OrderPanel.ownListingSettingUp')).not.toBeInTheDocument();
+    // The booking panel itself (not a setup card or a note).
+    expect(await screen.findByTestId('booking-panel')).toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.setupHeadingLead')).not.toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.settingUp')).not.toBeInTheDocument();
   });
 
   // A coach whose Google connection broke: the server has switched their sessions off
@@ -585,14 +589,13 @@ describe('OrderPanel', () => {
     renderFixed({ listing: fixedListing(), isOwnListing: true }, { initialState: brokenCoach });
 
     await waitFor(() => {
-      expect(screen.getByText('OrderPanel.setupCardHeadingReconnect')).toBeInTheDocument();
+      expect(screen.getByText('BookingPanel.setupHeadingLeadReconnect')).toBeInTheDocument();
     });
-    expect(screen.getByText('OrderPanel.setupCardIntroReconnect')).toBeInTheDocument();
-    expect(stepButton('OrderPanel.setupReconnectCalendar')).toBeInTheDocument();
+    expect(screen.getByText('BookingPanel.setupIntroReconnect')).toBeInTheDocument();
+    expect(stepButton('BookingPanel.setupReconnectCalendar')).toBeInTheDocument();
     // Not the first-time wording, and not ticked.
     expect(stepButton(CALENDAR)).not.toBeInTheDocument();
-    expect(screen.queryByText('OrderPanel.setupStepDone')).toBeInTheDocument(); // payouts are done
-    expect(screen.getAllByText('OrderPanel.setupStepDone')).toHaveLength(1);
+    expect(doneTexts()).toHaveLength(1);
   });
 
   it('Booking: fixed, own listing, the Reconnect row goes straight to the Google connect route', async () => {
@@ -600,7 +603,7 @@ describe('OrderPanel', () => {
     try {
       renderFixed({ listing: fixedListing(), isOwnListing: true }, { initialState: brokenCoach });
       const button = await screen.findByRole('button', {
-        name: 'OrderPanel.setupReconnectCalendar',
+        name: 'BookingPanel.setupReconnectCalendar',
       });
       button.click();
       expect(goToUrl).toHaveBeenCalledWith(
@@ -614,9 +617,9 @@ describe('OrderPanel', () => {
   it('Booking: fixed, Google connection broke: a client sees "isn\'t taking bookings yet" and no booking form', async () => {
     // The listing is switched off by the server, which is what the client's page reads.
     renderFixed({ listing: fixedListing(), isOwnListing: false });
-    expect(await screen.findByText('OrderPanel.notTakingBookings')).toBeInTheDocument();
+    expect(await screen.findByText('BookingPanel.notTakingLead')).toBeInTheDocument();
     expect(screen.queryByText('BookingFixedDurationForm.requestToBook')).not.toBeInTheDocument();
-    expect(screen.queryByText('OrderPanel.setupCardHeadingReconnect')).not.toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.setupHeadingLeadReconnect')).not.toBeInTheDocument();
   });
 
   it('Booking: fixed, own listing, reconnected: no reconnect card, the session is set up again', async () => {
@@ -635,18 +638,17 @@ describe('OrderPanel', () => {
       { listing: fixedListing({ calendarBookingEnabled: true }), isOwnListing: true },
       { initialState: reconnected }
     );
-    await waitFor(() => {
-      expect(screen.getAllByText('title!').length).toBeGreaterThan(0);
-    });
-    expect(screen.queryByText('OrderPanel.setupCardHeadingReconnect')).not.toBeInTheDocument();
+    // The booking panel itself (not a setup card or a note).
+    expect(await screen.findByTestId('booking-panel')).toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.setupHeadingLeadReconnect')).not.toBeInTheDocument();
   });
 
   it('Booking: fixed, a client or visitor: the plain "isn\'t taking bookings yet" line, never the card', async () => {
     renderFixed({ listing: fixedListing(), isOwnListing: false });
 
-    const line = await screen.findByText('OrderPanel.notTakingBookings');
+    const line = await screen.findByText('BookingPanel.notTakingLead');
     expect(line).toBeInTheDocument();
-    expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.setupHeadingLead')).not.toBeInTheDocument();
     expect(stepButton(CALENDAR)).not.toBeInTheDocument();
     // Body text, not the red error style.
     expect(line.className).not.toMatch(/error/i);
@@ -824,7 +826,7 @@ describe('OrderPanel', () => {
         }),
       },
     });
-    const PROFILE = 'OrderPanel.setupFinishProfile';
+    const PROFILE = 'BookingPanel.setupProfile';
     const button = name => screen.queryByRole('button', { name });
 
     it('calendar and payouts done but the profile not: still the card, with a button to the profile', async () => {
@@ -833,12 +835,12 @@ describe('OrderPanel', () => {
         { initialState: coachWith({ languages: ['x'] }), config: withTraitFields }
       );
       await waitFor(() => {
-        expect(screen.getByText('OrderPanel.setupCardHeadingFindable')).toBeInTheDocument();
+        expect(screen.getByText('BookingPanel.setupHeadingLeadFindable')).toBeInTheDocument();
       });
       expect(button(PROFILE)).toBeInTheDocument();
-      expect(button('OrderPanel.setupConnectCalendar')).not.toBeInTheDocument();
-      expect(button('OrderPanel.setupAddPayoutDetails')).not.toBeInTheDocument();
-      expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+      expect(button('BookingPanel.setupConnectCalendar')).not.toBeInTheDocument();
+      expect(button('BookingPanel.setupPayout')).not.toBeInTheDocument();
+      expect(screen.queryByText('BookingPanel.setupHeadingLead')).not.toBeInTheDocument();
     });
 
     it('any one of the four missing counts as not finished', async () => {
@@ -858,9 +860,9 @@ describe('OrderPanel', () => {
         { initialState: coachWith(ALL), config: withTraitFields }
       );
       await waitFor(() => {
-        expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+        expect(screen.queryByText('BookingPanel.setupHeadingLead')).not.toBeInTheDocument();
       });
-      expect(screen.queryByText('OrderPanel.setupCardHeadingFindable')).not.toBeInTheDocument();
+      expect(screen.queryByText('BookingPanel.setupHeadingLeadFindable')).not.toBeInTheDocument();
       expect(button(PROFILE)).not.toBeInTheDocument();
     });
 
@@ -875,10 +877,10 @@ describe('OrderPanel', () => {
         }
       );
       await waitFor(() => {
-        expect(screen.getByText('OrderPanel.setupCardHeading')).toBeInTheDocument();
+        expect(screen.getByText('BookingPanel.setupHeadingLead')).toBeInTheDocument();
       });
-      expect(button('OrderPanel.setupConnectCalendar')).toBeInTheDocument();
-      expect(button('OrderPanel.setupAddPayoutDetails')).toBeInTheDocument();
+      expect(button('BookingPanel.setupConnectCalendar')).toBeInTheDocument();
+      expect(button('BookingPanel.setupPayout')).toBeInTheDocument();
       expect(button(PROFILE)).toBeInTheDocument();
     });
 
@@ -888,7 +890,7 @@ describe('OrderPanel', () => {
         { initialState: coachWith({}), config }
       );
       await waitFor(() => {
-        expect(screen.queryByText('OrderPanel.setupCardHeading')).not.toBeInTheDocument();
+        expect(screen.queryByText('BookingPanel.setupHeadingLead')).not.toBeInTheDocument();
       });
       expect(button(PROFILE)).not.toBeInTheDocument();
     });

@@ -4,7 +4,7 @@ import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 
 import { IconPrep } from './SessionIcons';
 import { SectionLabel, ToggleButton } from './SessionParts';
-import { hasText, splitAfterLastComma, splitDescription } from './sessionPageHelpers';
+import { hasText, splitDescription } from './sessionPageHelpers';
 
 import css from './SessionSections.module.css';
 
@@ -17,8 +17,6 @@ const SessionAbout = ({ description, preWork }) => {
   const intl = useIntl();
   const [open, setOpen] = useState(false);
   const { lead, body, more } = splitDescription(description);
-  const leadParts = splitAfterLastComma(lead);
-  const hasLeadBreak = leadParts.lead !== '';
 
   if (!lead && !hasText(preWork)) {
     return null;
@@ -34,18 +32,7 @@ const SessionAbout = ({ description, preWork }) => {
         <FormattedMessage id="SessionPage.labelSession" />
       </SectionLabel>
 
-      {lead ? (
-        <p className={css.lead}>
-          {hasLeadBreak ? (
-            <>
-              {leadParts.lead}
-              <b>{leadParts.bold}</b>
-            </>
-          ) : (
-            lead
-          )}
-        </p>
-      ) : null}
+      {lead ? <p className={css.lead}>{lead}</p> : null}
       {body ? <p className={css.body}>{body}</p> : null}
       {more.length > 0 ? (
         <>

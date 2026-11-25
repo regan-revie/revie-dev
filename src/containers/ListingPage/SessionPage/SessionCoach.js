@@ -16,7 +16,6 @@ import {
   optionLabels,
   safeExternalUrl,
   socialKind,
-  splitAfterLastComma,
 } from './sessionPageHelpers';
 
 import css from './SessionSections.module.css';
@@ -91,7 +90,6 @@ const SessionCoach = ({ author, userFields }) => {
   const name = firstNameOf(userDisplayNameAsString(author, ''));
 
   const quote = hasText(publicData[COACH_QUOTE_KEY]) ? publicData[COACH_QUOTE_KEY].trim() : null;
-  const quoteParts = quote ? splitAfterLastComma(quote) : null;
   const styles = optionLabels(
     userFields,
     COMMUNICATION_STYLE_KEY,
@@ -116,10 +114,7 @@ const SessionCoach = ({ author, userFields }) => {
 
       {quote ? (
         <figure className={css.quoteCard} data-testid="coach-quote">
-          <blockquote className={css.quote}>
-            “{quoteParts.lead}
-            <b>{quoteParts.bold}</b>”
-          </blockquote>
+          <blockquote className={css.quote}>“{quote}”</blockquote>
         </figure>
       ) : null}
 

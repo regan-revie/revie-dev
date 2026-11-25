@@ -1,41 +1,237 @@
+/*
+ * The booking steps. Values are the approved design's: the desktop panel (Main) by default, the phone
+ * sheet (PhoneSheet) where the form has data-layout="sheet".
+ */
+
 .root {
   display: flex;
   flex-direction: column;
+  gap: 24px;
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .notice,
 .error {
-  margin: 16px 0;
-  color: var(--colorGrey700);
+  margin: 0;
+  font-size: 15px;
 }
 
 .error {
   color: var(--colorFail);
 }
 
-.timeZoneRow {
+/* ---------- Timezone ---------- */
+
+.timeZoneBlock {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  margin-top: 16px;
-  flex-wrap: wrap;
 }
 
-.timeZoneLabel {
-  color: var(--colorTextMuted);
-  font-size: 13px;
+.timeZoneLine {
+  font-size: 14px;
+  color: rgba(49, 4, 22, 0.74);
+}
+
+.linkButton {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--revieMaroon);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration-thickness: 2px;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
 }
 
 .timeZoneSelect {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 4px 6px;
-  border: 1px solid var(--colorGrey300);
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1.5px solid rgba(49, 4, 22, 0.25);
   border-radius: var(--borderRadiusMedium);
-  background-color: var(--colorWhite);
-  font-size: 13px;
+  background: var(--revieCream);
+  color: var(--revieMaroon);
+  font: inherit;
+  font-size: 14px;
 }
 
-.submitButton {
-  margin-top: 24px;
+/* ---------- Total and the book button ---------- */
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.totalRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(49, 4, 22, 0.14);
+}
+
+.totalLabels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.totalFor {
+  font-size: 15px;
+}
+
+.noFees {
+  font-size: 13px;
+  color: rgba(49, 4, 22, 0.74);
+}
+
+.totalPrice {
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 1;
+}
+
+.summary {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.summaryHint {
+  font-size: 15px;
+}
+
+.bookButton {
+  width: 100%;
+  min-height: 56px;
+  border: none;
+  border-radius: var(--borderRadiusPill);
+  background: var(--revieMaroon);
+  color: var(--revieCream);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+
+  &:hover:enabled,
+  &:focus-visible:enabled {
+    background: var(--reviePink);
+    color: var(--revieMaroon);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 3px;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.cancelText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(49, 4, 22, 0.74);
+}
+
+.messageBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(49, 4, 22, 0.14);
+}
+
+.messageText {
+  font-size: 15px;
+}
+
+.sheetLinks {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ---------- The phone sheet ---------- */
+
+/* The steps scroll; the total and the book button stay at the bottom. */
+[data-layout='sheet'].root {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+[data-layout='sheet'] .steps {
+  flex: 1;
+  min-height: 0;
+  gap: 22px;
+  padding: 4px 20px 16px;
+  overflow-y: auto;
+}
+
+[data-layout='sheet'] .timeZoneLine {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+[data-layout='sheet'] .footer {
+  flex: none;
+  gap: 10px;
+  padding: 14px 20px 28px;
+  border-top: 1px solid rgba(49, 4, 22, 0.14);
+  box-shadow: 0 -8px 24px rgba(49, 4, 22, 0.06);
+}
+
+[data-layout='sheet'] .totalRow {
+  padding-top: 0;
+  border-top: none;
+}
+
+[data-layout='sheet'] .totalFor {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+[data-layout='sheet'] .noFees {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+[data-layout='sheet'] .totalPrice {
+  font-size: 34px;
+}
+
+[data-layout='sheet'] .bookButton {
+  min-height: 52px;
+}
+
+[data-layout='sheet'] .cancelText {
+  font-size: 13px;
+  opacity: 0.8;
 }

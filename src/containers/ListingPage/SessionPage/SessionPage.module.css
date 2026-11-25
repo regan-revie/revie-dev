@@ -61,11 +61,6 @@
   }
 }
 
-.actionBar {
-  width: 100%;
-  margin: 24px 0 -32px;
-}
-
 /* Keeps the footer clear of the template's fixed "book" bar on a phone. */
 .pageRoot {
   padding-bottom: 90px;

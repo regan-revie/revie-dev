@@ -1,0 +1,246 @@
+/*
+ * "Pick a day" and "Pick a time". Values are the approved design's: the desktop panel (Main) by
+ * default, the phone sheet (PhoneSheet) where an ancestor has data-layout="sheet".
+ */
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- The five-day strip ---------- */
+
+.strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dayButton {
+  box-sizing: border-box;
+  padding: 8px 0;
+  border: 2px solid rgba(49, 4, 22, 0.18);
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--revieMaroon);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.daySelected {
+  border-color: var(--revieMaroon);
+  background: var(--revieLavender);
+}
+
+.dayOff {
+  border-color: transparent;
+  opacity: 0.4;
+  cursor: default;
+  text-decoration: line-through;
+}
+
+.dayWeekday {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dayNumber {
+  display: block;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+[data-layout='sheet'] .dayButton {
+  min-height: 56px;
+  padding: 0;
+}
+
+[data-layout='sheet'] .dayNumber {
+  font-size: 17px;
+}
+
+/* ---------- "More dates": the month grid ---------- */
+
+.textButton {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--revieMaroon);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid rgba(49, 4, 22, 0.16);
+  border-radius: var(--borderRadiusLarge);
+}
+
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.monthArrow {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1.5px solid rgba(49, 4, 22, 0.25);
+  border-radius: var(--borderRadiusPill);
+  background: transparent;
+  color: var(--revieMaroon);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.monthName {
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  text-align: center;
+  font-family: var(--fontFamilySecondary);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.monthDays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.blank {
+  width: 38px;
+  height: 38px;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  justify-self: center;
+  border: 2px solid transparent;
+  border-radius: var(--borderRadiusPill);
+  background: transparent;
+  color: var(--revieMaroon);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+/* Dates with times free are bold and underlined, the rest are faint. */
+.cellFree {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cellSelected {
+  border-color: var(--revieMaroon);
+  background: var(--revieLavender);
+  font-weight: 700;
+}
+
+.cellOff {
+  border: none;
+  opacity: 0.35;
+  cursor: default;
+}
+
+.calendarHint {
+  font-size: 13px;
+  color: rgba(49, 4, 22, 0.74);
+}
+
+/* ---------- Times ---------- */
+
+.times {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.timeButton {
+  box-sizing: border-box;
+  padding: 10px 0;
+  border: 2px solid rgba(49, 4, 22, 0.18);
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--revieMaroon);
+  font: inherit;
+  font-size: 15px;
+  text-align: center;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.timeSelected {
+  border-color: var(--revieMaroon);
+  background: var(--revieLavender);
+}
+
+[data-layout='sheet'] .timeButton {
+  min-height: 44px;
+  padding: 0;
+}
+
+[data-layout='sheet'] .timeSelected {
+  font-weight: 700;
+}

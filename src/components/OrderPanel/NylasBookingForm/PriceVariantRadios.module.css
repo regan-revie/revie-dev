@@ -1,0 +1,66 @@
+/* "Choose your session" rows. Values are the approved design's (Main; PhoneSheet in a sheet). */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 2px solid rgba(49, 4, 22, 0.18);
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--revieMaroon);
+  font: inherit;
+  font-size: 16px;
+  text-align: center;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 3px solid var(--revieLavender);
+    outline-offset: 2px;
+  }
+}
+
+.rowChecked {
+  border-color: var(--revieMaroon);
+  background: var(--revieLavender);
+}
+
+.dot {
+  flex: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(49, 4, 22, 0.4);
+  border-radius: var(--borderRadiusPill);
+}
+
+.rowChecked .dot {
+  border: 6px solid var(--revieMaroon);
+  background: var(--revieCream);
+}
+
+.name {
+  flex: 1;
+  font-weight: 700;
+  text-align: left;
+}
+
+[data-layout='sheet'] .row {
+  min-height: 50px;
+  font-size: 15px;
+}

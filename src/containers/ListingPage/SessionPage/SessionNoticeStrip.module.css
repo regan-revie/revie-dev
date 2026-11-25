@@ -1,0 +1,46 @@
+@import '../../../styles/customMediaQueries.css';
+
+/* A slim full-width strip under the topbar: lavender ground, maroon text (9.6:1), about 48px tall. */
+.strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 8px 20px;
+  background: var(--revieLavender);
+  color: var(--revieMaroon);
+
+  @media (--viewportLarge) {
+    padding: 8px 36px;
+  }
+}
+
+.text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.link {
+  flex: none;
+  color: var(--revieMaroon);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--revieMaroon);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--revieMaroon);
+    outline-offset: 2px;
+  }
+}

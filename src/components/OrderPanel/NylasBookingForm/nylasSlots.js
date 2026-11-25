@@ -108,3 +108,87 @@ export const formatTimeZoneName = (timeZone, date = new Date(), locale = 'en-US'
   }
   return FRIENDLY_ZONE_NAMES[name] || name;
 };
+
+/* ---------- The booking panel's day strip, month grid and time buttons ---------- */
+
+// A day key is "YYYY-MM-DD": a calendar date, the same in every timezone. These helpers do their date
+// arithmetic in UTC, so the viewer's timezone (which only decided WHICH date a slot falls on) cannot
+// shift a day.
+const keyToUtcDate = key => {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12));
+};
+const utcDateToKey = date => date.toISOString().slice(0, 10);
+
+export const addDaysToKey = (key, days) => {
+  const date = keyToUtcDate(key);
+  date.setUTCDate(date.getUTCDate() + days);
+  return utcDateToKey(date);
+};
+
+/** "2026-11" for a day key. */
+export const monthKeyOf = dayKey => dayKey.slice(0, 7);
+
+export const addMonthsToMonthKey = (monthKey, months) => {
+  const [y, m] = monthKey.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1 + months, 1, 12));
+  return utcDateToKey(date).slice(0, 7);
+};
+
+/** The days of a month as a Monday-first grid: `null` for the blanks before the 1st, then day keys. */
+export const monthGrid = monthKey => {
+  const [y, m] = monthKey.split('-').map(Number);
+  const first = new Date(Date.UTC(y, m - 1, 1, 12));
+  const daysInMonth = new Date(Date.UTC(y, m, 0, 12)).getUTCDate();
+  const leadingBlanks = (first.getUTCDay() + 6) % 7; // Monday = 0
+  return [
+    ...Array(leadingBlanks).fill(null),
+    ...Array.from(
+      { length: daysInMonth },
+      (_, i) => `${monthKey}-${String(i + 1).padStart(2, '0')}`
+    ),
+  ];
+};
+
+const formatKey = (key, options, locale) =>
+  new Intl.DateTimeFormat(locale, { timeZone: 'UTC', ...options }).format(keyToUtcDate(key));
+
+/** The two parts of a day button: "Tue" and "17". */
+export const dayButtonParts = (key, locale = 'en-GB') => ({
+  weekday: formatKey(key, { weekday: 'short' }, locale),
+  day: formatKey(key, { day: 'numeric' }, locale),
+});
+
+/** Spoken label for a day: "Tuesday 17 November". */
+export const dayAriaLabel = (key, locale = 'en-GB') =>
+  formatKey(key, { weekday: 'long', day: 'numeric', month: 'long' }, locale);
+
+/** "November 2026" */
+export const monthLabel = (monthKey, locale = 'en-GB') =>
+  formatKey(`${monthKey}-01`, { month: 'long', year: 'numeric' }, locale);
+
+/** "10:00 am": a slot's start in the given timezone, as the booking panel's time buttons read it. */
+export const formatSlotTime12 = (startMs, timeZone, locale = 'en-GB') =>
+  new Intl.DateTimeFormat(locale, { timeZone, hour: 'numeric', minute: '2-digit', hour12: true })
+    .format(new Date(startMs))
+    .replace(/[\s ]+/g, ' ')
+    .toLowerCase();
+
+/** "Wed 18 Nov": the day of a moment in the given timezone, for the panel's summary line. */
+export const formatSummaryDay = (startMs, timeZone, locale = 'en-GB') => {
+  const parts = new Intl.DateTimeFormat(locale, {
+    timeZone,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).formatToParts(new Date(startMs));
+  const pick = type => parts.find(p => p.type === type)?.value || '';
+  return `${pick('weekday')} ${pick('day')} ${pick('month')}`.trim();
+};
+
+/** "London" for "Europe/London", "New York" for "America/New_York". */
+export const timeZoneCity = timeZone =>
+  (timeZone || '')
+    .split('/')
+    .pop()
+    .replace(/_/g, ' ');

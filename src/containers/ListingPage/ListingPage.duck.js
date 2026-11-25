@@ -1,6 +1,10 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 import { types as sdkTypes, createImageVariantConfig } from '../../util/sdkLoader';
+import {
+  PROFILE_PHOTO_IMAGE_FIELDS,
+  profilePhotoVariantParams,
+} from '../../util/profileImageVariants';
 import { storableError } from '../../util/errors';
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 import { transactionLineItems } from '../../util/api';
@@ -88,7 +92,11 @@ const showListingPayloadCreator = ({ listingId, config, isOwn = false }, thunkAP
       // Avatars
       'variants.square-small',
       'variants.square-small2x',
+
+      // The coach's photo in its original shape (the session page hero crops it in the browser)
+      ...PROFILE_PHOTO_IMAGE_FIELDS,
     ],
+    ...profilePhotoVariantParams(),
     ...createImageVariantConfig(`${variantPrefix}`, 400, aspectRatio),
     ...createImageVariantConfig(`${variantPrefix}-2x`, 800, aspectRatio),
     ...createImageVariantConfig(`${variantPrefix}-4x`, 1600, aspectRatio),

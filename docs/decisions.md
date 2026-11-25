@@ -7,6 +7,12 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Coach photos are cropped in the browser
+**Date:** Nov 24, 2026
+**Decision:** The coach photo is the "sticker" capsule from the approved session page design: the photo in a pill-shaped frame tilted -3 degrees over a chartreuse pill offset and tilted +4 degrees, no border or frame. The photo is cropped in the browser (`object-fit: cover`, `object-position: 50% 25%`, so the face sits near the top), not on Sharetribe's side, and a coach is never asked to position it: no help text on the upload, no "position your photo" step. Pages ask Sharetribe for the profile image in its original shape (custom `scale-small`, 400px wide, and `scale-large`, 800px wide, image variants) instead of the template's centre-cropped square variants, which can cut the top of a head off in a tall capsule. With no photo the same capsule is lavender with the coach's initials in maroon (TT Commons Pro Bold, about 30% of the capsule's width), never the template's grey default avatar. One shared component, `CoachPhoto`, is used for it; the session page hero uses it now, the profile page, checkout summary and session cards will reuse it later.
+**Why:** A square centre crop is the wrong shape for a tall capsule, and asking coaches to position a photo is a step most will skip or get wrong. Cropping in the browser fixes the shape once, for every coach.
+**Affects:** `src/components/CoachPhoto/`, `src/util/profileImageVariants.js`, the listing page query (`ListingPage.duck.js`), the profile form (photo help text removed). Recorded from the chat with Regan.
+
 ### DECISION: The session page design is approved, and the words on it are fixed
 **Date:** Nov 16, 2026 (approved); recorded Nov 24, 2026
 **Decision:**

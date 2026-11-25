@@ -37,11 +37,11 @@ import {
   priceForSchemaMaybe,
   getDerivedRenderData,
 } from './ListingPage.shared';
-import Notifications from './Notifications/Notifications';
 import ListingPageAccessWrapper from './ListingPageAccessWrapper';
 
 // The redesigned session page (docs/design/session-page/)
 import SessionTopbar from './SessionPage/SessionTopbar';
+import SessionNoticeStrip from './SessionPage/SessionNoticeStrip';
 import SessionHero from './SessionPage/SessionHero';
 import SessionAbout from './SessionPage/SessionAbout';
 import SessionCoach from './SessionPage/SessionCoach';
@@ -231,23 +231,20 @@ export const ListingPageComponent = props => {
         footer={<FooterContainer />}
       >
         <div className={sessionCss.page}>
+          <SessionNoticeStrip
+            mounted={mounted}
+            listing={currentListing}
+            isOwnListing={isOwnListing}
+            noPayoutDetailsSetWithOwnListing={noPayoutDetailsSetWithOwnListing}
+            editParams={{
+              id: listingId.uuid,
+              slug: listingSlug,
+              type: listingPathParamType,
+              tab: listingTab,
+            }}
+          />
           <div className={sessionCss.main}>
             <div className={sessionCss.column}>
-              <Notifications
-                mounted={mounted}
-                listing={currentListing}
-                isOwnListing={isOwnListing}
-                noPayoutDetailsSetWithOwnListing={noPayoutDetailsSetWithOwnListing}
-                currentUser={currentUser}
-                className={sessionCss.actionBar}
-                editParams={{
-                  id: listingId.uuid,
-                  slug: listingSlug,
-                  type: listingPathParamType,
-                  tab: listingTab,
-                }}
-              />
-
               <SessionHero
                 listing={currentListing}
                 author={ensuredAuthor}

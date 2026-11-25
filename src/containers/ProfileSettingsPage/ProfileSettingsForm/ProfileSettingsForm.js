@@ -23,7 +23,7 @@ import {
   CustomExtendedDataField,
 } from '../../../components';
 
-import { withCoachTraitsRequired } from '../../../util/coachTraits';
+import { withCoachTraitsRequired, withProfileFieldLimits } from '../../../util/coachTraits';
 import css from './ProfileSettingsForm.module.css';
 
 const ACCEPT_IMAGES = 'image/*';
@@ -273,7 +273,9 @@ class ProfileSettingsFormComponent extends Component {
             false
           ).map(props => ({
             ...props,
-            fieldConfig: withCoachTraitsRequired(props.fieldConfig, userTypeConfig?.userType),
+            fieldConfig: withProfileFieldLimits(
+              withCoachTraitsRequired(props.fieldConfig, userTypeConfig?.userType)
+            ),
           }));
 
           return (
@@ -346,12 +348,6 @@ class ProfileSettingsFormComponent extends Component {
                     );
                   }}
                 </Field>
-                <div className={css.tip}>
-                  <FormattedMessage id="ProfileSettingsForm.tip" />
-                </div>
-                <div className={css.fileInfo}>
-                  <FormattedMessage id="ProfileSettingsForm.fileInfo" />
-                </div>
               </div>
               <div className={css.sectionContainer}>
                 <H4 as="h2" className={css.sectionTitle}>
