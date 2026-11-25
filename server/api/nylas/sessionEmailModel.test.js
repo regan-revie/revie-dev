@@ -241,6 +241,22 @@ describe('the booking confirmation fields', () => {
     expect(model.freeWindowOpen).toBe(false);
     expect(model.freeWindowClosed).toBe(true);
     expect(model.freeUntilOpen).toBe('');
+    // The wording for it: the checkout summary's sentence, with the coach's first name.
+    expect(model.freeWindowClosedText).toBe(
+      "Less than 48 hours away. This session can't be moved, and cancelling is charged in full. If Sam cancels, you're refunded in full."
+    );
+  });
+
+  it('a session 30 hours out says it is inside 48 hours; one 72 hours out gives the free-until time', () => {
+    const now = Date.parse('2026-11-20T12:00:00Z');
+    const iso = h => new Date(now + h * 3600000).toISOString();
+    const soon = confirmed({ now, start: iso(30), end: iso(31) });
+    expect(soon.freeUntilOpen).toBe('');
+    expect(soon.freeWindowClosedText).toMatch(/^Less than 48 hours away\./);
+    const later = confirmed({ now, start: iso(72), end: iso(73) });
+    expect(later.freeUntilOpen).not.toBe('');
+    expect(later.freeUntilOpen).toMatch(/\(.+\)$/);
+    expect(later.freeWindowClosedText).toBe('');
   });
 
   it('has no free-until at all, and neither flag, when the start cannot be read (the caller reports it)', () => {

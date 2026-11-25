@@ -36,6 +36,8 @@
 .timeZoneLine {
   font-size: 14px;
   color: rgba(49, 4, 22, 0.74);
+  /* "Times in your timezone (London) · Change" stays on one line: it never leaves "Change" alone. */
+  white-space: nowrap;
 }
 
 .linkButton {

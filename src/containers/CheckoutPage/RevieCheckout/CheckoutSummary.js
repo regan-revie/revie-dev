@@ -3,6 +3,7 @@ import React from 'react';
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { CoachPhoto, NamedLink } from '../../../components';
 import { createSlug } from '../../../util/urlHelpers';
+import { isInsideFreeWindow } from '../../../util/freeCancellationWindow';
 import { splitAfterLastComma } from '../../ListingPage/SessionPage/sessionPageHelpers';
 import {
   IconCalendarStar,
@@ -83,7 +84,7 @@ const CheckoutSummary = props => {
           className={css.photo}
           image={author?.profileImage}
           name={coachName}
-          sizes="58px"
+          sizes="76px"
         />
         <div className={css.coachText}>
           <div className={css.title} data-testid="summary-title">
@@ -182,7 +183,21 @@ const CheckoutSummary = props => {
         </span>
       </div>
 
-      {hasTime ? (
+      {hasTime && isInsideFreeWindow(startMs) ? (
+        // Never a "free to cancel until" time that has already passed: a session starting within 48
+        // hours can't be moved, and cancelling is charged (the coach cancelling still refunds in full).
+        <div className={css.insideBox} data-testid="inside-48">
+          <span aria-hidden="true" className={css.insideMark}>
+            !
+          </span>
+          <span>
+            <FormattedMessage
+              id="CheckoutPage.insideWindow"
+              values={{ name: coachFirstName, b: chunks => <b>{chunks}</b> }}
+            />
+          </span>
+        </div>
+      ) : hasTime ? (
         <div className={css.cancelBox}>
           <IconCancelling size={22} />
           <span>

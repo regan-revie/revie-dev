@@ -236,11 +236,10 @@ describe('Postmark templates', () => {
         expect(body).toContain(
           "Free to cancel or move until {{.}}. After that, it's charged in full."
         );
-        expect(body).toContain(
-          "This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full."
-        );
+        // No free window left: one value, the sentence itself, printed by its own section.
+        expect(body).toMatch(/\{\{#freeWindowClosedText\}\}/);
         expect(body).toMatch(/\{\{#freeUntilOpen\}\}/);
-        expect(body).toMatch(/\{\{#freeWindowClosed\}\}/);
+        expect(body).not.toContain('Free to cancel or move until {{coach');
       });
     });
   });
@@ -339,7 +338,9 @@ describe('Postmark templates', () => {
         manageUrl: 'u',
       });
       const out = render(t.text, soon);
-      expect(out).toContain("This session is less than 48 hours away, so it can't be moved.");
+      expect(out).toContain(
+        "Less than 48 hours away. This session can't be moved, and cancelling is charged in full. If C cancels, you're refunded in full."
+      );
       expect(out).not.toMatch(/Free to cancel or move until/);
     });
 

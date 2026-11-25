@@ -28,8 +28,10 @@
 
 .photo {
   flex: none;
-  width: 58px;
-  margin-right: 12px;
+  /* The session page hero's capsule (CoachPhoto), at a size where its shape, tilt and the initials
+     at 30% of its width read as in the hero: 58px made it a small blob. */
+  width: 76px;
+  margin-right: 10px;
 }
 
 .coachText {
@@ -164,4 +166,32 @@
   padding: 10px 14px;
   border-radius: 8px;
   background-color: var(--revieCream);
+}
+
+/* A session less than 48 hours away: the orange "!" box of the booking page's canvas. */
+.insideBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--revieOrange);
+  color: var(--revieMaroon);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.insideMark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--revieMaroon);
+  color: var(--revieOrange);
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 15px;
 }

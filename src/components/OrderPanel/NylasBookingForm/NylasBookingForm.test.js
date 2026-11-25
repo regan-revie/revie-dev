@@ -3,9 +3,12 @@ import '@testing-library/jest-dom';
 
 import { renderWithProviders as render, testingLibrary } from '../../../util/testHelpers';
 import * as api from '../../../util/api';
+import en from '../../../translations/en.json';
 import { BookingLayoutContext, LAYOUT_SHEET } from '../BookingPanelParts';
 import NylasBookingForm from './NylasBookingForm';
 import { dayKeyOf } from './nylasSlots';
+import fs from 'fs';
+import path from 'path';
 
 const { screen, waitFor, userEvent, within } = testingLibrary;
 
@@ -406,5 +409,54 @@ describe('messaging the coach', () => {
     expect(screen.queryByText('BookingPanel.askFirst')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'BookingPanel.message' })).toBeInTheDocument();
     expect(screen.getByText('BookingPanel.freeCancel')).toBeInTheDocument();
+  });
+});
+
+describe('NylasBookingForm: the line under the Book button', () => {
+  const HOUR = 3600000;
+  // A time on the hour, `hours` from now.
+  const slotIn = hours => {
+    const start = Math.ceil((Date.now() + hours * HOUR) / HOUR) * HOUR;
+    return { start, end: start + HOUR };
+  };
+  const pick = async hours => {
+    const s = slotIn(hours);
+    jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [s], connected: true });
+    render(<NylasBookingForm {...baseProps} />);
+    await waitFor(() => expect(screen.getByText(timeText(s.start))).toBeInTheDocument());
+    return s;
+  };
+
+  it('says "Free to cancel up to 48 hours before." until a time is picked', async () => {
+    await pick(72);
+    expect(screen.getByText('BookingPanel.freeCancel')).toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.insideFreeWindow')).not.toBeInTheDocument();
+  });
+
+  it('a time 72 hours out keeps the free-to-cancel line', async () => {
+    const s = await pick(72);
+    await userEvent.click(screen.getByText(timeText(s.start)));
+    expect(screen.getByText('BookingPanel.freeCancel')).toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.insideFreeWindow')).not.toBeInTheDocument();
+  });
+
+  it('a time 30 hours out says it is less than 48 hours away instead, and never the free line', async () => {
+    const s = await pick(30);
+    await userEvent.click(screen.getByText(timeText(s.start)));
+    expect(screen.getByText('BookingPanel.insideFreeWindow')).toBeInTheDocument();
+    expect(screen.queryByText('BookingPanel.freeCancel')).not.toBeInTheDocument();
+  });
+
+  it('says it in these words', () => {
+    expect(en['BookingPanel.insideFreeWindow']).toBe(
+      "Less than 48 hours away: can't be moved or cancelled for a refund."
+    );
+    expect(en['BookingPanel.freeCancel']).toBe('Free to cancel up to 48 hours before.');
+  });
+
+  it('keeps "Times in your timezone (…) · Change" on one line, so "Change" is never alone', () => {
+    const css = fs.readFileSync(path.join(__dirname, 'NylasBookingForm.module.css'), 'utf8');
+    const rule = css.match(/\.timeZoneLine\s*\{([^}]*)\}/)[1];
+    expect(rule).toMatch(/white-space:\s*nowrap/);
   });
 });

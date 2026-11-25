@@ -481,6 +481,7 @@ class StripePaymentForm extends Component {
       coachFirstName,
       coachWillWord,
       termsHref,
+      insideFreeWindow,
       showInitialMessageInput,
       intl,
       confirmCardPaymentError,
@@ -720,7 +721,13 @@ class StripePaymentForm extends Component {
           {!isDownload ? (
             <p className={css.terms}>
               <FormattedMessage
-                id={isBooking ? 'StripePaymentForm.termsBooking' : 'StripePaymentForm.terms'}
+                id={
+                  isBooking
+                    ? insideFreeWindow
+                      ? 'StripePaymentForm.termsBookingInside'
+                      : 'StripePaymentForm.termsBooking'
+                    : 'StripePaymentForm.terms'
+                }
                 values={{ terms: termsLink }}
               />
             </p>

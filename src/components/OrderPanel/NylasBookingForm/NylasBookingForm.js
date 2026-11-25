@@ -5,6 +5,7 @@ import classNames from 'classnames';
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { getDefaultTimeZoneOnBrowser, getTimeZoneNames } from '../../../util/dates';
 import { nylasAvailability } from '../../../util/api';
+import { isInsideFreeWindow } from '../../../util/freeCancellationWindow';
 
 import { Form } from '../../../components';
 
@@ -239,6 +240,19 @@ const NylasBookingForm = props => {
             )
           ) : null;
 
+        // "Free to cancel up to 48 hours before." is only true for a session more than 48 hours away.
+        // Once a time inside the 48 hours is picked the line says so instead, never offering a free
+        // window that has already passed. (Same rule as the server: util/freeCancellationWindow.js.)
+        const cancelNote = (
+          <FormattedMessage
+            id={
+              selectedSlot && isInsideFreeWindow(selectedSlot.start)
+                ? 'BookingPanel.insideFreeWindow'
+                : 'BookingPanel.freeCancel'
+            }
+          />
+        );
+
         return (
           <Form
             onSubmit={handleSubmit}
@@ -364,16 +378,12 @@ const NylasBookingForm = props => {
 
               {isSheet ? (
                 <div className={css.sheetLinks}>
-                  <span className={css.cancelText}>
-                    <FormattedMessage id="BookingPanel.freeCancel" />
-                  </span>
+                  <span className={css.cancelText}>{cancelNote}</span>
                   {messageMaybe}
                 </div>
               ) : (
                 <>
-                  <p className={css.cancelText}>
-                    <FormattedMessage id="BookingPanel.freeCancel" />
-                  </p>
+                  <p className={css.cancelText}>{cancelNote}</p>
                   {messageMaybe}
                 </>
               )}

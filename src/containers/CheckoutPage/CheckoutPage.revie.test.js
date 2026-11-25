@@ -135,7 +135,13 @@ const propsFor = ({ lineItems, total, orderData, ...extra } = {}) => ({
   ...extra,
 });
 
+// "Now" for these tests is the week before the sample session (3 December), so it is more than 48
+// hours away unless a test says otherwise.
+const nowAt = jest.spyOn(Date, 'now');
+const HOURS = 3600000;
+
 beforeEach(() => {
+  nowAt.mockReturnValue(START.getTime() - 5 * 24 * HOURS);
   window.matchMedia = jest.fn(() => ({
     matches: true,
     addEventListener: noop,
@@ -289,6 +295,40 @@ describe('the checkout page: the summary', () => {
   it('shows no order, request or listing wording', () => {
     render(<CheckoutPageWithPayment {...propsFor()} />, { messages });
     expect(document.body.textContent).not.toMatch(/\b(orders?|requests?|listings?)\b/i);
+  });
+});
+
+describe('a session less than 48 hours away', () => {
+  it('72 hours out shows the free-until time, as before', () => {
+    nowAt.mockReturnValue(START.getTime() - 72 * HOURS);
+    render(<CheckoutPageWithPayment {...propsFor()} />, { messages });
+    const summary = screen.getByTestId('checkout-summary');
+    expect(summary).toHaveTextContent('Free to cancel until');
+    expect(screen.queryByTestId('inside-48')).toBeNull();
+    expect(
+      screen.getByText(/You pay now; cancel up to 48 hours before for a full refund\./)
+    ).toBeInTheDocument();
+  });
+
+  it('30 hours out says so instead: it cannot be moved, cancelling is charged, the coach cancelling refunds', () => {
+    nowAt.mockReturnValue(START.getTime() - 30 * HOURS);
+    render(<CheckoutPageWithPayment {...propsFor()} />, { messages });
+    const box = screen.getByTestId('inside-48');
+    expect(box).toHaveTextContent(
+      "Less than 48 hours away. This session can't be moved, and cancelling is charged in full. If Maya cancels, you're refunded in full."
+    );
+    expect(within(box).getByText('Less than 48 hours away.').tagName).toBe('B');
+    // Never a "free to cancel until" time that has already passed.
+    expect(screen.getByTestId('checkout-summary')).not.toHaveTextContent('Free to cancel until');
+    // And the terms line no longer promises a refund for cancelling.
+    expect(screen.queryByText(/cancel up to 48 hours before for a full refund/)).toBeNull();
+    expect(screen.getByText(/By booking you agree to Revie's/)).toBeInTheDocument();
+  });
+
+  it('exactly 48 hours out is still free, as on the server', () => {
+    nowAt.mockReturnValue(START.getTime() - 48 * HOURS);
+    render(<CheckoutPageWithPayment {...propsFor()} />, { messages });
+    expect(screen.queryByTestId('inside-48')).toBeNull();
   });
 });
 

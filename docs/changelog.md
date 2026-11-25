@@ -19,6 +19,49 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-26 (review fixes for the session page and checkout, PRs #52 to #54)
+
+**Branch / PR:** `review-fixes`, one PR against `main`. The "Message {coach}" pop-up is not in it (waiting for a design). Rebased on `main` after the booking confirmation PR (#55) merged; the only conflicts were the two docs files, resolved by keeping both sides.
+
+**Before/after screenshots** (from the styleguide, sample data; reference only, not committed; sent with this report): account menu open over the panel (`/styleguide/c/SessionPage/AccountMenuOpen`), the panel scrolling (`/styleguide/c/RevieBookingPanel/BookingPanelAndPhoneBar/raw`, "More dates" open, short window), the checkout capsule with no photo (`/styleguide/c/CheckoutPage/CheckoutNoPhoto`), a session 30 hours out in checkout (`CheckoutInside48`) and in the panel (`BookingPanelTimesSoon/raw`, pick a time tomorrow). Headless Chrome hides scrollbars, so the panel shots show the corners and the inner scroll, not the bar itself.
+
+**What changed**
+1. **Account menu.** Minimum width 240px (the shared `Menu` sets an inline `min-width` of the button's own width, which beat the old class and squeezed the card until "Account and payments" wrapped; now `!important` with a comment), `white-space: nowrap` on every label, `contentPosition="left"` so the card opens leftwards with its right edge on the account button's right edge (avatar and chevron), and the topbar's root raised to `--zIndexPopup` so it is above the sticky booking panel. Before: three-line labels, panel drawn over the menu's corner. After: one line each, menu on top.
+2. **Booking panel scroll.** The card no longer scrolls: it is `overflow: hidden` with its rounded corners, and an inner wrapper (`.cardInner`) scrolls (`max-height` = window less 48px less the card's padding and border) with a thin scrollbar and a transparent track, only when the content is taller. No more grey bar on the right edge, white sliver or cut corners. The "setup" and "not taking bookings" cards keep their gap through `--cardGap`.
+3. **Timezone line.** "Times in your timezone ({zone}) · Change" is `white-space: nowrap`, so "Change" is never alone. **I could not reproduce the wrap at the panel's normal width with "Los Angeles"** (the styleguide fits on one line); the rule now guarantees it for any zone and the phone sheet. If it still wraps on your device, tell me the width.
+4. **Checkout capsule.** The summary already used the same `CoachPhoto` as the hero, and measured in the browser its geometry matched (pill, -3deg, chartreuse behind, initials 30% of the width and centred), but at 58px wide it read as a small blob with tiny initials. It is now 76px wide (the capsule's own proportions, as in the hero), initials 23px. If you meant something else by "lumpy" (a real photo, a particular device), send me a screenshot.
+5. **Sessions less than 48 hours away.** One helper per side (`src/util/freeCancellationWindow.js`, `isInsideFreeWindow` in `server/api/nylas/scheduler.js`), held to the same answers by `server/api/nylas/freeWindow.test.js` (boundary included). Checkout: the orange "!" box replaces the free-until box, and the terms line says only "You pay now." (**not in your list:** it said "cancel up to 48 hours before for a full refund", untrue here). Panel: the new line once a time inside 48 hours is picked ("Free to cancel up to 48 hours before." until then). Email: see below.
+
+**The email.** The booked email already left out "Free to cancel or move until" for a session inside 48 hours and showed "This session is less than 48 hours away, so it can't be moved. If you cancel now, you'll be charged in full." It now shows the checkout's sentence instead (plain text, no bold), with the coach's first name, in "You're booked" and in the reschedule confirmation. **The 60-hour reminder never sends for these:** it is not queued under 60 hours and the sender re-checks before sending; new test at 30 and 47 hours. The 24-hour reminder keeps its own wording (it always describes an inside-48 session).
+
+**Render Shell (two Postmark templates changed).** After the deploy, in Render Shell, check first:
+```
+node scripts/postmark-create-templates.js --dry-run --only booking-confirmed-client
+node scripts/postmark-create-templates.js --dry-run --only session-rescheduled-client
+```
+then, if both dry runs pass (a dry run only validates the template with Postmark and changes nothing):
+```
+node scripts/postmark-create-templates.js --overwrite --only booking-confirmed-client
+node scripts/postmark-create-templates.js --overwrite --only session-rescheduled-client
+```
+(`--overwrite` replaces what is in Postmark with the code's wording; if you have edited either in Postmark's editor those edits are replaced, so look first. Sending stays governed by `POSTMARK_SENDING_ENABLED`.) Until you run them, the old (also correct) inside-48 sentence keeps going out, and the new `freeWindowClosedText` value is simply unused.
+
+**Not verified:** a real session booked inside 48 hours on Dev, the Postmark rendering of the new sentence (the unit tests render the templates with Postmark's scoping rules), Safari's scrollbar styling.
+
+**Tests:** `yarn format-ci` clean; client and server suites pass. New: panel line at 30 vs 72 hours (and the timezone rule), checkout box at 30 vs 72 hours and exactly 48, the menu and card CSS rules, the helper and its server twin at every offset, the email at 30 vs 72 hours, the 60-hour reminder at 30 and 47 hours.
+
+**Console / Render steps:** only the two Postmark commands above. No environment variable, process or Console change.
+
+**Dev test steps**
+1. Signed in on a session page at desktop width, open the account menu: one line per item, the right edge under the avatar's button, drawn over the booking panel.
+2. Open "More dates" in the booking panel in a short window (or zoom the browser to 150%): the panel scrolls inside, with no bar on its edge and its corners intact; with the window tall enough nothing scrolls.
+3. Look at the line "Times in your timezone (…) · Change" at panel width and in the phone sheet: it stays on one line.
+4. Start a checkout for a coach with no photo and with one: the capsule matches the session page's.
+5. Book a session less than 48 hours away: pick a time tomorrow, the panel says "Less than 48 hours away: can't be moved or cancelled for a refund."; checkout shows the orange box and "You pay now."; the "You're booked" email carries the same sentence and no free-until time; no 60-hour reminder is ever sent for it.
+6. Book one 3 days away: the free line in the panel, the periwinkle box with the free-until time at checkout, the free-until sentence in the email.
+
+---
+
 ## HANDOFF — 2026-11-25 (booking confirmation: the client's booking page redesign, and the `prep_link` field)
 
 **Branch / PR:** `booking-confirmation`, one PR against `main`. Design: `docs/design/booking-confirmation/` (the canvas "Revie booking confirmation — desktop & phone", copied as given; the hero is its option B, the date between the two photos, which Main and Phone also use).

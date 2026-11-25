@@ -1,7 +1,8 @@
 /* The coach's setup checklist. Values are the approved design's (States.dc.html, right card). */
 
 .card {
-  gap: 20px;
+  /* BookingCard's inner wrapper holds the gap. */
+  --cardGap: 20px;
 }
 
 .head {

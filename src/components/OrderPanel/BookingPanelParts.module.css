@@ -17,9 +17,6 @@
 }
 
 .card {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
   box-sizing: border-box;
   padding: 28px;
   border: 1px solid rgba(49, 4, 22, 0.16);
@@ -30,13 +27,43 @@
   font-family: var(--fontFamily);
   font-size: 16px;
   line-height: 1.5;
+  /* The rounded corners are the card's; anything inside is clipped to them. */
+  overflow: hidden;
+}
 
-  /* On desktop the card is sticky. Taller than the window (the calendar opened by "More dates"),
-     it scrolls inside itself, so the Book button stays reachable. */
+/*
+ * What the card holds. On a desktop the card is sticky and, taller than the window (the calendar
+ * opened by "More dates"), this inner wrapper scrolls so the Book button stays reachable. It is the
+ * wrapper that scrolls, never the card: the card keeps its rounded corners, and nothing scrolls at
+ * all while the content fits. The scrollbar is a thin overlay in the card's own colours, with no
+ * track.
+ */
+.cardInner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cardGap, 24px);
+
   @media (--viewportLarge) {
-    max-height: calc(100vh - 48px);
+    /* the window, less the 24px above and below the sticky card, its 2 x 28px padding and 2 x 1px border */
+    max-height: calc(100vh - 48px - 58px);
     overflow-y: auto;
     overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(49, 4, 22, 0.3) transparent;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border-radius: 3px;
+      background: rgba(49, 4, 22, 0.3);
+    }
   }
 }
 

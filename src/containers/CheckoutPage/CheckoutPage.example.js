@@ -40,14 +40,19 @@ const author = {
   profileImage: withPhoto(),
 };
 
-const listing = createListing(
-  'example-session',
-  {
-    title: 'Get clear on your next career move, then make it.',
-    publicData: { transactionProcessAlias: 'default-booking/release-1', unitType: 'fixed' },
-  },
-  { author }
-);
+const authorNoPhoto = { ...author, profileImage: undefined };
+
+const listingFor = a =>
+  createListing(
+    'example-session',
+    {
+      title: 'Get clear on your next career move, then make it.',
+      publicData: { transactionProcessAlias: 'default-booking/release-1', unitType: 'fixed' },
+    },
+    { author: a }
+  );
+
+const listing = listingFor(author);
 
 const sessionLine = {
   code: 'line-item/fixed',
@@ -94,11 +99,17 @@ const useBareStyleguide = () =>
     }
   }, []);
 
-const Page = ({ promo, ...extra }) => {
+const Page = ({ promo, hours, noPhoto, ...extra }) => {
   useBareStyleguide();
   const intl = useIntl();
   const config = useConfiguration();
   const routeConfiguration = useRouteConfiguration();
+  const pageListing = noPhoto ? listingFor(authorNoPhoto) : listing;
+  // A session `hours` from now, on the hour; the default is the nine-days-out one above.
+  const start = hours
+    ? new Date(Math.ceil((Date.now() + hours * 3600000) / 3600000) * 3600000)
+    : START;
+  const end = hours ? new Date(start.getTime() + 3600000) : END;
   const lineItems = promo
     ? [sessionLine, promoLine, providerCommission]
     : [sessionLine, providerCommission];
@@ -125,14 +136,14 @@ const Page = ({ promo, ...extra }) => {
       routeConfiguration={routeConfiguration}
       pageData={{
         orderData: {
-          bookingDates: { bookingStart: START, bookingEnd: END },
+          bookingDates: { bookingStart: start, bookingEnd: end },
           priceVariantName: '60 minutes',
           ...(promo ? { promoCode: 'NEWYEAR15', promoPercent: 15 } : {}),
         },
-        listing,
+        listing: pageListing,
       }}
       processName="default-booking"
-      listingTitle={listing.attributes.title}
+      listingTitle={pageListing.attributes.title}
       title="Complete your booking"
       speculatedTransaction={createTransaction({ id: 'example-tx', lineItems, total })}
       {...extra}
@@ -141,6 +152,8 @@ const Page = ({ promo, ...extra }) => {
 };
 
 const Plain = () => <Page />;
+const NoPhoto = () => <Page noPhoto />;
+const Inside48 = () => <Page hours={30} />;
 const WithPromo = () => <Page promo />;
 const Declined = () => (
   <Page confirmCardPaymentError={{ type: 'card_error', code: 'card_declined' }} />
@@ -150,6 +163,10 @@ const NoConnection = () => (
 );
 
 export const Checkout = { component: Plain, props: {}, group: 'checkout' };
+// The coach has no photo: her initials in the lavender capsule.
+export const CheckoutNoPhoto = { component: NoPhoto, props: {}, group: 'checkout' };
+// The session is 30 hours away: the orange "less than 48 hours" box.
+export const CheckoutInside48 = { component: Inside48, props: {}, group: 'checkout' };
 export const CheckoutWithPromo = { component: WithPromo, props: {}, group: 'checkout' };
 export const CheckoutCardDeclined = { component: Declined, props: {}, group: 'checkout' };
 export const CheckoutNoConnection = { component: NoConnection, props: {}, group: 'checkout' };

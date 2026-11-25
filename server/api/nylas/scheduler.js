@@ -311,6 +311,26 @@ const isFreeCancellation = ({ bookingStart, cancelledAt }) => {
 };
 
 /**
+ * Is this session inside the 48 hours: less than 48 hours from `now`, so it cannot be moved and
+ * cancelling it is charged in full? The same rule as isFreeCancellation, asked the other way round
+ * and without throwing, for the emails and screens that only need to know which wording to use. The
+ * client's screens ask the same question of src/util/freeCancellationWindow.js; freeWindow.test.js
+ * keeps the two in step.
+ *
+ * @param {Date|string|number} bookingStart
+ * @param {Date|string|number} [now]
+ * @returns {boolean} false when the start cannot be read
+ */
+const isInsideFreeWindow = (bookingStart, now = new Date()) => {
+  if (bookingStart === null || bookingStart === undefined || bookingStart === '') return false;
+  try {
+    return !isFreeCancellation({ bookingStart, cancelledAt: now });
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
  * May a client move this session? Only while cancelling it would still be free: the same 48-hour
  * window, from the same rule, so the two can never disagree. Coaches are not limited (they move the
  * event in their own calendar, and nothing here is asked).
@@ -332,6 +352,7 @@ const canClientReschedule = ({ bookingStart, now = new Date() }) => {
 
 module.exports = {
   isFreeCancellation,
+  isInsideFreeWindow,
   canClientReschedule,
   TRANSACTION_FIELD,
   EVENT_TYPES,

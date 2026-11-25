@@ -6,6 +6,7 @@
  * Every time here is in the viewer's own timezone, the one the booking panel showed.
  */
 import { createSlug } from '../../../util/urlHelpers';
+import { FREE_CANCELLATION_HOURS } from '../../../util/freeCancellationWindow';
 import {
   dayKeyOf,
   formatSlotTime12,
@@ -13,8 +14,8 @@ import {
 } from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
 
 // A client cancelling inside this window is charged: the same 48 hours the server applies
-// (server/api/nylas/scheduler.js) and the "Your session" panel uses.
-export const FREE_CANCELLATION_HOURS = 48;
+// (server/api/nylas/scheduler.js), from the one shared definition.
+export { FREE_CANCELLATION_HOURS };
 
 const HOUR_MS = 60 * 60 * 1000;
 

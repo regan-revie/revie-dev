@@ -9,6 +9,8 @@ import {
   getHostedConfiguration,
 } from '../../../util/testHelpers';
 import enMessages from '../../../translations/en.json';
+import fs from 'fs';
+import path from 'path';
 
 import SessionTopbar, { accountMenuItems, MARKETING_LINKS } from './SessionTopbar';
 import SessionNoticeStrip from './SessionNoticeStrip';
@@ -235,5 +237,29 @@ describe('SessionNoticeStrip (the "This is your session." strip under the topbar
   it('shows nothing before the browser has taken over (server render)', () => {
     const { container } = renderStrip({ mounted: false });
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('the account menu card', () => {
+  const css = fs.readFileSync(path.join(__dirname, 'SessionTopbar.module.css'), 'utf8');
+  const rule = selector =>
+    css.match(new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`))[1];
+
+  it('is at least 240px wide, which beats the shared Menu\'s inline width (so "Account and payments" fits)', () => {
+    expect(rule('.menuCard')).toMatch(/min-width:\s*240px\s*!important/);
+  });
+
+  it('never wraps a label', () => {
+    expect(rule('.menuLink')).toMatch(/white-space:\s*nowrap/);
+  });
+
+  it('sits above the sticky booking panel', () => {
+    expect(rule('.root')).toMatch(/z-index:\s*var\(--zIndexPopup\)/);
+    expect(rule('.menuCard')).toMatch(/z-index:\s*var\(--zIndexPopup\)/);
+  });
+
+  it("opens leftwards, its right edge on the avatar button's", () => {
+    const js = fs.readFileSync(path.join(__dirname, 'SessionTopbar.js'), 'utf8');
+    expect(js).toMatch(/<Menu skipFocusOnNavigation=\{true\} contentPosition="left">/);
   });
 });
