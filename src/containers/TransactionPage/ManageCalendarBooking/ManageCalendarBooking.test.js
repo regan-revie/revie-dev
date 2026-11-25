@@ -6,9 +6,10 @@ import * as api from '../../../util/api';
 import en from '../../../translations/en.json';
 import { getDefaultTimeZoneOnBrowser } from '../../../util/dates';
 import { formatTimeZoneName } from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
+import { shortTimeZoneName } from '../BookingConfirmation/bookingFormat';
 import ManageCalendarBooking from './ManageCalendarBooking';
 
-// The real picker is a calendar plus a list of times; what matters here is what the card does once
+// The real picker is a strip of days plus a grid of times; what matters here is what the card does once
 // a slot is chosen, so it is replaced by one button that chooses one. Slots carry millisecond
 // timestamps, as the availability endpoint returns them, and are relative to now so that the 48-hour
 // line (which depends on how far away the new time is) means the same on any day the tests run.
@@ -18,7 +19,7 @@ const slotAt = hoursAway => {
   return { start, end: start + HOUR_MS };
 };
 const mockPick = { slot: null };
-jest.mock('../../../components/OrderPanel/NylasBookingForm/NylasSlotPicker', () => {
+jest.mock('../../../components/OrderPanel/NylasBookingForm/NylasSlotSteps', () => {
   const React = require('react');
   return ({ onSelectSlot }) =>
     React.createElement('button', { onClick: () => onSelectSlot(mockPick.slot) }, 'pick a slot');
@@ -39,11 +40,18 @@ const active = (hoursAway, overrides = {}) => ({
   ...overrides,
 });
 
-const renderPanel = () =>
-  render(<ManageCalendarBooking transactionId="tx-1" listingId="listing-1" />);
+const renderPanel = (props = {}) =>
+  render(
+    <ManageCalendarBooking
+      transactionId="tx-1"
+      listingId="listing-1"
+      refundText="$93.50"
+      {...props}
+    />
+  );
 
-// Clicking a time only opens the confirm dialog; this is the click that actually moves the session. The
-// dialog ignores clicks for its first half second (a double-click on a time), so the clock is moved on.
+// Clicking a time only opens the confirm panel; this is the click that actually moves the session. The
+// panel ignores clicks for its first half second (a double-click on a time), so the clock is moved on.
 const confirmMove = async () => {
   const button = await screen.findByText('ManageCalendarBooking.confirmMoveButton');
   const realNow = Date.now;
@@ -54,14 +62,6 @@ const confirmMove = async () => {
     spy.mockRestore();
   }
 };
-
-// The app's page has a #portal-root (public/index.html) that the Modal renders into.
-beforeEach(() => {
-  document.body.insertAdjacentHTML('beforeend', '<div id="portal-root"></div>');
-});
-afterEach(() => {
-  document.getElementById('portal-root')?.remove();
-});
 
 beforeEach(() => {
   mockPick.slot = slotAt(100);
@@ -87,6 +87,24 @@ describe('ManageCalendarBooking', () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 
+  it('says what the refund will be, in the real words, and without an amount when it has none', () => {
+    expect(en['ManageCalendarBooking.confirmCancelTextFree']).toBe(
+      "You'll get a full refund of {amount}."
+    );
+    expect(en['ManageCalendarBooking.confirmCancelTextFreeNoAmount']).toBe(
+      "You'll get a full refund."
+    );
+  });
+
+  it('without a refund amount to show, promises a refund without one', async () => {
+    jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+    renderPanel({ refundText: undefined });
+    await userEvent.click(await screen.findByText('ManageCalendarBooking.cancelButton'));
+    expect(
+      screen.getByText('ManageCalendarBooking.confirmCancelTextFreeNoAmount')
+    ).toBeInTheDocument();
+  });
+
   it('says the session is still charged when it is inside 48 hours', async () => {
     jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(12));
     renderPanel();
@@ -94,16 +112,21 @@ describe('ManageCalendarBooking', () => {
     expect(screen.getByText('ManageCalendarBooking.confirmCancelTextCharged')).toBeInTheDocument();
   });
 
-  it('settles on a clear cancelled state with the refund outcome, and no buttons', async () => {
+  it('settles on cancelled with the refund outcome: the card steps aside and tells the page', async () => {
     jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
     jest.spyOn(api, 'nylasCancelBooking').mockResolvedValue({ ok: true });
-    renderPanel();
+    const onViewChange = jest.fn();
+    const onCancelled = jest.fn();
+    const { container } = renderPanel({ onViewChange, onCancelled });
     await userEvent.click(await screen.findByText('ManageCalendarBooking.cancelButton'));
     await userEvent.click(screen.getByText('ManageCalendarBooking.confirmCancelButton'));
 
-    expect(await screen.findByText('ManageCalendarBooking.cancelledFree')).toBeInTheDocument();
-    expect(screen.queryByText('ManageCalendarBooking.rescheduleButton')).not.toBeInTheDocument();
-    expect(screen.queryByText('ManageCalendarBooking.cancelButton')).not.toBeInTheDocument();
+    // The page shows the refund section and the heading; the card shows no buttons.
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(onViewChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isCancelled: true, cancelFree: true })
+    );
+    expect(onCancelled).toHaveBeenCalled();
   });
 
   it('inside 48 hours the confirmation says they are charged in full, and the button says so too', async () => {
@@ -134,22 +157,31 @@ describe('ManageCalendarBooking', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('says it was charged when cancelled inside 48 hours', async () => {
+  it('reports that it was charged when cancelled inside 48 hours', async () => {
     jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(12));
     jest.spyOn(api, 'nylasCancelBooking').mockResolvedValue({ ok: true });
-    renderPanel();
+    const onViewChange = jest.fn();
+    renderPanel({ onViewChange });
     await userEvent.click(await screen.findByText('ManageCalendarBooking.cancelButton'));
     await userEvent.click(screen.getByText('ManageCalendarBooking.confirmCancelButtonCharged'));
-    expect(await screen.findByText('ManageCalendarBooking.cancelledCharged')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(onViewChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ isCancelled: true, cancelFree: false })
+      )
+    );
   });
 
-  it('shows the cancelled state, not the buttons, when the page is opened after cancelling', async () => {
+  it('shows no buttons, and reports the cancellation, when the page is opened after cancelling', async () => {
     jest
       .spyOn(api, 'nylasBookingStatus')
       .mockResolvedValue(active(72, { status: 'cancelled', freeCancellation: true }));
-    renderPanel();
-    expect(await screen.findByText('ManageCalendarBooking.cancelledFree')).toBeInTheDocument();
-    expect(screen.queryByText('ManageCalendarBooking.cancelButton')).not.toBeInTheDocument();
+    const onViewChange = jest.fn();
+    const { container } = renderPanel({ onViewChange });
+    await waitFor(() => expect(onViewChange).toHaveBeenCalled());
+    expect(onViewChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isCancelled: true, cancelFree: true })
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('shows nothing for a session that has already happened', async () => {
@@ -166,7 +198,8 @@ describe('ManageCalendarBooking', () => {
     await userEvent.click(await screen.findByText('ManageCalendarBooking.cancelButton'));
     await userEvent.click(screen.getByText('ManageCalendarBooking.confirmCancelButton'));
     expect(await screen.findByText('ManageCalendarBooking.genericError')).toBeInTheDocument();
-    expect(screen.queryByText('ManageCalendarBooking.cancelledFree')).not.toBeInTheDocument();
+    // Still on the confirm panel, nothing cancelled.
+    expect(screen.getByText('ManageCalendarBooking.confirmCancelButton')).toBeInTheDocument();
   });
 
   describe('rescheduling', () => {
@@ -178,20 +211,18 @@ describe('ManageCalendarBooking', () => {
       );
       expect(button).toBeEnabled();
       expect(screen.queryByText('ManageCalendarBooking.rescheduleLocked')).not.toBeInTheDocument();
+      expect(screen.getByText('ManageCalendarBooking.freeUntil')).toBeInTheDocument();
     });
 
-    it('is disabled 47 hours out, with the reason and the way out, and cancelling is still offered', async () => {
+    it('is not offered 47 hours out: the orange box says why, and cancelling is still offered', async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(47));
       const availability = jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [] });
       renderPanel();
-      const button = (await screen.findByText('ManageCalendarBooking.rescheduleButton')).closest(
-        'button'
-      );
-      expect(button).toBeDisabled();
-      expect(screen.getByText('ManageCalendarBooking.rescheduleLocked')).toBeInTheDocument();
+      expect(await screen.findByText('ManageCalendarBooking.rescheduleLocked')).toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.rescheduleButton')).not.toBeInTheDocument();
+      // The "free until" line goes too: it is no longer free.
+      expect(screen.queryByText('ManageCalendarBooking.freeUntil')).not.toBeInTheDocument();
       expect(screen.getByText('ManageCalendarBooking.cancelButton')).toBeInTheDocument();
-
-      await userEvent.click(button);
       expect(availability).not.toHaveBeenCalled();
     });
 
@@ -220,8 +251,8 @@ describe('ManageCalendarBooking', () => {
         start: new Date(mockPick.slot.start).toISOString(),
         end: new Date(mockPick.slot.end).toISOString(),
       });
-      const banner = await screen.findByRole('status');
-      expect(banner).toHaveTextContent('ManageCalendarBooking.rescheduledNote');
+      const banner = await screen.findByText('ManageCalendarBooking.rescheduledNote');
+      expect(banner.closest('[role="status"]')).not.toBeNull();
       // The status endpoint still says the old time; the panel does not go back to it.
       expect(status).toHaveBeenCalledTimes(1);
       expect(screen.getByText('ManageCalendarBooking.rescheduleButton')).toBeInTheDocument();
@@ -254,7 +285,7 @@ describe('ManageCalendarBooking', () => {
       await userEvent.click(await screen.findByText('pick a slot'));
       await confirmMove();
 
-      // In the dialog, which still offers the confirm button and Cancel.
+      // In the panel, which still offers the confirm button and "Pick a different time".
       expect(
         await screen.findByText('ManageCalendarBooking.rescheduleTooSoon')
       ).toBeInTheDocument();
@@ -263,7 +294,7 @@ describe('ManageCalendarBooking', () => {
     });
   });
 
-  describe('the confirm dialog', () => {
+  describe('the confirm panel', () => {
     const openPicker = async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
       jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockPick.slot] });
@@ -273,7 +304,7 @@ describe('ManageCalendarBooking', () => {
       return reschedule;
     };
 
-    it('opens over the picker when a time is clicked, with where from and to, and sends nothing', async () => {
+    it('opens when a time is clicked, with the old time struck through and the new one, and sends nothing', async () => {
       const reschedule = await openPicker();
       expect(
         screen.queryByText('ManageCalendarBooking.confirmMoveHeading')
@@ -283,12 +314,14 @@ describe('ManageCalendarBooking', () => {
       expect(
         await screen.findByText('ManageCalendarBooking.confirmMoveHeading')
       ).toBeInTheDocument();
-      expect(screen.getByText('ManageCalendarBooking.confirmMoveFrom')).toBeInTheDocument();
-      expect(screen.getByText('ManageCalendarBooking.confirmMoveTo')).toBeInTheDocument();
+      const panel = screen.getByTestId('confirm-move');
+      // The current time struck through, the new one beside an arrow.
+      expect(panel.querySelector('s')).not.toBeNull();
+      expect(panel).toHaveTextContent(/\d{1,2}:\d{2}.*PT|GMT|BST|ET|CET|UTC|GMT[+-]/);
       expect(screen.getByText('ManageCalendarBooking.confirmMoveButton')).toBeInTheDocument();
       expect(screen.getByText('ManageCalendarBooking.confirmMoveCancel')).toBeInTheDocument();
-      // A dialog over the picker, not a panel in its place: the picker is still there.
-      expect(screen.getByText('pick a slot')).toBeInTheDocument();
+      // The panel takes the picker's place, but the picker is kept (hidden), so it comes back as it was.
+      expect(screen.getByText('pick a slot', { hidden: true })).not.toBeVisible();
       expect(reschedule).not.toHaveBeenCalled();
     });
 
@@ -305,13 +338,13 @@ describe('ManageCalendarBooking', () => {
         end: new Date(mockPick.slot.end).toISOString(),
       });
       expect(await screen.findByText('ManageCalendarBooking.rescheduledNote')).toBeInTheDocument();
-      // The dialog has closed.
+      // The panel has closed.
       expect(
         screen.queryByText('ManageCalendarBooking.confirmMoveHeading')
       ).not.toBeInTheDocument();
     });
 
-    it('shows "Moving your session…" inside the dialog while the request is out', async () => {
+    it('shows "Moving your session…" in the panel while the request is out', async () => {
       const reschedule = await openPicker();
       let finish;
       reschedule.mockImplementation(
@@ -329,7 +362,7 @@ describe('ManageCalendarBooking', () => {
       expect(await screen.findByText('ManageCalendarBooking.rescheduledNote')).toBeInTheDocument();
     });
 
-    it('Cancel closes it and leaves the picker as it was, sending nothing', async () => {
+    it('"Pick a different time" closes it and brings the picker back as it was, sending nothing', async () => {
       const reschedule = await openPicker();
       await userEvent.click(await screen.findByText('pick a slot'));
       await userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveCancel'));
@@ -337,7 +370,7 @@ describe('ManageCalendarBooking', () => {
       expect(
         screen.queryByText('ManageCalendarBooking.confirmMoveHeading')
       ).not.toBeInTheDocument();
-      expect(screen.getByText('pick a slot')).toBeInTheDocument();
+      expect(screen.getByText('pick a slot')).toBeVisible();
       expect(reschedule).not.toHaveBeenCalled();
       // And a time can be clicked again.
       await userEvent.click(screen.getByText('pick a slot'));
@@ -391,7 +424,7 @@ describe('ManageCalendarBooking', () => {
         expect(reschedule).toHaveBeenCalledTimes(1);
       });
 
-      it('starts again from the moment the dialog is opened again', async () => {
+      it('starts again from the moment the panel is opened again', async () => {
         const reschedule = await openPicker();
         await userEvent.click(await screen.findByText('pick a slot'));
         await userEvent.click(await screen.findByText('ManageCalendarBooking.confirmMoveCancel'));
@@ -429,7 +462,7 @@ describe('ManageCalendarBooking', () => {
       jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [mockPick.slot] });
     });
 
-    it("says the time isn't available any more in the dialog, and Cancel returns to freshly loaded times", async () => {
+    it('says the time isn\'t available any more in the panel, and "Pick a different time" returns to freshly loaded times', async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
       failWith('reschedule-slot-unavailable');
       renderPanel();
@@ -438,7 +471,7 @@ describe('ManageCalendarBooking', () => {
       expect(
         await screen.findByText('ManageCalendarBooking.rescheduleSlotUnavailable')
       ).toBeInTheDocument();
-      // Still in the dialog, which offers no way to repeat the refused time.
+      // Still in the panel, which offers no way to repeat the refused time.
       expect(screen.getByText('ManageCalendarBooking.confirmMoveHeading')).toBeInTheDocument();
       expect(screen.queryByText('ManageCalendarBooking.confirmMoveButton')).not.toBeInTheDocument();
       expect(screen.queryByText('ManageCalendarBooking.genericError')).not.toBeInTheDocument();
@@ -452,7 +485,7 @@ describe('ManageCalendarBooking', () => {
       expect(api.nylasAvailability).toHaveBeenCalledTimes(2);
     });
 
-    it('says the 48-hour rule in the dialog when the session has just moved inside it', async () => {
+    it('says the 48-hour rule in the panel when the session has just moved inside it', async () => {
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
       failWith('reschedule-too-late');
       renderPanel();
@@ -461,11 +494,10 @@ describe('ManageCalendarBooking', () => {
       expect(await screen.findByText('ManageCalendarBooking.rescheduleLocked')).toBeInTheDocument();
       expect(screen.getByText('ManageCalendarBooking.confirmMoveHeading')).toBeInTheDocument();
       expect(screen.queryByText('ManageCalendarBooking.confirmMoveButton')).not.toBeInTheDocument();
-      // The way out is Cancel, back to the card, where Reschedule is now disabled.
+      // The way out is "Pick a different time", back to the card, where Reschedule is now gone.
       await userEvent.click(screen.getByText('ManageCalendarBooking.confirmMoveCancel'));
-      expect(
-        (await screen.findByText('ManageCalendarBooking.rescheduleButton')).closest('button')
-      ).toBeDisabled();
+      expect(await screen.findByText('ManageCalendarBooking.rescheduleLocked')).toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.rescheduleButton')).not.toBeInTheDocument();
     });
 
     it('says the session has been cancelled when the server says so', async () => {
@@ -575,15 +607,20 @@ describe('ManageCalendarBooking', () => {
   });
 
   describe('the copy on the card', () => {
-    it('names the timezone after the session time, the way the confirm dialog does', async () => {
+    it('names the timezone after the session time, in the short form: "10:00–11:00 AM PT"', async () => {
       const start = hoursFromNow(72);
       jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72, { bookingStart: start }));
       renderPanel();
-      const zone = formatTimeZoneName(getDefaultTimeZoneOnBrowser(), start, 'en');
-      const time = await screen.findByText(
-        (content, node) => node?.tagName === 'P' && content.endsWith(`(${zone})`)
-      );
-      expect(time).toBeInTheDocument();
+      const zone = shortTimeZoneName(getDefaultTimeZoneOnBrowser(), new Date(start).getTime());
+      const when = await screen.findByTestId('session-when');
+      expect(when).toHaveTextContent(new RegExp(`\\d{1,2}:\\d{2}.*–.*${zone}`));
+      expect(when).toHaveTextContent(/[AP]M/);
+    });
+
+    it('says how long the video call is', async () => {
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+      renderPanel();
+      expect(await screen.findByText('ManageCalendarBooking.videoCall')).toBeInTheDocument();
     });
 
     it('shows no "moved" note on a fresh visit (the Activity list keeps the record)', async () => {
@@ -603,16 +640,11 @@ describe('ManageCalendarBooking', () => {
       await confirmMove();
 
       const note = await screen.findByText('ManageCalendarBooking.rescheduledNote');
-      expect(note.closest('p')).toHaveAttribute(
-        'class',
-        expect.stringContaining('rescheduledNote')
-      );
+      expect(note.closest('[role="status"]')).not.toBeNull();
       expect(screen.queryByText('ManageCalendarBooking.rescheduled')).not.toBeInTheDocument();
-      // Under the session time, which is shown once.
-      const time = screen.getByText(/\(.+\)$/, { selector: 'p' });
-      expect(
-        time.compareDocumentPosition(note.closest('p')) & Node.DOCUMENT_POSITION_FOLLOWING
-      ).toBeTruthy();
+      // Under the session time, which is shown once, and it is the new time.
+      const time = screen.getByTestId('session-when');
+      expect(time.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("the locked message says it can't be moved and cancelling is charged in full, and does not send the client to the coach", () => {
@@ -623,11 +655,84 @@ describe('ManageCalendarBooking', () => {
       expect(text).not.toMatch(/message|coach|\{/i);
     });
 
-    it('the success note says what happened, once, with a tick', () => {
+    it('the success note says what happened, once (the tick is an icon)', () => {
       expect(en['ManageCalendarBooking.rescheduledNote']).toBe(
-        "✓ Moved. We've emailed you both and updated your calendars."
+        "Moved. We've emailed you both and updated your calendars."
       );
       expect(en['ManageCalendarBooking.rescheduled']).toBeUndefined();
+    });
+  });
+
+  describe('free to cancel or move until', () => {
+    it('says until when (48 hours before the start), with Reschedule and Cancel beside it', async () => {
+      jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72));
+      renderPanel();
+      expect(await screen.findByText('ManageCalendarBooking.freeUntil')).toBeInTheDocument();
+      expect(en['ManageCalendarBooking.freeUntil']).toBe(
+        'Free to cancel or move until <b>{date}</b>.'
+      );
+    });
+  });
+
+  describe('join and add to calendar', () => {
+    const links = {
+      meetLink: 'https://meet.google.com/abc-defg',
+      calendarUrl: 'https://example.com/api/nylas/calendar/tok/revie-session.ics',
+    };
+
+    it('asks for the links on its first load, and shows Join on Google Meet and Add to calendar', async () => {
+      const status = jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue(active(72, links));
+      renderPanel();
+      const join = await screen.findByText('ManageCalendarBooking.join');
+      expect(status).toHaveBeenCalledWith({ transactionId: 'tx-1', links: true });
+      const joinLink = join.closest('a');
+      expect(joinLink).toHaveAttribute('href', links.meetLink);
+      expect(joinLink).toHaveAttribute('target', '_blank');
+      expect(screen.getByText('ManageCalendarBooking.addToCalendar').closest('a')).toHaveAttribute(
+        'href',
+        links.calendarUrl
+      );
+      expect(screen.getByText('ManageCalendarBooking.calendarHelp')).toBeInTheDocument();
+    });
+
+    it('shows no button for a link it does not have yet (the invite carries it)', async () => {
+      jest
+        .spyOn(api, 'nylasBookingStatus')
+        .mockResolvedValue(active(72, { meetLink: '', calendarUrl: '' }));
+      renderPanel();
+      await screen.findByText('ManageCalendarBooking.rescheduleButton');
+      expect(screen.queryByText('ManageCalendarBooking.join')).not.toBeInTheDocument();
+      expect(screen.queryByText('ManageCalendarBooking.addToCalendar')).not.toBeInTheDocument();
+    });
+
+    it('keeps the links after a reschedule, when the polling status leaves them out', async () => {
+      jest.useFakeTimers({ advanceTimers: true });
+      try {
+        const status = jest.spyOn(api, 'nylasBookingStatus');
+        status.mockResolvedValueOnce(active(72, links));
+        const moved = mockPick.slot;
+        status.mockResolvedValue(
+          active(72, {
+            bookingStart: new Date(moved.start).toISOString(),
+            bookingEnd: new Date(moved.end).toISOString(),
+          })
+        );
+        jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: [moved] });
+        jest.spyOn(api, 'nylasRescheduleBooking').mockResolvedValue({ ok: true });
+        renderPanel();
+        await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
+        await userEvent.click(await screen.findByText('pick a slot'));
+        await confirmMove();
+        await screen.findByText('ManageCalendarBooking.rescheduledNote');
+        jest.advanceTimersByTime(3000);
+        await waitFor(() => expect(status).toHaveBeenCalledTimes(2));
+        expect(screen.getByText('ManageCalendarBooking.join').closest('a')).toHaveAttribute(
+          'href',
+          links.meetLink
+        );
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });

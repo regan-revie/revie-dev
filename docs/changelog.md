@@ -19,6 +19,48 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-25 (booking confirmation: the client's booking page redesign, and the `prep_link` field)
+
+**Branch / PR:** `booking-confirmation`, one PR against `main`. Design: `docs/design/booking-confirmation/` (the canvas "Revie booking confirmation — desktop & phone", copied as given; the hero is its option B, the date between the two photos, which Main and Phone also use).
+
+**Finding to know first: "Join on Google Meet" and "Add to calendar" were not on the page.** They existed only in the "You're booked" email (`meetLinkFor`, `calendarUrlFor` in `server/api/nylas/sessionEmails.js`). To put them on the page, `GET /api/nylas/booking-status` now also returns `meetLink` and `calendarUrl` when asked (`?links=1`, the card's first load only, so the reschedule polling does not ask Nylas every few seconds). Found the same way as for the email, caller already proven to be a party to the transaction, either can be empty (then no button), neither can fail the response. Tested.
+
+**What was built** (a client's page for a calendar-booked session; a coach's page, inquiries and other processes keep the template's page)
+1. **Hero:** maroon, the coach's sticker photo (chartreuse capsule) and the client's own capsule (her photo, or initials on lavender; periwinkle behind), name pills ("Maya", "You"), dashed lines to the chartreuse date card ("Thu · Dec", "3", "10:00 AM PT"), "You're **booked.**" or "Session **cancelled.**", and the session title with "with MAYA R." in capitals. `CoachPhoto` gained `tone="periwinkle"` and takes its tilt from CSS variables.
+2. **"Your session" card** (periwinkle, forest text; `ManageCalendarBooking`): "Thu, Dec 3 · 10:00–11:00 AM PT" (two lines on a phone), "60-minute video call", "Join on Google Meet", "Add to calendar" and its help line, "Free to cancel or move until {date}" with Reschedule and Cancel. Reschedule: day strip and time buttons in a cream panel, then the forest "Move your **session?**" panel (old time struck through, new in chartreuse, "Confirm new time", "Pick a different time"), then "Moved. We've emailed you both and updated your calendars." Cancel: maroon "Cancel this **session?**" panel ("You'll get a full refund of $X", "Yes, cancel it", "Keep my session"). Inside 48 hours: the orange "!" box, no Reschedule, cancelling charged in full as before. **All the logic is the existing logic** (48-hour rule, 24-hour notice, confirm step and its click guard, one request at a time, polling for the new time, the coach-is-cancelling states, refund rules); the tests were rewritten for the new structure and still cover it.
+3. **"What happens next."** three numbered steps; step 2 shows `pre_work` as plain text plus, with a prep link, the outlined "Open your prep questionnaire" button; with neither it is left out and the numbers close up.
+4. **Right column:** the maroon "Message Maya" card (latest two messages, three lines each, "See the whole conversation in your inbox", a send box that uses the page's own sender) and the payment box (session price, "Promo discount (CODE)", total paid). No receipt link.
+5. **Other states:** "Confirming your **session…**" (right after paying), "Uh-oh! That one **didn't go through.**" (not charged, "Pick another time"; also payment expired), cancelled by the client with a refund, cancelled by the client late (charged, "We've let Maya know."), cancelled by the coach (full refund, "Book another time"). Who cancelled comes from `metadata.cancelledBy`, which the server already writes. The tab reads "Your booking with Maya | Revie", and the topbar is the session page's.
+6. **`prep_link`:** a new optional listing field in the session editor's Details tab: label "Prep link (optional)", help "A link to your own prep questionnaire, e.g. Typeform or Google Form.", checked as a web link (`javascript:` and the like are refused, `forms.gle/x` gets https:// added when shown). Nothing shows in the editor until the field exists in Console.
+
+**The Console step for Dev (`prep_link`)** — Console, Dev environment, the Listings section's listing fields (the same place `pre_work` and `outcome_1` live): add a field with key **`prep_link`** (exactly), type **short text**, label **"Prep link (optional)"**, public data, **not required**, listing type Signature Session, **not a search filter, not shown as a detail on the listing page**. Nothing else: the help line and the link check are in code. (Console's exact menu names were not checked from here; there is no URL field type, which is why it is short text.) Test and Live at cutover: logged in `docs/go-live-plan.md`.
+
+**Anything I couldn't match**
+- **"Visa ending 4242" is not built.** The transaction carries no card details (no brand, no last four), so the payment box has no card line. The canvas's own note also says to cut "Usually replies within a day" if it cannot be measured; nothing measures it, so it is not there.
+- **The conversation:** the design replaces the thread with the latest two messages and "See the whole conversation in your inbox", but the inbox list shows no messages. So the full conversation and the activity list (moves, late cancellations, review prompts) are kept at the bottom of the page under "Conversation and activity". Say if you would rather lose them.
+- **A finished session** has no design in the canvas. It gets the same hero with the existing wording "Your booking was completed.", no card, no next steps, and the review button where it was.
+- **The picker** is the booking panel's day strip and time buttons (with "More dates"), not the five fixed days of the canvas: a coach has weeks of availability. `NylasSlotPicker` is no longer used by this page.
+- **Subtitle:** the canvas shows a short sample title; the real title is shown in full, with a trailing full stop dropped.
+- **Cancelled states:** the canvas shows them twice (the Main board's bordered section with "Book Maya again" and "Find a coach", and the States board's maroon cards). The build follows Main's layout with the States board's wording.
+- **A coach cancelling inside 48 hours** used to be able to read "charged" on the card (it judged by when the cancellation happened); the page now judges by who cancelled, so it says refunded in full.
+- **Not verified:** a real booking on Dev (a signed-in client, a real calendar), the real Meet link arriving from Nylas, the styleguide examples only show sample data, Safari.
+
+**Tests:** `yarn format-ci` clean; 1614 client tests and 1131 server tests pass. New: `BookingConfirmation.test.js` (every state, the prep step hidden with neither field, messages, payment, wording), `bookingState.test.js`, `bookingFormat.test.js`, `prepLink.test.js`, `PrepLinkField.test.js`, links in `bookingStatusEndpoint.test.js`, the day-strip and join/calendar cases in `ManageCalendarBooking.test.js`, and the page-level cases in `TransactionPage.reschedule.test.js`.
+
+**Console / Render steps:** only the `prep_link` field above (Dev). No process, environment variable or deploy step; the server change is backward-compatible (`links` is opt-in).
+
+**Dev test steps** (a client with a calendar-booked session, a coach with the calendar connected)
+1. **Book:** book and pay as a client. You land on "Confirming your session…", then within seconds "You're booked." with your photo or initials beside the coach's, the date card, the session card with Join on Google Meet (opens the Meet) and Add to calendar (downloads a calendar file), and "What happens next.". The tab reads "Your booking with {Coach} | Revie". Times are in your own timezone, written like "10:00–11:00 AM PT".
+2. **Prep:** with `pre_work` and a `prep_link` on the session (after the Console step), step 2 shows the text and the button; remove both and the step disappears and the others renumber.
+3. **Reschedule:** Reschedule, pick a day and time, "Move your session?" shows the old time struck through and the new one; "Pick a different time" returns to the picker on the same day; "Confirm new time" shows "Moved. ..." and the new time in the hero and the card. Check the coach's calendar and the emails.
+4. **Cancel (early):** Cancel, "You'll get a full refund of $X", "Yes, cancel it": the heading becomes "Session cancelled.", the refund section appears, the event leaves the coach's calendar, the refund shows in Stripe.
+5. **Late cancel view:** on a session less than 48 hours away: the orange box says it cannot be moved, only Cancel is offered ("Cancel and pay in full"); after cancelling the page says you were charged and "We've let {Coach} know."
+6. **Coach cancels:** cancel as the coach (or delete the event): the client's page says the coach cancelled and the refund is in full.
+7. **Messages:** the card shows the latest two messages and your checkout note first; send one from the box and see it in the coach's inbox; "Conversation and activity" at the bottom still lists everything.
+8. **Phone width:** the hero shrinks, the time is on two lines, and everything stacks in the canvas's order.
+
+---
+
 ## HANDOFF — 2026-11-25 (checkout redesign, and `clients_love` required for coaches)
 
 **Branch / PR:** `checkout-redesign`, one PR against `main`. Design: `docs/design/checkout/` (the canvas "Revie checkout — desktop & phone", copied as given; the sign-up, log-in and banner boards on the same canvas are a separate proposal and were **not built**).

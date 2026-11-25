@@ -1,0 +1,77 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-11-24T22:05:00Z"
+ },
+ "title": "Revie booking confirmation — desktop & phone",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 2000,
+   "title": "Desktop — you're booked (client's booking page)",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "Phone.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Phone — you're booked (scroll inside)",
+   "is_interactive": true,
+   "radius": 28
+  },
+  "States.dc.html": {
+   "x": 1520,
+   "y": 964,
+   "w": 1200,
+   "h": 1000,
+   "title": "Booking page — other states"
+  },
+  "HeroB.dc.html": {
+   "x": 0,
+   "y": 2120,
+   "w": 1440,
+   "h": 520,
+   "title": "Hero — option B (date between you)"
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Phone.dc.html",
+  "States.dc.html",
+  "HeroB.dc.html"
+ ],
+ "notes": {
+  "n1": {
+   "x": 1990,
+   "y": 0,
+   "w": 360,
+   "fill": "orange",
+   "text": "Try it in Play: Reschedule → pick a time → \"Move your session?\" → Confirm shows the \"Moved\" line. Cancel → \"Yes, cancel it\" shows the refunded state. Copy matches what's built (Nov 17 session-card wording, release-4 cancellation)."
+  },
+  "n2": {
+   "x": 1990,
+   "y": 340,
+   "w": 360,
+   "fill": "blue",
+   "text": "This is the order page after checkout: the same page is the confirmation and where she comes back to join, move or cancel. 'Before your session' shows the coach's pre_work text. 'Usually replies within a day' needs real data: cut it if we can't measure it."
+  }
+ },
+ "designSystems": [
+  {
+   "title": "Revie",
+   "namespace": "revie",
+   "artifact": "https://claude.ai/artifact/6fdEvFtcDe6SSj1sPsbnZD",
+   "version": null,
+   "copiedAt": "2026-11-24T22:05:00Z"
+  }
+ ]
+}

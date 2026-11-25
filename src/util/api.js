@@ -176,8 +176,10 @@ export const coachTraitsSyncMe = () => {
 
 // The session time to actually display: our own database once a reschedule has moved it,
 // Sharetribe's original booking record otherwise. See bookingStatusEndpoint.js.
-export const nylasBookingStatus = ({ transactionId }) => {
-  const params = new URLSearchParams({ transactionId });
+// With `links`, an active session also comes back with `meetLink` and `calendarUrl` (the booking
+// page's first load; its polling after a reschedule leaves them out).
+export const nylasBookingStatus = ({ transactionId, links = false }) => {
+  const params = new URLSearchParams({ transactionId, ...(links ? { links: '1' } : {}) });
   return request(`/api/nylas/booking-status?${params.toString()}`, {
     method: methods.GET,
     headers: { 'Content-Type': 'application/json' },

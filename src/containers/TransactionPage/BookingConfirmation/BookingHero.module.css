@@ -1,0 +1,175 @@
+@import '../../../styles/customMediaQueries.css';
+
+/* Values: docs/design/booking-confirmation/ Main (desktop) and Phone. */
+
+.root {
+  background-color: var(--revieMaroon);
+  color: var(--revieCream);
+  padding: 40px 0 44px;
+
+  @media (min-width: 901px) {
+    padding: 56px 0 64px;
+  }
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+  text-align: center;
+
+  @media (min-width: 901px) {
+    gap: 36px;
+    padding: 0 48px;
+  }
+}
+
+.trio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  @media (min-width: 901px) {
+    gap: 18px;
+  }
+}
+
+.person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 84 x 112 on a phone, 120 x 160 on a desktop; both capsules tilt a little more than elsewhere. */
+.coachPhoto,
+.clientPhoto {
+  width: 84px;
+
+  @media (min-width: 901px) {
+    width: 120px;
+  }
+}
+
+.coachPhoto {
+  --photoBackX: 7.5%;
+  --photoBackY: 5%;
+  --photoBackTilt: 5deg;
+  --photoTilt: -4deg;
+}
+
+.clientPhoto {
+  --photoBackX: -7.5%;
+  --photoBackY: 5%;
+  --photoBackTilt: -5deg;
+  --photoTilt: 4deg;
+}
+
+.pill {
+  padding: 4px 14px;
+  border-radius: var(--borderRadiusPill);
+  background-color: rgba(239, 238, 237, 0.16);
+  color: var(--revieCream);
+  font-size: 14px;
+}
+
+.dash {
+  flex: 1 1 40px;
+  min-width: 10px;
+  max-width: 24px;
+  height: 0;
+  border-top: 2px dashed rgba(239, 238, 237, 0.5);
+
+  @media (min-width: 901px) {
+    min-width: 24px;
+    max-width: 80px;
+  }
+}
+
+.dateCard {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: var(--borderRadiusLarge);
+  background-color: var(--revieChartreuse);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+  color: var(--revieMaroon);
+  transform: rotate(-2deg);
+
+  @media (min-width: 901px) {
+    padding: 16px 22px;
+  }
+}
+
+.dateTop {
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.dateDay {
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 38px;
+  line-height: 1;
+
+  @media (min-width: 901px) {
+    font-size: 56px;
+  }
+}
+
+.dateTime {
+  font-size: 12px;
+  font-weight: var(--fontWeightBold);
+
+  @media (min-width: 901px) {
+    font-size: 14px;
+  }
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 400;
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: normal;
+  color: var(--revieCream);
+
+  @media (min-width: 901px) {
+    font-size: 64px;
+  }
+
+  & b {
+    font-weight: 700;
+  }
+}
+
+.subtitle {
+  font-family: var(--fontFamilySecondary);
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+
+  @media (min-width: 901px) {
+    font-size: 16px;
+  }
+}

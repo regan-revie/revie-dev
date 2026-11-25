@@ -20,7 +20,7 @@ import { TX_TRANSITION_ACTOR_CUSTOMER, getProcess } from '../../transactions/tra
 
 import { TransactionPageComponent } from './TransactionPage';
 
-const { screen, userEvent } = testingLibrary;
+const { screen, userEvent, waitFor } = testingLibrary;
 const noop = () => null;
 const HOUR = 3600000;
 
@@ -108,14 +108,6 @@ const slots = [
   { start: slotStart + 2 * HOUR, end: slotStart + 3 * HOUR },
 ];
 
-// The app's page has a #portal-root (public/index.html) that the Modal renders into.
-beforeEach(() => {
-  document.body.insertAdjacentHTML('beforeend', '<div id="portal-root"></div>');
-});
-afterEach(() => {
-  document.getElementById('portal-root')?.remove();
-});
-
 afterEach(() => jest.restoreAllMocks());
 
 describe('the reschedule flow on the real order page', () => {
@@ -137,11 +129,13 @@ describe('the reschedule flow on the real order page', () => {
     return reschedule;
   };
 
-  // The time buttons read "HH:MM" and nothing else on the page does.
+  // The time buttons read "3:30 pm" and nothing else on the page does.
   const timeButtons = () =>
-    screen.getAllByRole('button').filter(button => /^\d{2}:\d{2}$/.test(button.textContent.trim()));
+    screen
+      .getAllByRole('button')
+      .filter(button => /^\d{1,2}:\d{2} [ap]m$/.test(button.textContent.trim()));
 
-  // The dialog ignores clicks on Confirm for its first half second (a double-click on a time), so the
+  // The panel ignores clicks on Confirm for its first half second (a double-click on a time), so the
   // clock is moved on for the click that is meant.
   const confirmMove = async () => {
     const button = await screen.findByText('ManageCalendarBooking.confirmMoveButton');
@@ -154,7 +148,7 @@ describe('the reschedule flow on the real order page', () => {
     }
   };
 
-  it('offers Reschedule on the order page, and a time click opens the confirm dialog and sends nothing', async () => {
+  it('offers Reschedule on the order page, and a time click opens the confirm panel and sends nothing', async () => {
     const reschedule = await openOrderPage();
 
     await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
@@ -185,7 +179,7 @@ describe('the reschedule flow on the real order page', () => {
     });
   });
 
-  it('Cancel closes the dialog and leaves the real picker as it was, with nothing sent', async () => {
+  it('"Pick a different time" closes the panel and brings back the real picker as it was, with nothing sent', async () => {
     const reschedule = await openOrderPage();
 
     await userEvent.click(await screen.findByText('ManageCalendarBooking.rescheduleButton'));
@@ -195,5 +189,38 @@ describe('the reschedule flow on the real order page', () => {
     expect(timeButtons().length).toBe(2);
     expect(screen.queryByText('ManageCalendarBooking.confirmMoveHeading')).not.toBeInTheDocument();
     expect(reschedule).not.toHaveBeenCalled();
+  });
+});
+
+describe("the client's booking page on the real order page", () => {
+  const open = async extra => {
+    jest.spyOn(api, 'nylasBookingStatus').mockResolvedValue({
+      source: 'database',
+      status: 'created',
+      bookingStart: new Date(Date.now() + 5 * 24 * HOUR).toISOString(),
+      bookingEnd: new Date(Date.now() + 5 * 24 * HOUR + HOUR).toISOString(),
+      freeCancellationNow: true,
+      rescheduleAllowed: true,
+      cancellationPending: false,
+    });
+    await act(async () => {
+      render(<TransactionPageComponent {...props} {...extra} />);
+    });
+  };
+
+  it('is the booking page: "You\'re booked." with the session card, and the tab says "Your booking with ... | Revie"', async () => {
+    await open();
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+      'BookingConfirmation.bookedHeading'
+    );
+    expect(
+      screen.getByRole('region', { name: 'ManageCalendarBooking.heading' })
+    ).toBeInTheDocument();
+    await waitFor(() => expect(document.title).toBe('BookingConfirmation.pageTitle'));
+  });
+
+  it("is not shown to the coach: her page is the template's", async () => {
+    await open({ transactionRole: 'provider', currentUser: createCurrentUser('provider') });
+    expect(screen.queryByTestId('booking-hero')).not.toBeInTheDocument();
   });
 });

@@ -37,6 +37,9 @@ const STRIP_DAYS = 5;
  * @param {(slot) => void} props.onSelectSlot
  * @param {() => void} [props.onDayChange] called when another day is chosen, so a held pick can clear
  * @param {number} props.dayStepNumber the number on the "Pick a day" title
+ * @param {boolean} [props.plainTitles] no numbered titles: the group labels are for screen readers
+ *   only (the reschedule panel on the booking page has its own heading, "Pick a new time", and its
+ *   times read "9:00 AM")
  * @param {string} [props.initialDayKey] a day (YYYY-MM-DD) to open on, if it has times: "Find a new
  *   time" on the checkout sends the client back to the day they had chosen
  */
@@ -48,6 +51,7 @@ const NylasSlotSteps = ({
   onDayChange,
   dayStepNumber,
   initialDayKey,
+  plainTitles = false,
 }) => {
   const intl = useIntl();
   const locale = intl.locale;
@@ -89,9 +93,15 @@ const NylasSlotSteps = ({
   return (
     <>
       <div className={css.step}>
-        <StepTitle number={dayStepNumber} id="booking-day-title">
-          <FormattedMessage id="BookingPanel.pickDay" />
-        </StepTitle>
+        {plainTitles ? (
+          <span id="booking-day-title" className={css.visuallyHidden}>
+            <FormattedMessage id="BookingPanel.pickDay" />
+          </span>
+        ) : (
+          <StepTitle number={dayStepNumber} id="booking-day-title">
+            <FormattedMessage id="BookingPanel.pickDay" />
+          </StepTitle>
+        )}
 
         {!calendarOpen ? (
           <>
@@ -203,10 +213,20 @@ const NylasSlotSteps = ({
       </div>
 
       <div className={css.step}>
-        <StepTitle number={dayStepNumber + 1} id="booking-time-title">
-          <FormattedMessage id="BookingPanel.pickTime" />
-        </StepTitle>
-        <div className={css.times} role="group" aria-labelledby="booking-time-title">
+        {plainTitles ? (
+          <span id="booking-time-title" className={css.visuallyHidden}>
+            <FormattedMessage id="BookingPanel.pickTime" />
+          </span>
+        ) : (
+          <StepTitle number={dayStepNumber + 1} id="booking-time-title">
+            <FormattedMessage id="BookingPanel.pickTime" />
+          </StepTitle>
+        )}
+        <div
+          className={classNames(css.times, { [css.timesUpper]: plainTitles })}
+          role="group"
+          aria-labelledby="booking-time-title"
+        >
           {daySlots.map(slot => {
             const selected = !!selectedSlot && slot.start === selectedSlot.start;
             return (

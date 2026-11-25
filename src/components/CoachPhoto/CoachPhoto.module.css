@@ -15,7 +15,15 @@
   inset: 0;
   border-radius: var(--borderRadiusPill);
   background: var(--revieChartreuse);
-  transform: translate(7%, 4%) rotate(4deg);
+  /* The tilt and offset can be set by the caller (the booking page's hero tilts both photos a little
+     more, and mirrors the client's). */
+  transform: translate(var(--photoBackX, 7%), var(--photoBackY, 4%))
+    rotate(var(--photoBackTilt, 4deg));
+}
+
+/* The client's capsule on the booking page sits on periwinkle, not chartreuse. */
+.periwinkle .back {
+  background: var(--reviePeriwinkle);
 }
 
 /* The photo's pill, tilted -3 degrees. Lavender while there is no photo. */
@@ -28,7 +36,7 @@
   overflow: hidden;
   border-radius: var(--borderRadiusPill);
   background: var(--revieLavender);
-  transform: rotate(-3deg);
+  transform: rotate(var(--photoTilt, -3deg));
 }
 
 /* Cropped here, in the browser: fill the pill, keep the face near the top. */

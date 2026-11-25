@@ -1,82 +1,393 @@
 @import '../../../styles/customMediaQueries.css';
 
+/*
+ * The "Your session" card. Values are the approved design's (docs/design/booking-confirmation/ Main,
+ * Phone and States). Periwinkle with forest text; the panels inside it (reschedule, confirm a move,
+ * cancel) are the canvas's.
+ */
+
 .root {
-  padding: 24px;
-  margin-bottom: 24px;
-  border: 1px solid var(--colorGrey100);
-  border-radius: var(--borderRadius);
-}
-
-.heading {
-  margin-top: 0;
-  margin-bottom: 12px;
-}
-
-.time {
-  font-weight: var(--fontWeightSemiBold);
-  margin-bottom: 16px;
-}
-
-.error {
-  color: var(--colorFail);
-}
-
-.actions {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
+  flex-direction: column;
+  gap: 22px;
+  box-sizing: border-box;
+  padding: 22px;
+  border-radius: var(--borderRadiusLarge);
+  background-color: var(--reviePeriwinkle);
+  box-shadow: 0 16px 40px rgba(49, 4, 22, 0.12);
+  color: var(--revieGreen);
 
-.cancelLink {
-  color: var(--revieMaroon);
-  text-decoration: underline;
-}
-
-.confirmCancel {
-  margin-top: 8px;
-}
-
-.reschedule {
-  margin-top: 8px;
-}
-
-/* The settled state after cancelling: a plain statement, not an error and not a call to action. */
-.cancelledMessage {
-  margin: 0;
-  color: var(--colorGrey700);
-}
-
-/* The note under the session time after moving it: success (Forest), at body size. */
-.rescheduledNote {
-  margin: 0 0 16px;
-  color: var(--colorSuccess);
-}
-
-/* Why Reschedule is unavailable; the explanation sits above the buttons so it is read first. */
-.lockedNote {
-  margin: 0 0 16px;
-  color: var(--colorGrey700);
-}
-
-/* The confirm dialog that opens over the picker when a time is clicked. */
-.modalRoot {
-  composes: marketplaceModalBaseStyles from global;
-  padding-top: 70px;
-
-  @media (--viewportMedium) {
-    flex-basis: 567px;
+  @media (min-width: 901px) {
+    padding: 32px;
   }
 }
 
-.modalContent {
-  flex-grow: 1;
+/* "YOUR SESSION" and its hairline. */
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
 }
 
-.modalTitle {
-  composes: marketplaceModalTitleStyles from global;
+.eyebrowRule {
+  flex: 1;
+  height: 1px;
+  background-color: currentColor;
+  opacity: 0.3;
 }
 
-.modalMessage {
-  composes: marketplaceModalParagraphStyles from global;
+.whenBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* One line on a desktop; the day, then the time, on two lines on a phone. */
+.when {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 23px;
+  line-height: 1.15;
+  letter-spacing: normal;
+
+  @media (min-width: 901px) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    font-size: 28px;
+  }
+}
+
+.whenDot {
+  display: none;
+  white-space: pre;
+
+  @media (min-width: 901px) {
+    display: inline;
+  }
+}
+
+.quiet {
+  font-size: 15px;
+  color: rgba(3, 39, 35, 0.8);
+}
+
+.moved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+}
+
+.linkButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.joinButton,
+.calendarButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-sizing: border-box;
+  min-height: 54px;
+  border-radius: var(--borderRadiusPill);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.joinButton {
+  padding: 0 28px;
+  background-color: var(--revieMaroon);
+  color: var(--revieCream);
+
+  &:hover {
+    background-color: var(--reviePink);
+    color: var(--revieMaroon);
+    text-decoration: none;
+  }
+}
+
+.calendarButton {
+  padding: 0 24px;
+  border: 1.5px solid var(--revieGreen);
+  color: var(--revieGreen);
+
+  &:hover {
+    background-color: var(--revieGreen);
+    color: var(--reviePeriwinkle);
+    text-decoration: none;
+  }
+}
+
+.joinButton:focus-visible,
+.calendarButton:focus-visible,
+.linkButton:focus-visible,
+.lavenderButton:focus-visible,
+.chartreuseButton:focus-visible {
+  outline: 3px solid var(--revieLavender);
+  outline-offset: 2px;
+}
+
+.help {
+  font-size: 14px;
+  color: rgba(3, 39, 35, 0.8);
+}
+
+.rule {
+  height: 1px;
+  margin: 0;
+  border: none;
+  background-color: rgba(3, 39, 35, 0.2);
+}
+
+.freeUntil {
+  font-size: 15px;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.actionLinks {
+  display: flex;
+  gap: 24px;
+}
+
+/* A text button: TT Commons bold, underlined. */
+.linkButton {
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 16px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.onDark {
+  color: var(--revieCream);
+}
+
+.onDarkBlue {
+  color: var(--reviePeriwinkle);
+}
+
+.error {
+  margin: 0;
+  color: var(--revieError);
+  font-weight: var(--fontWeightBold);
+}
+
+.lockedNote {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* Inside 48 hours: it cannot be moved. */
+.lockedBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--revieOrange);
+  color: var(--revieMaroon);
+  font-size: 15px;
+}
+
+.lockedMark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--borderRadiusPill);
+  background-color: var(--revieMaroon);
+  color: var(--revieOrange);
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* ---------- Reschedule ---------- */
+
+.reschedule {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pickPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--revieCream);
+  color: var(--revieMaroon);
+}
+
+.pickPanel[hidden] {
+  display: none;
+}
+
+.pickHeading {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: normal;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- The panels: move, cancel ---------- */
+
+.movePanel,
+.cancelPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border-radius: var(--borderRadiusLarge);
+}
+
+.movePanel {
+  background-color: var(--revieGreen);
+  color: var(--reviePeriwinkle);
+}
+
+.cancelPanel {
+  background-color: var(--revieMaroon);
+  color: var(--revieCream);
+}
+
+.panelHeading {
+  margin: 0;
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: normal;
+
+  & b {
+    font-weight: 700;
+  }
+}
+
+.panelText {
+  margin: 0;
+  font-size: 16px;
+}
+
+.panelNote {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Red on a dark panel is unreadable, so a message there is cream text with the icon of an alert. */
+.panelError {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background-color: var(--revieCream);
+  color: var(--revieError);
+  font-size: 15px;
+  font-weight: var(--fontWeightBold);
+}
+
+.panelActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+}
+
+.moveTimes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 16px;
+}
+
+.oldTime {
+  opacity: 0.8;
+}
+
+.newTime {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--revieChartreuse);
+  font-family: var(--fontFamilyHeadline);
+  font-weight: 700;
+  font-size: 22px;
+}
+
+.lavenderButton,
+.chartreuseButton {
+  min-height: 48px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--borderRadiusPill);
+  color: var(--revieMaroon);
+  font-family: var(--fontFamilySecondary);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: var(--reviePink);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.lavenderButton {
+  background-color: var(--revieLavender);
+}
+
+.chartreuseButton {
+  background-color: var(--revieChartreuse);
 }

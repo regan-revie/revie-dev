@@ -61,14 +61,19 @@ export const initialsOf = name =>
  * @param {Object} [props.image] the user's profileImage entity (denormalised), if any
  * @param {string} props.name the coach's name, for the alt text and the initials
  * @param {string} [props.sizes] the `sizes` attribute for the image
+ * @param {'chartreuse'|'periwinkle'} [props.tone] the capsule behind: chartreuse for a coach, periwinkle
+ *   for the client (the booking page's hero)
  */
 const CoachPhoto = props => {
-  const { className, image, name, sizes } = props;
+  const { className, image, name, sizes, tone = 'chartreuse' } = props;
   const srcSet = profilePhotoSrcSet(image);
   const hasPhoto = srcSet !== '';
 
   return (
-    <div className={classNames(css.root, className)} data-testid="coach-photo">
+    <div
+      className={classNames(css.root, { [css.periwinkle]: tone === 'periwinkle' }, className)}
+      data-testid="coach-photo"
+    >
       <div aria-hidden="true" className={css.back} data-testid="coach-photo-back" />
       <div className={css.frame}>
         {hasPhoto ? (

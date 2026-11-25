@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Booking — other states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/6d76f43d36baf3805f70b6166aee7257) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'TT Commons Pro';src:url(/_blob/1e516a619a65c2b36d7626d61be57d13) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/e3a1639f471a6cee1b2538e7bdc1fad9) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Bio Sans';src:url(/_blob/bfcf9d3bc6b9be58b0fe265bafefa6af) format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Schibsted Grotesk';src:url(/_blob/50110bc4b2557e922afbbab5e5399948) format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+</style>
+<style>
+body{margin:0;background:#EFEEED}
+a{color:#310416}a:hover{color:#310416;text-decoration-thickness:2px}
+button{font:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #DBABF5;outline-offset:2px}
+.card{transition:transform 200ms, box-shadow 200ms}
+.card:hover,.card:focus-visible{transform:rotate(var(--tilt)) translateY(-4px);box-shadow:0 16px 40px rgba(49,4,22,0.14)}
+.card .go{transition:background-color 150ms}
+.card:hover .go{background:#FF90C2 !important}
+.pbtn:hover{background:#FF90C2 !important}
+@media (max-width: 1100px){.fgrid{grid-template-columns:repeat(2, minmax(0, 1fr)) !important}}
+@media (max-width: 640px){.fgrid{grid-template-columns:minmax(0, 1fr) !important}}
+.sgrid > :last-child:nth-child(odd){grid-column:1/-1;min-height:280px !important}
+@media (max-width: 760px){.sgrid{grid-template-columns:minmax(0,1fr) !important}}
+</style>
+</helmet>
+<div style="width: 1200px; box-sizing: border-box; padding: 48px; background: #EFEEED; color: #310416; font-family: 'Bio Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.5; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; align-items: center; gap: 14px; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #310416"><span>The booking page · other states</span><span aria-hidden="true" style="flex: 1; height: 1px; background: currentColor; opacity: 0.3"></span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-size: 13px; color: rgba(49,4,22,0.74)">Design note · shows when: right after paying (a few seconds)</div><div style="display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: 20px; background: #310416; color: #EFEEED"><div style="font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 34px; line-height: 1.05"><span style="display: block; margin-bottom: 10px"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#EAEA73" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"></path></svg></span>Confirming your <b>session…</b></div><p style="margin: 0; font-size: 15px">We're locking in your time with Maya. This usually takes a few seconds.</p></div></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-size: 13px; color: rgba(49,4,22,0.74)">Design note · shows when: that time was just taken</div><div style="display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: 20px; background: #310416; color: #EFEEED"><div style="font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 34px; line-height: 1.05">Uh-oh! That one <b>didn't go through.</b></div><p style="margin: 0; font-size: 15px">You haven't been charged. Pick another time and we'll get you booked.</p><a href="#" class="pbtn" style="align-self: flex-start; display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 999px; background: #DBABF5; color: #310416; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 13px">Pick another time</a></div></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-size: 13px; color: rgba(49,4,22,0.74)">Design note · shows when: you cancelled (more than 48 hours before)</div><div style="display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: 20px; background: #310416; color: #EFEEED"><div style="font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 34px; line-height: 1.05">Session <b>cancelled.</b></div><p style="margin: 0; font-size: 15px">We've sent your refund. Expect it in 5 to 10 days. We've also taken the session off both your calendars.</p><a href="#" class="pbtn" style="align-self: flex-start; display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 999px; background: #DBABF5; color: #310416; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 13px">Book Maya again</a></div></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-size: 13px; color: rgba(49,4,22,0.74)">Design note · shows when: you cancelled late (inside 48 hours)</div><div style="display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: 20px; background: #310416; color: #EFEEED"><div style="font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 34px; line-height: 1.05">Session <b>cancelled.</b></div><p style="margin: 0; font-size: 15px">You cancelled less than 48 hours before, so we've charged the full price. We've let Maya know.</p><a href="#" class="pbtn" style="align-self: flex-start; display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 999px; background: #DBABF5; color: #310416; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 13px">Book Maya again</a></div></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-size: 13px; color: rgba(49,4,22,0.74)">Design note · shows when: maya cancelled</div><div style="display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: 20px; background: #310416; color: #EFEEED"><div style="font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 400; font-size: 34px; line-height: 1.05">Session <b>cancelled.</b></div><p style="margin: 0; font-size: 15px">Maya had to cancel, so we've refunded you in full. Expect it in 5 to 10 days.</p><a href="#" class="pbtn" style="align-self: flex-start; display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 999px; background: #DBABF5; color: #310416; text-decoration: none; font-family: 'Schibsted Grotesk', sans-serif; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 13px">Book another time</a></div></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div style="font-size: 13px; color: rgba(49,4,22,0.74)">Design note · shows when: the session is less than 48 hours away (the 'Your session' card)</div><div style="display: flex; flex-direction: column; gap: 12px; padding: 28px; border-radius: 20px; border: 1px solid rgba(49,4,22,0.16)"><div style="font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 22px">Thu, Dec 3 · 10:00–11:00 AM PT</div><div style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 12px; background: #FF9352; color: #310416; font-size: 15px"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 999px; background: #310416; color: #FF9352; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 15px">!</span><span>This session is less than 48 hours away, so it can't be moved. You can still cancel, but you'll be charged in full.</span></div><div style="display: flex; gap: 20px"><button type="button" onClick="{{x}}" style="min-height: 44px; padding: 0; border: none; background: none; color: #310416; font-family: 'TT Commons Pro', 'Schibsted Grotesk', sans-serif; font-weight: 700; font-size: 16px; text-decoration: underline; text-underline-offset: 4px">Cancel</button></div></div></div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return { x: function () {} }; }
+}
+</script>
+</body>
+</html>
