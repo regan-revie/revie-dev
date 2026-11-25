@@ -261,7 +261,11 @@ export const ListingPageComponent = props => {
               {/* Hidden while the session has no reviews */}
               <SessionReviews reviews={reviews} />
 
-              <SessionCoach author={ensuredAuthor} userFields={config.user?.userFields} />
+              <SessionCoach
+                author={ensuredAuthor}
+                userFields={config.user?.userFields}
+                afterReviews={reviews.length > 0}
+              />
 
               <SessionGoodToKnow
                 firstName={firstNameOf(authorDisplayName)}

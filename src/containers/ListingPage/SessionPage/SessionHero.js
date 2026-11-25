@@ -18,7 +18,7 @@ import {
   PRONOUNS_KEY,
 } from './coachFields';
 import {
-  averageRating,
+  reviewScore,
   capTags,
   firstNameOf,
   formatShortDay,
@@ -104,7 +104,7 @@ const SessionHero = props => {
   ]
     .filter(hasText)
     .join(' · ');
-  const rating = averageRating(reviews);
+  const { average: rating, count: reviewCount } = reviewScore(reviews);
   const tags = capTags(
     optionLabels(userFields, LIVED_EXPERIENCE_KEY, authorPublicData[LIVED_EXPERIENCE_KEY])
   );
@@ -185,13 +185,21 @@ const SessionHero = props => {
         </div>
 
         <div className={css.badges}>
-          {rating ? (
+          {reviewCount > 0 ? (
+            // The score only from three reviews; with one or two the badge just counts them.
             <a href="#reviews" className={css.newBadge} data-testid="rating-badge">
               <Star size={14} />
-              <FormattedMessage
-                id="SessionPage.ratingBadge"
-                values={{ rating, count: reviews.length }}
-              />
+              {rating ? (
+                <FormattedMessage
+                  id="SessionPage.ratingBadge"
+                  values={{ rating, count: reviewCount }}
+                />
+              ) : (
+                <FormattedMessage
+                  id="SessionPage.reviewCountBadge"
+                  values={{ count: reviewCount }}
+                />
+              )}
             </a>
           ) : (
             <span className={css.newBadge} data-testid="new-badge">

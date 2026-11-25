@@ -6,7 +6,7 @@
       "expand": "fill",
       "h": 3300,
       "is_interactive": true,
-      "title": "Desktop — session page (signed in)",
+      "title": "Desktop \u2014 session page (signed in)",
       "w": 1440,
       "x": -15,
       "y": -41
@@ -15,7 +15,7 @@
       "h": 844,
       "is_interactive": true,
       "radius": 28,
-      "title": "Phone — session page (scroll inside)",
+      "title": "Phone \u2014 session page (scroll inside)",
       "w": 390,
       "x": 1520,
       "y": 0
@@ -23,21 +23,21 @@
     "PhoneSheet.dc.html": {
       "h": 844,
       "radius": 28,
-      "title": "Phone — after tapping See times",
+      "title": "Phone \u2014 after tapping See times",
       "w": 390,
       "x": 1990,
       "y": 0
     },
     "HeaderLoggedOut.dc.html": {
       "h": 130,
-      "title": "Header — signed out (same as heyrevie.com)",
+      "title": "Header \u2014 signed out (same as heyrevie.com)",
       "w": 1440,
       "x": 1520,
       "y": 1724
     },
     "States.dc.html": {
       "h": 640,
-      "title": "Booking panel — can't book yet (client / coach)",
+      "title": "Booking panel \u2014 can't book yet (client / coach)",
       "w": 880,
       "x": 1520,
       "y": 964
@@ -49,7 +49,14 @@
       "w": 1440,
       "x": 0,
       "y": 3380,
-      "title": "Desktop — session page once it has reviews"
+      "title": "Desktop \u2014 session page once it has reviews"
+    },
+    "AccountMenu.dc.html": {
+      "h": 460,
+      "title": "Account menu, opened (client / coach)",
+      "w": 880,
+      "x": 1520,
+      "y": -560
     }
   },
   "createdOnFiles": {
@@ -83,7 +90,7 @@
     "title": {
       "kind": "title1",
       "maxW": 2380,
-      "text": "Session page (/l/…) — proposal for review",
+      "text": "Session page (/l/\u2026) \u2014 proposal for review",
       "w": 240,
       "x": 0,
       "y": -300
@@ -95,8 +102,9 @@
     "PhoneSheet.dc.html",
     "States.dc.html",
     "HeaderLoggedOut.dc.html",
-    "Reviews.dc.html"
+    "Reviews.dc.html",
+    "AccountMenu.dc.html"
   ],
   "pages": [],
-  "title": "Revie session page — desktop & phone"
+  "title": "Revie session page \u2014 desktop & phone"
 }

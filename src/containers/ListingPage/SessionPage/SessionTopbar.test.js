@@ -100,7 +100,7 @@ describe('SessionTopbar: signed in', () => {
     expect(nav.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
   });
 
-  it("opens an account menu with the coach's items in order: Your sessions, Calendar, Profile settings, Account settings, Log out", async () => {
+  it("opens an account menu with the coach's items in order: Your sessions, Calendar and hours, Edit your profile, Account and payments, Log out", async () => {
     render(<SessionTopbar />, {
       initialState: signedIn('coach', { currentUserHasListings: true }),
       config,
@@ -110,14 +110,14 @@ describe('SessionTopbar: signed in', () => {
     await screen.findByRole('button', { name: 'Your account menu' });
     expect(menuLabels()).toEqual([
       'Your sessions',
-      'Calendar',
-      'Profile settings',
-      'Account settings',
+      'Calendar and hours',
+      'Edit your profile',
+      'Account and payments',
       'Log out',
     ]);
   });
 
-  it('gives a client: Your bookings, Profile settings, Account settings, Log out', async () => {
+  it('gives a client: Your bookings, Edit your profile, Account and payments, Log out', async () => {
     render(<SessionTopbar />, {
       initialState: signedIn('client'),
       config,
@@ -127,8 +127,8 @@ describe('SessionTopbar: signed in', () => {
     await screen.findByRole('button', { name: 'Your account menu' });
     expect(menuLabels()).toEqual([
       'Your bookings',
-      'Profile settings',
-      'Account settings',
+      'Edit your profile',
+      'Account and payments',
       'Log out',
     ]);
   });

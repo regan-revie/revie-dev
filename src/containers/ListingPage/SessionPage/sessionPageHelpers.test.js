@@ -8,6 +8,7 @@ import {
   optionLabels,
   firstNameOf,
   averageRating,
+  reviewScore,
   formatShortDay,
   safeExternalUrl,
   socialKind,
@@ -169,6 +170,28 @@ describe('optionLabels', () => {
     expect(optionLabels(userFields, 'personality_identifier', 'adhd')).toEqual(['ADHD']);
     expect(optionLabels(userFields, 'nope', ['adhd'])).toEqual([]);
     expect(optionLabels(undefined, 'x', undefined)).toEqual([]);
+  });
+});
+
+describe('reviewScore (the average is shown from three reviews)', () => {
+  const ratings = list => list.map(rating => ({ attributes: { rating } }));
+
+  it('has no score and a count of 0 with no reviews', () => {
+    expect(reviewScore([])).toEqual({ count: 0, average: null });
+    expect(reviewScore(undefined)).toEqual({ count: 0, average: null });
+  });
+
+  it('has a count but no score with one or two reviews, however good', () => {
+    expect(reviewScore(ratings([5]))).toEqual({ count: 1, average: null });
+    expect(reviewScore(ratings([5, 5]))).toEqual({ count: 2, average: null });
+  });
+
+  it('has the average from three reviews', () => {
+    expect(reviewScore(ratings([5, 4, 4]))).toEqual({ count: 3, average: '4.3' });
+  });
+
+  it('rounds to one decimal: seven reviews adding up to 34 average 4.9', () => {
+    expect(reviewScore(ratings([5, 5, 5, 5, 5, 5, 4]))).toEqual({ count: 7, average: '4.9' });
   });
 });
 

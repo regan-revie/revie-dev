@@ -136,6 +136,26 @@ export const averageRating = reviews => {
   return (Math.round(average * 10) / 10).toFixed(1);
 };
 
+// The score is only shown from this many reviews: one or two ratings are an anecdote, and a
+// "5.0" built on one review says more than it knows. See docs/decisions.md (Nov 25).
+export const MIN_REVIEWS_FOR_SCORE = 3;
+
+/**
+ * What the page says about a session's reviews: how many, and the average (one decimal, "4.9")
+ * only once there are `MIN_REVIEWS_FOR_SCORE` of them. With one or two, `average` is null and the
+ * page shows the cards and a count but no score; with none, `count` is 0 and the page shows
+ * "New to Revie" and no reviews section.
+ *
+ * @returns {{count: number, average: string|null}}
+ */
+export const reviewScore = reviews => {
+  const list = Array.isArray(reviews) ? reviews : [];
+  return {
+    count: list.length,
+    average: list.length >= MIN_REVIEWS_FOR_SCORE ? averageRating(list) : null,
+  };
+};
+
 /**
  * A day as the quick facts read it: "Tue 17 Nov". Always in the viewer's own timezone (the
  * browser's), never the coach's.

@@ -19,6 +19,47 @@ working session. Do not put secrets in this folder; it is synced to Claude.ai.
 
 ---
 
+## HANDOFF — 2026-11-25 (session page updates after jobs A and B: canvas changes of Nov 24 to 25)
+
+**Branch / PR:** `session-page-updates`, one PR against `main`. Job B (PR #52) was merged first, so this sits on `main`, not on top of another PR.
+
+**Differences found between the old and the new canvas, and what was built** (from `git diff` of `docs/design/session-page/project/`, and the new `AccountMenu.dc.html`). The design files are committed with the code, as given.
+1. **Eyebrows removed** ("The session", "The coach", "Reviews of this session", "The details"; Main, Phone, Reviews). Built; the four messages are deleted. The hero's "SIGNATURE SESSION · ..." label is kept.
+2. **Hairline and space above "Get to know {name}." when there are reviews** (Reviews: `border-top: 1px solid rgba(49,4,22,.16); padding-top: 72px`). Built as `SessionCoach afterReviews`.
+3. **Quote card with the wave photo** (Main, Phone, Reviews): card padding 36 and a 40px gap on desktop (was 40/44, gap 28), photo 260 x 300 on the left; on the phone the photo is full width, 300 tall, above the quote, padding 24, gap 22. The wave is the canvas's SVG `clipPath` with `clipPathUnits="objectBoundingBox"`. Under the quote: the display name in capitals (Schibsted, 14px, 1.4px spacing), the pronouns in a soft pill (only if set), and an outlined "See {firstName}'s profile ›" button (44px tall, 1.5px maroon border) to her profile. Built as the shared `WavePhoto` (`src/components/WavePhoto/`) with its own test. It keeps `CoachPhoto`'s crop (`object-position: 50% 25%`, the canvas files use 18%) and the initials fallback; `CoachPhoto` now exports `profilePhotoSrcSet()` so both pick the same image files.
+4. **Phone quote text is 20px** (was 19). Not in your list; built (desktop stays 24px).
+5. **"Before your session" is a chartreuse callout** (`#EAEA73`, maroon text, no border, padding 24/26) showing `pre_work`; hidden when empty. The canvas shows placeholder words ("Maya has a few questions for you once you book."); those were not copied, no invented copy.
+6. **Desktop booking panel**: `max-height: calc(100vh - 48px)`, `overflow-y: auto`, `overscroll-behavior: contain` (Main, Reviews). Built on the booking card from 1024px up; checked in a real browser (852px in a 900px window).
+7. **Account menu labels** (AccountMenu board, new): "Edit your profile", "Account and payments", coach "Calendar and hours"; order and hover as built in job A. New `SessionTopbar.editProfile` and `SessionTopbar.accountAndPayments` keys, `SessionTopbar.calendar` reworded; the phone menu uses the same items. The template's `TopbarDesktop` strings are untouched.
+8. **Review score from 3 reviews** (your list, **not in the canvas**): `reviewScore()` in `sessionPageHelpers.js`, tested for 0, 1, 2, 3 and 7 reviews (34/7 gives 4.9). With 1 or 2: cards, no score, badge "★ 1 review" / "★ 2 reviews"; with 0 unchanged.
+9. Canvas differences with nothing to build: the Main, Phone and Reviews hero photo is now a real picture instead of a "Photo" placeholder (`CoachPhoto` already does this), and `canvas.json` only re-encodes dashes and adds the AccountMenu board.
+
+**Not in the canvas / couldn't match**
+- **Review score rule (item 8) and the decision wording.** The two Nov 25 DECISION blocks did not arrive: the message still held the placeholder line "[PASTE THE TWO NOV 25 DECISION BLOCKS ... HERE]". The entries in `docs/decisions.md` are written from your brief and say so; replace them with the planning project's text if it differs.
+- **Phone spacing above "Get to know" with reviews**: the canvas has only the desktop value (72px). On the phone I used a hairline and 40px (below the usual 56px column gap); say if you want it different.
+- **Initials in the wave** are 30% of the shape's width, at most 88px (the canvas has no no-photo state for the wave).
+- **The quote card needs a quote.** As before, no `clients_love` means no card, so a coach without one has no large photo or profile button in this section (the hero still has her photo and name link).
+- **Not verified:** the real page signed in on Dev (the styleguide fixtures stand in), a real scroll inside the booking card with "More dates" open (computed style checked, not the scroll), Safari's handling of the clip-path on a photo.
+
+**Checked:** `yarn format-ci` clean; client tests 1512 passed (105 suites). Styleguide screenshots at 1440 and 390 wide of `FullPage` and `FullPageWithReviews` were taken (headless Chrome, `?bare=1`); the example pages now use that bare mode too.
+
+**Dev test steps** (nothing to change in Console, process or environment)
+1. Open a session with a quote on its coach's profile (`clients_love` set) and a few reviews on Dev, at desktop width: no grey labels above the sections; below the reviews a hairline, then "Get to know {name}." with the photo large in the wave, her name in capitals, pronouns if set, and "See {name}'s profile ›" opening her profile.
+2. Same on a phone: the photo sits above the quote.
+3. A session with `pre_work` shows the chartreuse "Before your session" card with exactly that text; clear `pre_work` and it disappears.
+4. Open "More dates" on a short window (or zoom the browser to 200%): the booking card scrolls inside itself and Book is reachable.
+5. Reviews: a session with 1 or 2 reviews shows the cards, no big score and "★ 1 review"/"★ 2 reviews" in the hero; with 3 or more, the score and "★ 4.x · N reviews"; with none, no section and "New to Revie".
+6. Sign in as a client and as a coach, open the account menu: "Edit your profile", "Account and payments", and for coaches "Calendar and hours".
+
+**What's next**
+- Reuse `WavePhoto` on the coach profile page (its query needs the two scale image variants).
+- Decide on the phone spacing above "Get to know" with reviews.
+
+**Blocked / needs a decision**
+- Replace the two decision entries if the planning project's wording differs.
+
+---
+
 ## HANDOFF — 2026-11-26 (session page redesign, job B: booking panel, phone sheet, can't-book states, coach photo, topbar fixes)
 
 **Branch / PR:** `session-page-job-b`, one PR against `main` (job A, PR #51, is merged), not merged.

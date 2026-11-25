@@ -7,6 +7,26 @@ Newest at the top. When the planning project settles something, it produces a `#
 
 ---
 
+### DECISION: Review score shows from 3 reviews
+**Date:** Nov 25, 2026
+**Decision:** The session page shows an average rating (the mean of the 1 to 5 ratings, one decimal, so 34 across 7 reviews reads 4.9) only once the session has 3 or more reviews. With 1 or 2 reviews the review cards show with no score, and the hero badge reads "★ N reviews". With none, nothing changes: the reviews section is hidden and the badge reads "★ New to Revie".
+**Why:** One or two ratings are an anecdote, and a "5.0" built on a single review claims more than it knows.
+**Affects:** `reviewScore()` in `src/containers/ListingPage/SessionPage/sessionPageHelpers.js`, the hero badge, the reviews section. Recorded from the chat with Regan; the design canvas does not show this rule.
+
+### DECISION: Session page updates after jobs A and B
+**Date:** Nov 25, 2026
+**Decision:** The approved canvas was updated after review (Nov 24 to 25) and the page follows it:
+- The section eyebrows (label and rule) "The session", "The coach", "Reviews of this session" and "The details" are removed. The hero's "SIGNATURE SESSION · ..." label stays.
+- When the session has reviews, a hairline and extra top space separate the reviews from "Get to know {name}."
+- The coach quote card carries the coach's photo, large, clipped to a wavy shape (one shared component, `WavePhoto`, which the coach profile will reuse), with her name in capitals, her pronouns in the hero's soft pill (if set) and an outlined "See {first name}'s profile" button.
+- "Before your session" is a chartreuse callout with maroon text and no border, showing the session's `pre_work` text; hidden when empty.
+- The desktop booking panel scrolls inside itself (`max-height: calc(100vh - 48px)`) so the Book button stays reachable when "More dates" opens the calendar.
+- Account menu labels: "Profile settings" becomes "Edit your profile", "Account settings" becomes "Account and payments", the coach's "Calendar" becomes "Calendar and hours".
+**Why:** The design chat settled these after reading the built pages in review.
+**Affects:** `src/containers/ListingPage/SessionPage/`, `src/components/WavePhoto/`, `src/components/OrderPanel/BookingPanelParts.module.css`, `docs/design/session-page/`. Recorded from the chat with Regan; written from the task brief, as the pasted block did not arrive with it.
+
+---
+
 ### DECISION: Coach photos are cropped in the browser
 **Date:** Nov 24, 2026
 **Decision:** The coach photo is the "sticker" capsule from the approved session page design: the photo in a pill-shaped frame tilted -3 degrees over a chartreuse pill offset and tilted +4 degrees, no border or frame. The photo is cropped in the browser (`object-fit: cover`, `object-position: 50% 25%`, so the face sits near the top), not on Sharetribe's side, and a coach is never asked to position it: no help text on the upload, no "position your photo" step. Pages ask Sharetribe for the profile image in its original shape (custom `scale-small`, 400px wide, and `scale-large`, 800px wide, image variants) instead of the template's centre-cropped square variants, which can cut the top of a head off in a tall capsule. With no photo the same capsule is lavender with the coach's initials in maroon (TT Commons Pro Bold, about 30% of the capsule's width), never the template's grey default avatar. One shared component, `CoachPhoto`, is used for it; the session page hero uses it now, the profile page, checkout summary and session cards will reuse it later.
